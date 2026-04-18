@@ -13,7 +13,19 @@ namespace ERP.Identity.Persistance.Data
     {
         public IdentityDbContext(DbContextOptions<IdentityDbContext> options) : base(options)
         {
-            
+
+        }
+
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+
+            builder.Entity<ApplicationUser>()
+                .HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(u => u.ManagerId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
         }
     }
 }

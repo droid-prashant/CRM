@@ -35,6 +35,7 @@ namespace ERP.Identity.Extensions
             services.AddScoped<ITokenService, TokenService>();
             services.AddHttpContextAccessor();
             services.AddScoped<IUserContextService, UserContextService>();
+            services.AddScoped<IIdentityService, IdentityService>();
 
             return services;
         }
