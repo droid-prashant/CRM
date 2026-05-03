@@ -1,25 +1,20 @@
 import { Component } from '@angular/core';
-import { NotificationsWidget } from './components/notificationswidget';
-import { StatsWidget } from './components/statswidget';
-import { RecentSalesWidget } from './components/recentsaleswidget';
-import { BestSellingWidget } from './components/bestsellingwidget';
-import { RevenueStreamWidget } from './components/revenuestreamwidget';
 
 @Component({
     selector: 'app-dashboard',
-    imports: [StatsWidget, RecentSalesWidget, BestSellingWidget, RevenueStreamWidget, NotificationsWidget],
+    standalone: true,
     template: `
-        <div class="grid grid-cols-12 gap-8">
-            <app-stats-widget class="contents" />
-            <div class="col-span-12 xl:col-span-6">
-                <app-recent-sales-widget />
-                <app-best-selling-widget />
+        <section class="grid grid-cols-12 gap-6">
+            <div class="col-span-12">
+                <div class="card">
+                    <div class="text-sm text-surface-500 dark:text-surface-400 mb-2">CRM workspace</div>
+                    <h1 class="text-2xl font-semibold m-0">Dashboard</h1>
+                    <p class="text-surface-600 dark:text-surface-300 mt-3 mb-0">
+                        This clean baseline is ready for the first real CRM user story.
+                    </p>
+                </div>
             </div>
-            <div class="col-span-12 xl:col-span-6">
-                <app-revenue-stream-widget />
-                <app-notifications-widget />
-            </div>
-        </div>
+        </section>
     `
 })
 export class Dashboard {}

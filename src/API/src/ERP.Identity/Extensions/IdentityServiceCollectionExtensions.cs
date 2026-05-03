@@ -33,6 +33,7 @@ namespace ERP.Identity.Extensions
             .AddDefaultTokenProviders();
 
             services.AddScoped<ITokenService, TokenService>();
+            services.AddScoped<IIdentityService, IdentityService>();
             services.AddHttpContextAccessor();
             services.AddScoped<IUserContextService, UserContextService>();
 
