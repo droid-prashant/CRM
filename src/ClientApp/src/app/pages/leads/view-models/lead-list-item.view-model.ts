@@ -1,0 +1,28 @@
+export interface LeadListItemViewModel {
+    id: string;
+    leadNumber: string;
+    sourceId: string;
+    categoryId: string;
+    partnerId?: string;
+    campaignName?: string;
+    companyName: string;
+    website?: string;
+    contactPersonName: string;
+    jobTitle?: string;
+    email?: string;
+    phone?: string;
+    alternatePhone?: string;
+    countryId: string;
+    address?: string;
+    industryId?: string;
+    notes?: string;
+    leadScore?: number;
+    productIds: string[];
+    sourceName: string;
+    categoryName: string;
+    countryName: string;
+    status: string;
+    assignedToUserName?: string;
+    productNames: string;
+    createdAt: string;
+}

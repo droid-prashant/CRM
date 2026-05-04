@@ -12,6 +12,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { Menu, MenuModule } from 'primeng/menu';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { RadioButtonModule } from 'primeng/radiobutton';
+import { RippleModule } from 'primeng/ripple';
 import { SelectModule } from 'primeng/select';
 import { Table, TableModule } from 'primeng/table';
 import { TextareaModule } from 'primeng/textarea';
@@ -43,6 +44,7 @@ export interface CrudSaveEvent {
         MenuModule,
         MultiSelectModule,
         RadioButtonModule,
+        RippleModule,
         SelectModule,
         TableModule,
         TextareaModule,
@@ -69,7 +71,7 @@ export class Crud implements OnChanges {
     @Output() delete = new EventEmitter<Record<string, unknown>>();
     @Output() bulkDelete = new EventEmitter<Record<string, unknown>[]>();
 
-    @ViewChild('dt') dt?: Table;
+    @ViewChild('dt') dt!: Table;
 
     dialog = false;
     submitted = false;
@@ -155,7 +157,9 @@ export class Crud implements OnChanges {
         this.submitted = true;
         this.form.markAllAsTouched();
 
-        if (this.form.invalid) return;
+        if (this.form.invalid) {
+            return;
+        }
 
         this.save.emit({
             mode: this.mode,
@@ -177,7 +181,9 @@ export class Crud implements OnChanges {
     }
 
     confirmBulkDelete(): void {
-        if (!this.selectedRows.length) return;
+        if (!this.selectedRows.length) {
+            return;
+        }
 
         const action = this.bulkActionLabel.toLowerCase();
         this.confirmationService.confirm({
@@ -210,7 +216,17 @@ export class Crud implements OnChanges {
     onFileSelected(fieldKey: string, event: Event): void {
         const input = event.target as HTMLInputElement;
         const file = input.files?.item(0);
-        if (file) this.selectedFiles[fieldKey] = file;
+
+        if (file) {
+            this.selectedFiles[fieldKey] = file;
+        }
+    }
+
+    toggleRowActions(menu: Menu, row: Record<string, unknown>, event: Event): void {
+        this.activeActionRow = row;
+        this.activeRowActionItems[1].label = this.rowActionLabelResolver?.(row) ?? this.rowActionLabel;
+        this.activeRowActionItems[1].icon = this.rowActionIconResolver?.(row) ?? this.rowActionIcon;
+        menu.toggle(event);
     }
 
     fieldGridClass(field: DynamicField): string {
@@ -230,18 +246,14 @@ export class Crud implements OnChanges {
         }
     }
 
-    toggleRowActions(menu: Menu, row: Record<string, unknown>, event: Event): void {
-        this.activeActionRow = row;
-        this.activeRowActionItems[1].label = this.rowActionLabelResolver?.(row) ?? this.rowActionLabel;
-        this.activeRowActionItems[1].icon = this.rowActionIconResolver?.(row) ?? this.rowActionIcon;
-        menu.toggle(event);
-    }
-
     private buildForm(): FormGroup {
         const group: Record<string, unknown[]> = {};
+
         this.fields.forEach((field) => {
-            group[field.key] = [this.getDefaultValue(field), field.required ? [Validators.required] : []];
+            const validators = field.required ? [Validators.required] : [];
+            group[field.key] = [this.getDefaultValue(field), validators];
         });
+
         return this.fb.group(group);
     }
 
@@ -249,11 +261,14 @@ export class Crud implements OnChanges {
         const formValue = this.form.getRawValue() as Record<string, unknown>;
         const fileKeys = Object.keys(this.selectedFiles);
 
-        if (!fileKeys.length) return formValue;
+        if (!fileKeys.length) {
+            return formValue;
+        }
 
         const formData = new FormData();
         Object.entries(formValue).forEach(([key, value]) => formData.append(key, String(value ?? '')));
         fileKeys.forEach((key) => formData.append(key, this.selectedFiles[key]));
+
         return formData;
     }
 
