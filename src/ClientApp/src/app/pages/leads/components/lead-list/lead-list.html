@@ -1,0 +1,15 @@
+<p-toast position="bottom-right"></p-toast>
+
+@if (!isLoading) {
+    <app-crud
+        [columns]="columns"
+        [data]="data"
+        [fields]="fields"
+        [title]="title"
+        [dataNotFound]="dataNotFound"
+        [errorMessage]="errorMessage"
+        (save)="saveLead($event)"
+        (delete)="deleteLead($event)"
+        (bulkDelete)="deleteLeads($event)"
+    />
+}
