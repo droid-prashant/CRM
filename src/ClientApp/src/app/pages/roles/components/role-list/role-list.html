@@ -1,0 +1,78 @@
+<p-toast position="bottom-right"></p-toast>
+
+@if (!isLoading) {
+    <app-crud
+        [columns]="columns"
+        [data]="data"
+        [fields]="fields"
+        [title]="title"
+        [dataNotFound]="dataNotFound"
+        [errorMessage]="errorMessage"
+        [bulkActionLabel]="'Deactivate'"
+        [rowActionLabel]="rowActionLabel"
+        [rowActionIcon]="rowActionIcon"
+        [rowActionLabelResolver]="rowActionLabelResolver"
+        [rowActionIconResolver]="rowActionIconResolver"
+        [enableViewAction]="true"
+        (save)="saveRole($event)"
+        (delete)="toggleRoleStatus($event)"
+        (bulkDelete)="deactivateRoles($event)"
+        (view)="openRoleDetail($event)"
+    />
+}
+
+<p-dialog [(visible)]="detailDialog" [style]="{ width: 'min(900px, 95vw)' }" [modal]="true" header="Role Detail">
+    @if (selectedRole) {
+        <div class="grid grid-cols-12 gap-4">
+            <div class="col-span-12 md:col-span-6">
+                <div class="text-sm text-surface-500">Role</div>
+                <div class="font-semibold">{{ selectedRole.name }}</div>
+            </div>
+            <div class="col-span-12 md:col-span-6">
+                <div class="text-sm text-surface-500">Code</div>
+                <div class="font-semibold">{{ selectedRole.code || 'Not set' }}</div>
+            </div>
+            <div class="col-span-12">
+                <div class="text-sm text-surface-500">Description</div>
+                <div>{{ selectedRole.description }}</div>
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <div class="text-sm text-surface-500">Status</div>
+                <p-tag [severity]="selectedRole.isActive ? 'success' : 'danger'" [value]="selectedRole.isActive ? 'Active' : 'Inactive'" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <div class="text-sm text-surface-500">Type</div>
+                <p-tag [severity]="selectedRole.isSystemRole ? 'info' : 'secondary'" [value]="selectedRole.isSystemRole ? 'System' : 'Custom'" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <div class="text-sm text-surface-500">Linked Users</div>
+                <div class="font-semibold">{{ selectedRole.userCount }}</div>
+            </div>
+        </div>
+
+        <h4 class="mt-6 mb-3">Linked Users</h4>
+        <p-table [value]="selectedRole.linkedUsers" [rows]="5" [paginator]="selectedRole.linkedUsers.length > 5" [tableStyle]="{ 'min-width': '42rem' }">
+            <ng-template #header>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                </tr>
+            </ng-template>
+            <ng-template #body let-user>
+                <tr>
+                    <td>{{ user.fullName }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>
+                        <p-tag [severity]="user.isActive ? 'success' : 'danger'" [value]="user.isActive ? 'Active' : 'Inactive'" />
+                    </td>
+                </tr>
+            </ng-template>
+            <ng-template #emptymessage>
+                <tr>
+                    <td colspan="3">No users are linked to this role.</td>
+                </tr>
+            </ng-template>
+        </p-table>
+    }
+</p-dialog>

@@ -28,8 +28,14 @@ export class AppMenu {
                 label: 'CRM',
                 items: [
                     { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/'] },
-                    { label: 'Leads', icon: 'pi pi-fw pi-briefcase', routerLink: ['/pages/leads'] },
-                    { label: 'User Management', icon: 'pi pi-fw pi-users', routerLink: ['/pages/users'] }
+                    { label: 'Leads', icon: 'pi pi-fw pi-briefcase', routerLink: ['/pages/leads'] }
+                ]
+            },
+            {
+                label: 'Administration',
+                items: [
+                    { label: 'Users', icon: 'pi pi-fw pi-users', routerLink: ['/pages/users'] },
+                    { label: 'Roles', icon: 'pi pi-fw pi-shield', routerLink: ['/pages/roles'] }
                 ]
             }
         ];

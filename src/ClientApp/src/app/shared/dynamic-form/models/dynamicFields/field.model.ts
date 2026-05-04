@@ -14,4 +14,5 @@ export interface DynamicField {
     colSpan?: number;
     section?: string;
     placeholder?: string;
+    defaultValue?: unknown;
 }

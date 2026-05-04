@@ -463,7 +463,10 @@ namespace ERP.Identity.Services.Implementations
 
         public async Task<List<RoleListItemViewModel>> GetRolesAsync(CancellationToken cancellationToken)
         {
-            var roles = await _roleManager.Roles.ToListAsync();
+            var roles = await _roleManager.Roles
+                .OrderByDescending(role => role.IsActive)
+                .ThenBy(role => role.Name)
+                .ToListAsync(cancellationToken);
             var result = new List<RoleListItemViewModel>();
 
             foreach (var role in roles)
@@ -519,24 +522,31 @@ namespace ERP.Identity.Services.Implementations
 
         public async Task<RoleDetailViewModel> CreateRoleAsync(CreateRoleRequest request, CancellationToken cancellationToken)
         {
-            var existingByName = await _roleManager.FindByNameAsync(request.Name);
-            if (existingByName != null)
-                throw new InvalidOperationException($"Role name '{request.Name}' already exists.");
+            var name = CleanRequired(request.Name, "Role name");
+            var code = CleanOptional(request.Code);
+            var description = CleanRequired(request.Description, "Description");
 
-            if (!string.IsNullOrEmpty(request.Code))
+            if (request.IsSystemRole && !_userContextService.GetUserRoles().Contains(DefaultRoles.SuperAdmin))
+                throw new UnauthorizedAccessException("Only SuperAdmin can create system roles.");
+
+            var existingByName = await _roleManager.FindByNameAsync(name);
+            if (existingByName != null)
+                throw new InvalidOperationException($"Role name '{name}' already exists.");
+
+            if (!string.IsNullOrEmpty(code))
             {
-                var existingByCode = await _roleManager.Roles.FirstOrDefaultAsync(r => r.Code == request.Code);
+                var existingByCode = await _roleManager.Roles.FirstOrDefaultAsync(r => r.Code != null && r.Code.ToLower() == code.ToLower(), cancellationToken);
                 if (existingByCode != null)
-                    throw new InvalidOperationException($"Role code '{request.Code}' already exists.");
+                    throw new InvalidOperationException($"Role code '{code}' already exists.");
             }
 
             var currentUserId = _userContextService.GetUserId() ?? Guid.Empty;
 
             var role = new ApplicationRole
             {
-                Name = request.Name,
-                Code = request.Code,
-                Description = request.Description,
+                Name = name,
+                Code = code,
+                Description = description,
                 IsSystemRole = request.IsSystemRole,
                 IsActive = request.IsActive,
                 CreatedOn = DateTime.UtcNow,
@@ -567,23 +577,35 @@ namespace ERP.Identity.Services.Implementations
             if (role == null)
                 throw new KeyNotFoundException($"Role with ID '{roleId}' not found.");
 
-            if (role.Name != request.Name)
+            var name = CleanRequired(request.Name, "Role name");
+            var code = CleanOptional(request.Code);
+            var description = CleanRequired(request.Description, "Description");
+
+            if (role.IsSystemRole && !string.Equals(role.Name, name, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("System role names cannot be changed.");
+
+            if (!string.Equals(role.Name, name, StringComparison.OrdinalIgnoreCase))
             {
-                var existingByName = await _roleManager.FindByNameAsync(request.Name);
+                var existingByName = await _roleManager.FindByNameAsync(name);
                 if (existingByName != null)
-                    throw new InvalidOperationException($"Role name '{request.Name}' already exists.");
+                    throw new InvalidOperationException($"Role name '{name}' already exists.");
             }
 
-            if (!string.IsNullOrEmpty(request.Code) && role.Code != request.Code)
+            if (!string.IsNullOrEmpty(code) && !string.Equals(role.Code, code, StringComparison.OrdinalIgnoreCase))
             {
-                var existingByCode = await _roleManager.Roles.FirstOrDefaultAsync(r => r.Code == request.Code && r.Id != roleId);
+                var existingByCode = await _roleManager.Roles.FirstOrDefaultAsync(r => r.Code != null && r.Code.ToLower() == code.ToLower() && r.Id != roleId, cancellationToken);
                 if (existingByCode != null)
-                    throw new InvalidOperationException($"Role code '{request.Code}' already exists.");
+                    throw new InvalidOperationException($"Role code '{code}' already exists.");
             }
 
-            role.Name = request.Name;
-            role.Code = request.Code;
-            role.Description = request.Description;
+            if (role.IsActive && !request.IsActive)
+            {
+                await ValidateRoleCanBeDeactivatedAsync(role, cancellationToken);
+            }
+
+            role.Name = name;
+            role.Code = code;
+            role.Description = description;
             role.IsActive = request.IsActive;
             role.UpdatedOn = DateTime.UtcNow;
             role.UpdatedBy = _userContextService.GetUserId() ?? Guid.Empty;
@@ -645,8 +667,7 @@ namespace ERP.Identity.Services.Implementations
             if (!role.IsActive)
                 return;
 
-            if (role.IsSystemRole)
-                throw new InvalidOperationException("Cannot deactivate a system role.");
+            await ValidateRoleCanBeDeactivatedAsync(role, cancellationToken);
 
             role.IsActive = false;
             role.UpdatedOn = DateTime.UtcNow;
@@ -671,6 +692,54 @@ namespace ERP.Identity.Services.Implementations
                 Email = u.Email ?? string.Empty,
                 IsActive = u.IsActive
             }).ToList();
+        }
+
+        private async Task ValidateRoleCanBeDeactivatedAsync(ApplicationRole role, CancellationToken cancellationToken)
+        {
+            if (role.IsSystemRole)
+                throw new InvalidOperationException("Cannot deactivate a protected system role.");
+
+            if (IsAdminCapableRole(role.Name))
+            {
+                var activeAdminRoleCount = await _roleManager.Roles.CountAsync(
+                    candidate => candidate.IsActive
+                        && candidate.Id != role.Id
+                        && candidate.Name != null
+                        && (candidate.Name == DefaultRoles.Admin || candidate.Name == DefaultRoles.SuperAdmin),
+                    cancellationToken);
+
+                if (activeAdminRoleCount == 0)
+                {
+                    throw new InvalidOperationException("Cannot deactivate the last active admin-capable role.");
+                }
+            }
+
+            var users = await _userManager.GetUsersInRoleAsync(role.Name ?? string.Empty);
+            if (users.Any(user => user.IsActive))
+            {
+                throw new InvalidOperationException("Cannot deactivate a role that is assigned to active users.");
+            }
+        }
+
+        private static bool IsAdminCapableRole(string? roleName)
+        {
+            return string.Equals(roleName, DefaultRoles.Admin, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(roleName, DefaultRoles.SuperAdmin, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string CleanRequired(string value, string fieldName)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException($"{fieldName} is required.");
+            }
+
+            return value.Trim();
+        }
+
+        private static string? CleanOptional(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
     }
 }

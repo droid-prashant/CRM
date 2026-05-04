@@ -66,10 +66,12 @@ export class Crud implements OnChanges {
     @Input() rowActionSeverity: 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' | undefined = undefined;
     @Input() rowActionLabelResolver?: (row: Record<string, unknown>) => string;
     @Input() rowActionIconResolver?: (row: Record<string, unknown>) => string;
+    @Input() enableViewAction = false;
 
     @Output() save = new EventEmitter<CrudSaveEvent>();
     @Output() delete = new EventEmitter<Record<string, unknown>>();
     @Output() bulkDelete = new EventEmitter<Record<string, unknown>[]>();
+    @Output() view = new EventEmitter<Record<string, unknown>>();
 
     @ViewChild('dt') dt!: Table;
 
@@ -77,26 +79,10 @@ export class Crud implements OnChanges {
     submitted = false;
     form!: FormGroup;
     selectedRows: Record<string, unknown>[] = [];
-    activeRowActionItems: MenuItem[] = [
-        {
-            label: 'Edit',
-            icon: 'pi pi-pencil',
-            command: () => {
-                if (this.activeActionRow) this.openEdit(this.activeActionRow);
-            }
-        },
-        {
-            label: '',
-            icon: '',
-            command: () => {
-                if (this.activeActionRow) this.confirmDelete(this.activeActionRow);
-            }
-        }
-    ];
+    activeRowActionItems: MenuItem[] = [];
 
     private mode: CrudMode = 'create';
     private editingRow?: Record<string, unknown>;
-    private activeActionRow?: Record<string, unknown>;
     private selectedFiles: Record<string, File> = {};
 
     constructor(
@@ -223,10 +209,35 @@ export class Crud implements OnChanges {
     }
 
     toggleRowActions(menu: Menu, row: Record<string, unknown>, event: Event): void {
-        this.activeActionRow = row;
-        this.activeRowActionItems[1].label = this.rowActionLabelResolver?.(row) ?? this.rowActionLabel;
-        this.activeRowActionItems[1].icon = this.rowActionIconResolver?.(row) ?? this.rowActionIcon;
+        this.activeRowActionItems = this.buildRowActionItems(row);
         menu.toggle(event);
+    }
+
+    private buildRowActionItems(row: Record<string, unknown>): MenuItem[] {
+        const items: MenuItem[] = [];
+
+        if (this.enableViewAction) {
+            items.push({
+                label: 'View',
+                icon: 'pi pi-eye',
+                command: () => this.view.emit(row)
+            });
+        }
+
+        items.push(
+            {
+                label: 'Edit',
+                icon: 'pi pi-pencil',
+                command: () => this.openEdit(row)
+            },
+            {
+                label: this.rowActionLabelResolver?.(row) ?? this.rowActionLabel,
+                icon: this.rowActionIconResolver?.(row) ?? this.rowActionIcon,
+                command: () => this.confirmDelete(row)
+            }
+        );
+
+        return items;
     }
 
     fieldGridClass(field: DynamicField): string {
@@ -280,6 +291,10 @@ export class Crud implements OnChanges {
     }
 
     private getDefaultValue(field: DynamicField): unknown {
+        if (field.defaultValue !== undefined) {
+            return field.defaultValue;
+        }
+
         switch (field.type) {
             case 'checkbox':
                 return false;
