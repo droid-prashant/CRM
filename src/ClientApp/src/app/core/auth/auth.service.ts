@@ -1,0 +1,78 @@
+import { HttpClient } from '@angular/common/http';
+import { Injectable, computed, signal } from '@angular/core';
+import { Router } from '@angular/router';
+import { tap } from 'rxjs';
+import { environment } from 'src/environments/environment';
+import { AuthUser, LoginRequest, LoginResponse } from './auth.models';
+
+const tokenStorageKey = 'crm.auth.token';
+const userStorageKey = 'crm.auth.user';
+
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+    private readonly currentUserSignal = signal<AuthUser | null>(this.readUser());
+
+    readonly currentUser = this.currentUserSignal.asReadonly();
+    readonly isAuthenticated = computed(() => {
+        const user = this.currentUserSignal();
+        return !!user && new Date(user.expiration).getTime() > Date.now();
+    });
+
+    constructor(
+        private readonly http: HttpClient,
+        private readonly router: Router
+    ) {}
+
+    login(request: LoginRequest) {
+        return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, request).pipe(
+            tap((response) => {
+                const user: AuthUser = {
+                    userId: response.userId,
+                    fullName: response.fullName,
+                    roles: response.roles,
+                    expiration: response.expiration
+                };
+
+                this.storage?.setItem(tokenStorageKey, response.token);
+                this.storage?.setItem(userStorageKey, JSON.stringify(user));
+                this.currentUserSignal.set(user);
+            })
+        );
+    }
+
+    logout(): void {
+        this.storage?.removeItem(tokenStorageKey);
+        this.storage?.removeItem(userStorageKey);
+        this.currentUserSignal.set(null);
+        this.router.navigate(['/auth/login']);
+    }
+
+    getToken(): string | null {
+        return this.storage?.getItem(tokenStorageKey) ?? null;
+    }
+
+    hasAnyRole(roles: string[]): boolean {
+        const user = this.currentUserSignal();
+        return !!user && roles.some((role) => user.roles.includes(role));
+    }
+
+    private readUser(): AuthUser | null {
+        const raw = this.storage?.getItem(userStorageKey);
+        if (!raw) {
+            return null;
+        }
+
+        try {
+            const user = JSON.parse(raw) as AuthUser;
+            return new Date(user.expiration).getTime() > Date.now() ? user : null;
+        } catch {
+            this.storage?.removeItem(userStorageKey);
+            this.storage?.removeItem(tokenStorageKey);
+            return null;
+        }
+    }
+
+    private get storage(): Storage | null {
+        return typeof localStorage === 'undefined' ? null : localStorage;
+    }
+}

@@ -12,8 +12,8 @@ namespace ERP.Identity.Extensions
     {
         public static AuthorizationOptions AddCustomPolicies(this AuthorizationOptions options)
         {
-            options.AddPolicy("AdminOnly", policy => policy.RequireRole(DefaultRoles.Admin));
-            options.AddPolicy("ManagerOrAdmin", policy => policy.RequireRole(DefaultRoles.Manager, DefaultRoles.Admin));
+            options.AddPolicy("AdminOnly", policy => policy.RequireRole(DefaultRoles.Admin, DefaultRoles.SuperAdmin));
+            options.AddPolicy("ManagerOrAdmin", policy => policy.RequireRole(DefaultRoles.Manager, DefaultRoles.Admin, DefaultRoles.SuperAdmin));
 
             return options;
         }

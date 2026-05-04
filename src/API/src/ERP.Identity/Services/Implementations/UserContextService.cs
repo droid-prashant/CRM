@@ -36,7 +36,7 @@ namespace ERP.Identity.Services.Implementations
 
         public string? GetUserName()
         {
-            var userName = _httpContextAccessor.HttpContext?.User?.Claims.FirstOrDefault(c => c.Type == "unique_name")?.Value;
+            var userName = _httpContextAccessor.HttpContext?.User?.Claims.FirstOrDefault(c => c.Type == "name")?.Value;
             return userName;
         }
 
@@ -48,7 +48,7 @@ namespace ERP.Identity.Services.Implementations
 
         public IList<string> GetUserRoles()
         {
-           var roles = _httpContextAccessor.HttpContext?.User?.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role).Select(c => c.Value).ToList();
+           var roles = _httpContextAccessor.HttpContext?.User?.Claims.Where(c => c.Type == IdentityClaimTypes.Role).Select(c => c.Value).ToList();
             return roles ?? new List<string>();
         }
     }

@@ -55,6 +55,11 @@ export class AppMenu {
                 icon: 'pi pi-fw pi-briefcase',
                 routerLink: ['/pages'],
                 items: [
+                    {
+                        label: 'User Management',
+                        icon: 'pi pi-fw pi-users',
+                        routerLink: ['/pages/users']
+                    },
                     // {
                     //     label: 'Landing',
                     //     icon: 'pi pi-fw pi-globe',

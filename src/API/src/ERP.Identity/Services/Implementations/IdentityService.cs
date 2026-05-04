@@ -112,7 +112,10 @@ namespace ERP.Identity.Services.Implementations
 
         public async Task<LoginResponseViewModel> LoginUserAsync(LoginRequestDto loginUserDto, CancellationToken cancellationToken)
         {
-            var identityUser = await _userManager.FindByNameAsync(loginUserDto.UserName);
+            var usernameOrEmail = loginUserDto.UsernameOrEmail.Trim();
+            var identityUser = await _userManager.FindByNameAsync(usernameOrEmail)
+                ?? await _userManager.FindByEmailAsync(usernameOrEmail);
+
             if (identityUser == null)
             {
                 return new LoginResponseViewModel { Error = "User does not exist", StatusCode = 401, Succeded = false };
@@ -136,12 +139,19 @@ namespace ERP.Identity.Services.Implementations
                 }
                 else
                 {
+                    var roles = (await _userManager.GetRolesAsync(identityUser)).ToList();
                     List<Claim> claims = await ConstructUserClaimAsync(identityUser);
                     var tokenResult =  _tokenService.GenerateToken(identityUser, claims);
+                    identityUser.LastLoginAt = DateTime.UtcNow;
+                    await _userManager.UpdateAsync(identityUser);
+
                     LoginResponseViewModel tokenResultViewModel = new LoginResponseViewModel
                     {
                         Token = new JwtSecurityTokenHandler().WriteToken(tokenResult),
                         Expiration = tokenResult.ValidTo,
+                        UserId = identityUser.Id,
+                        FullName = identityUser.FullName,
+                        Roles = roles,
                         StatusCode = 200,
                         Succeded = true
                     };
@@ -170,6 +180,7 @@ namespace ERP.Identity.Services.Implementations
             claims = new List<Claim>(claims)
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Name,user.UserName ?? ""),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email ?? "")
             };
@@ -188,8 +199,10 @@ namespace ERP.Identity.Services.Implementations
                 {
                     Id = user.Id,
                     FullName = user.FullName,
+                    Username = user.UserName ?? string.Empty,
                     Email = user.Email ?? string.Empty,
                     Roles = roles.ToList(),
+                    RoleIds = await GetRoleIdsAsync(roles),
                     IsActive = user.IsActive
                 });
             }
@@ -214,6 +227,7 @@ namespace ERP.Identity.Services.Implementations
                 DepartmentId = user.DepartmentId,
                 ManagerId = user.ManagerId,
                 Roles = roles.ToList(),
+                RoleIds = await GetRoleIdsAsync(roles),
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedOn
             };
@@ -232,19 +246,7 @@ namespace ERP.Identity.Services.Implementations
             if (existingByUsername != null)
                 throw new InvalidOperationException($"Username '{request.Username}' is already in use.");
 
-            if (!request.RoleIds.Any())
-                throw new ArgumentException("At least one role is required.");
-
-            var roleNames = new List<string>();
-            foreach (var roleId in request.RoleIds)
-            {
-                var role = await _roleManager.FindByIdAsync(roleId.ToString());
-                if (role == null)
-                    throw new KeyNotFoundException($"Role with ID '{roleId}' does not exist.");
-                if (!role.IsActive)
-                    throw new InvalidOperationException($"Role '{role.Name}' is not active and cannot be assigned.");
-                roleNames.Add(role.Name!);
-            }
+            var roleNames = await GetActiveRoleNamesAsync(request.RoleIds);
 
             var password = request.GeneratePassword ? GenerateSecurePassword() : request.Password!;
 
@@ -282,6 +284,7 @@ namespace ERP.Identity.Services.Implementations
                 Email = appUser.Email ?? string.Empty,
                 Username = appUser.UserName ?? string.Empty,
                 Roles = roleNames,
+                RoleIds = request.RoleIds,
                 IsActive = appUser.IsActive,
                 CreatedAt = appUser.CreatedOn
             };
@@ -300,6 +303,8 @@ namespace ERP.Identity.Services.Implementations
                     throw new KeyNotFoundException($"Manager user with ID '{request.ManagerId}' does not exist.");
             }
 
+            var roleNames = await GetActiveRoleNamesAsync(request.RoleIds);
+
             user.FullName = $"{request.FirstName} {request.LastName}";
             user.PhoneNumber = request.PhoneNumber;
             user.DepartmentId = request.DepartmentId;
@@ -312,7 +317,24 @@ namespace ERP.Identity.Services.Implementations
             if (!result.Succeeded)
                 throw new InvalidOperationException($"Failed to update user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
 
-            var roles = await _userManager.GetRolesAsync(user);
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            var rolesToRemove = currentRoles.Except(roleNames).ToList();
+            var rolesToAdd = roleNames.Except(currentRoles).ToList();
+
+            if (rolesToRemove.Count > 0)
+            {
+                var removeResult = await _userManager.RemoveFromRolesAsync(user, rolesToRemove);
+                if (!removeResult.Succeeded)
+                    throw new InvalidOperationException($"Failed to remove roles: {string.Join(", ", removeResult.Errors.Select(e => e.Description))}");
+            }
+
+            if (rolesToAdd.Count > 0)
+            {
+                var addResult = await _userManager.AddToRolesAsync(user, rolesToAdd);
+                if (!addResult.Succeeded)
+                    throw new InvalidOperationException($"Failed to assign roles: {string.Join(", ", addResult.Errors.Select(e => e.Description))}");
+            }
+
             return new UserDetailViewModel
             {
                 Id = user.Id,
@@ -322,7 +344,8 @@ namespace ERP.Identity.Services.Implementations
                 PhoneNumber = user.PhoneNumber,
                 DepartmentId = user.DepartmentId,
                 ManagerId = user.ManagerId,
-                Roles = roles.ToList(),
+                Roles = roleNames,
+                RoleIds = request.RoleIds,
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedOn
             };
@@ -355,14 +378,22 @@ namespace ERP.Identity.Services.Implementations
             if (!user.IsActive)
                 return;
 
-            var isAdmin = await _userManager.IsInRoleAsync(user, DefaultRoles.Admin);
-            if (isAdmin)
+            var protectedRoles = new[] { DefaultRoles.Admin, DefaultRoles.SuperAdmin };
+            foreach (var protectedRole in protectedRoles)
             {
-                var allAdmins = await _userManager.GetUsersInRoleAsync(DefaultRoles.Admin);
-                var activeAdminCount = allAdmins.Count(u => u.IsActive);
+                var isInProtectedRole = await _userManager.IsInRoleAsync(user, protectedRole);
+                if (!isInProtectedRole)
+                {
+                    continue;
+                }
 
-                if (activeAdminCount <= 1)
-                    throw new InvalidOperationException("Cannot deactivate the last active administrator. Assign another administrator before deactivating this account.");
+                var roleUsers = await _userManager.GetUsersInRoleAsync(protectedRole);
+                var activeUserCount = roleUsers.Count(u => u.IsActive);
+
+                if (activeUserCount <= 1)
+                {
+                    throw new InvalidOperationException($"Cannot deactivate the last active {protectedRole}. Assign another {protectedRole} before deactivating this account.");
+                }
             }
 
             user.IsActive = false;
@@ -393,6 +424,41 @@ namespace ERP.Identity.Services.Implementations
 
                 return new string(chars);
             }
+        }
+
+        private async Task<List<string>> GetActiveRoleNamesAsync(List<Guid> roleIds)
+        {
+            if (!roleIds.Any())
+                throw new ArgumentException("At least one role is required.");
+
+            var roleNames = new List<string>();
+            foreach (var roleId in roleIds.Distinct())
+            {
+                var role = await _roleManager.FindByIdAsync(roleId.ToString());
+                if (role == null)
+                    throw new KeyNotFoundException($"Role with ID '{roleId}' does not exist.");
+                if (!role.IsActive)
+                    throw new InvalidOperationException($"Role '{role.Name}' is not active and cannot be assigned.");
+                roleNames.Add(role.Name!);
+            }
+
+            return roleNames;
+        }
+
+        private async Task<List<Guid>> GetRoleIdsAsync(IEnumerable<string> roleNames)
+        {
+            var roleIds = new List<Guid>();
+
+            foreach (var roleName in roleNames)
+            {
+                var role = await _roleManager.FindByNameAsync(roleName);
+                if (role != null)
+                {
+                    roleIds.Add(role.Id);
+                }
+            }
+
+            return roleIds;
         }
 
         public async Task<List<RoleListItemViewModel>> GetRolesAsync(CancellationToken cancellationToken)

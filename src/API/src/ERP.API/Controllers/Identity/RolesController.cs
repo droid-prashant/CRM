@@ -4,9 +4,9 @@ using ERP.Identity.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace ERP.API.Controllers.Roles
+namespace ERP.API.Controllers.Identity
 {
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     public class RolesController : BaseApiController
     {
         private readonly IIdentityService _identityService;

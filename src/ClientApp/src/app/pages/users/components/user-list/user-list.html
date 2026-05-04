@@ -1,0 +1,20 @@
+<p-toast position="bottom-right"></p-toast>
+
+@if (!isLoading) {
+    <app-crud
+        [columns]="columns"
+        [data]="data"
+        [fields]="fields"
+        [title]="title"
+        [dataNotFound]="dataNotFound"
+        [errorMessage]="errorMessage"
+        [bulkActionLabel]="'Deactivate'"
+        [rowActionLabel]="rowActionLabel"
+        [rowActionIcon]="rowActionIcon"
+        [rowActionLabelResolver]="rowActionLabelResolver"
+        [rowActionIconResolver]="rowActionIconResolver"
+        (save)="saveUser($event)"
+        (delete)="toggleUserStatus($event)"
+        (bulkDelete)="deactivateUsers($event)"
+    />
+}

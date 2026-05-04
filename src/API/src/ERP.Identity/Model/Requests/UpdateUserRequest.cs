@@ -21,6 +21,9 @@ namespace ERP.Identity.Model.Requests
 
         public Guid? ManagerId { get; set; }
 
+        [Required, MinLength(1)]
+        public List<Guid> RoleIds { get; set; } = new();
+
         public bool IsActive { get; set; }
     }
 }

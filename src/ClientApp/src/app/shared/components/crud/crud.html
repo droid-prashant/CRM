@@ -1,0 +1,164 @@
+<p-toolbar styleClass="mb-6">
+    <ng-template #start>
+        <p-button label="New" icon="pi pi-plus" severity="secondary" class="mr-2" (onClick)="openNew()" />
+        <p-button [label]="bulkActionLabel" icon="pi pi-trash" severity="secondary" outlined (onClick)="confirmBulkDelete()" [disabled]="!selectedRows.length" />
+    </ng-template>
+
+    <ng-template #end>
+        <p-button label="Export" icon="pi pi-upload" severity="secondary" (onClick)="exportCSV()" />
+    </ng-template>
+</p-toolbar>
+
+<p-menu #rowActions [model]="activeRowActionItems" [popup]="true" appendTo="body" />
+
+@if (!dataNotFound) {
+    <p-table
+        #dt
+        [value]="data"
+        [rows]="10"
+        [paginator]="true"
+        [globalFilterFields]="globalFilterFields"
+        [tableStyle]="{ 'min-width': '75rem' }"
+        [(selection)]="selectedRows"
+        dataKey="id"
+        [rowHover]="true"
+        currentPageReportTemplate="Showing {first} to {last} of {totalRecords} records"
+        [showCurrentPageReport]="true"
+        [rowsPerPageOptions]="[10, 20, 30]"
+    >
+        <ng-template #caption>
+            <div class="flex items-center justify-between">
+                <h5 class="m-0">Manage {{ title }}</h5>
+                <p-iconfield>
+                    <p-inputicon styleClass="pi pi-search" />
+                    <input pInputText type="text" (input)="onGlobalFilter(dt, $event)" placeholder="Search..." />
+                </p-iconfield>
+            </div>
+        </ng-template>
+
+        <ng-template #header>
+            <tr>
+                <th style="width: 3rem"><p-tableHeaderCheckbox /></th>
+                @for (column of columns; track column.field) {
+                    <th [pSortableColumn]="column.sortable ? column.field : undefined" [style.width]="column.width">
+                        {{ column.header }}
+                        @if (column.sortable) {
+                            <p-sortIcon [field]="column.field"></p-sortIcon>
+                        }
+                    </th>
+                }
+                <th style="width: 4rem" class="text-center"></th>
+            </tr>
+        </ng-template>
+
+        <ng-template #body let-row>
+            <tr>
+                <td><p-tableCheckbox [value]="row" /></td>
+                @for (column of columns; track column.field) {
+                    <td>
+                        @switch (column.type) {
+                            @case ('currency') {
+                                <span>{{ row[column.field] | currency: column.format || 'USD' }}</span>
+                            }
+                            @case ('image') {
+                                <img [src]="row[column.field]" alt="" style="height: 48px; width: auto; border-radius: 6px" />
+                            }
+                            @case ('checkbox') {
+                                <span>{{ row[column.field] ? 'Yes' : 'No' }}</span>
+                            }
+                            @default {
+                                <span>{{ row[column.field] }}</span>
+                            }
+                        }
+                    </td>
+                }
+                <td class="text-center">
+                    <p-button icon="pi pi-ellipsis-v" severity="secondary" [rounded]="true" [text]="true" ariaLabel="Row actions" (onClick)="toggleRowActions(rowActions, row, $event)" />
+                </td>
+            </tr>
+        </ng-template>
+    </p-table>
+} @else {
+    <div class="card text-surface-600 dark:text-surface-300">{{ errorMessage }}</div>
+}
+
+<p-dialog [(visible)]="dialog" [style]="{ width: 'min(1280px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" [header]="title" [modal]="true" position="top">
+    <ng-template #content>
+        <form [formGroup]="form" class="flex flex-col gap-5">
+            @for (section of fieldSections; track section.title) {
+                <section class="overflow-hidden rounded-md border border-surface-200 dark:border-surface-700">
+                    <div class="border-b border-surface-200 bg-surface-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                        <h3 class="m-0 text-base font-semibold text-surface-900 dark:text-surface-0">{{ section.title }}</h3>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-x-4 gap-y-3 p-4">
+                        @for (field of section.fields; track field.key) {
+                            <div [ngClass]="fieldGridClass(field)">
+                                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">
+                                    {{ field.label }}
+                                    @if (field.required) {
+                                        <span class="text-red-500">*</span>
+                                    }
+                                </label>
+
+                                @switch (field.type) {
+                                    @case ('text') {
+                                        <input pInputText type="text" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full" />
+                                    }
+                                    @case ('email') {
+                                        <input pInputText type="email" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full" />
+                                    }
+                                    @case ('textarea') {
+                                        <textarea pTextarea rows="2" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full"></textarea>
+                                    }
+                                    @case ('number') {
+                                        <p-inputnumber [formControlName]="field.key" [useGrouping]="false" class="w-full" />
+                                    }
+                                    @case ('decimalNumber') {
+                                        <p-inputnumber [formControlName]="field.key" [useGrouping]="false" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                                    }
+                                    @case ('currency') {
+                                        <p-inputnumber [formControlName]="field.key" mode="currency" currency="USD" locale="en-US" class="w-full" />
+                                    }
+                                    @case ('select') {
+                                        <p-select [options]="field.options ?? []" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" class="w-full" />
+                                    }
+                                    @case ('multiSelect') {
+                                        <p-multiselect [options]="field.options ?? []" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" display="chip" class="w-full" />
+                                    }
+                                    @case ('radio') {
+                                        <div class="grid grid-cols-12 gap-3">
+                                            @for (option of field.options ?? []; track option.value) {
+                                                <div class="col-span-6 flex items-center gap-2">
+                                                    <p-radiobutton [inputId]="field.key + option.value" [value]="option.value" [formControlName]="field.key" />
+                                                    <label [for]="field.key + option.value">{{ option.label }}</label>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    @case ('checkbox') {
+                                        <input type="checkbox" [formControlName]="field.key" />
+                                    }
+                                    @case ('image') {
+                                        <input type="file" accept="image/*" (change)="onFileSelected(field.key, $event)" />
+                                    }
+                                }
+
+                                @if (form.get(field.key)?.errors && (form.get(field.key)?.touched || submitted)) {
+                                    <span class="p-error mt-1 block text-sm text-red-600">{{ field.label }} is required</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </section>
+            }
+        </form>
+    </ng-template>
+
+    <ng-template #footer>
+        <p-button label="Cancel" icon="pi pi-times" text (onClick)="hideDialog()" />
+        <p-button label="Save" icon="pi pi-check" (onClick)="saveForm()" />
+    </ng-template>
+</p-dialog>
+
+<p-confirmdialog [style]="{ width: '450px' }" />

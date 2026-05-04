@@ -1,4 +1,4 @@
-export type FieldType = 'text' | 'number' | 'decimalNumber' | 'textarea' | 'checkbox' | 'select' | 'image' | 'currency' | 'radio' | 'email';
+export type FieldType = 'text' | 'number' | 'decimalNumber' | 'textarea' | 'checkbox' | 'select' | 'multiSelect' | 'image' | 'currency' | 'radio' | 'email';
 
 export interface SelectOption {
     label: string;
@@ -12,4 +12,6 @@ export interface DynamicField {
     required?: boolean;
     options?: SelectOption[];
     colSpan?: number;
+    section?: string;
+    placeholder?: string;
 }

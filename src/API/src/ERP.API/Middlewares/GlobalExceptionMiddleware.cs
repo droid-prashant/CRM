@@ -26,12 +26,19 @@ namespace ERP.API.Middlewares
             {
                 _logger.LogError(ex, "Unhandled exception");
 
-                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                context.Response.StatusCode = ex switch
+                {
+                    ArgumentException => (int)HttpStatusCode.BadRequest,
+                    InvalidOperationException => (int)HttpStatusCode.BadRequest,
+                    KeyNotFoundException => (int)HttpStatusCode.NotFound,
+                    UnauthorizedAccessException => (int)HttpStatusCode.Forbidden,
+                    _ => (int)HttpStatusCode.InternalServerError
+                };
                 context.Response.ContentType = "application/json";
 
                 var response = new
                 {
-                    title = "Server Error",
+                    title = context.Response.StatusCode == (int)HttpStatusCode.InternalServerError ? "Server Error" : "Request Error",
                     status = context.Response.StatusCode,
                     detail = ex.Message
                 };

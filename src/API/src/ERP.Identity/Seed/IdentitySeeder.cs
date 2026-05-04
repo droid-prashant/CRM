@@ -1,10 +1,6 @@
-﻿using ERP.Identity.Entities;
+using ERP.Identity.Constants;
+using ERP.Identity.Entities;
 using Microsoft.AspNetCore.Identity;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ERP.Identity.Seed
 {
@@ -14,7 +10,8 @@ namespace ERP.Identity.Seed
         {
             var userName = "IntelliSyncAdmin";
             var adminEmail = "intellisync@gmail.com";
-            if(await userManager.FindByEmailAsync(adminEmail) == null)
+
+            if (await userManager.FindByEmailAsync(adminEmail) == null)
             {
                 var adminUser = new ApplicationUser
                 {
@@ -27,10 +24,11 @@ namespace ERP.Identity.Seed
                     CreatedOn = DateTime.UtcNow,
                     CreatedBy = Guid.Empty
                 };
+
                 var result = await userManager.CreateAsync(adminUser, "IntelliSyncAdmin@123");
                 if (result.Succeeded)
                 {
-                    await userManager.AddToRoleAsync(adminUser, "SuperAdmin");
+                    await userManager.AddToRoleAsync(adminUser, DefaultRoles.SuperAdmin);
                 }
             }
         }

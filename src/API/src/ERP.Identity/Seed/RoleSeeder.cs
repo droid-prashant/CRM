@@ -15,7 +15,8 @@ namespace ERP.Identity.Seed
         {
             var roles = new List<ApplicationRole>
             {
-                new ApplicationRole { Name = DefaultRoles.Admin, Description = "Super administrator with full access", IsSystemRole = true },
+                new ApplicationRole { Name = DefaultRoles.SuperAdmin, Description = "Software owner and production support administrator", IsSystemRole = true },
+                new ApplicationRole { Name = DefaultRoles.Admin, Description = "Client administrator with user management access", IsSystemRole = true },
                 new ApplicationRole { Name = DefaultRoles.Manager, Description = "Manager with limited access", IsSystemRole = true },
                 new ApplicationRole { Name = DefaultRoles.User, Description = "Regular user with basic access", IsSystemRole = true }
             };
