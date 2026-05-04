@@ -1,10 +1,13 @@
+using ERP.Identity.Constants;
 using Leads.Application.Services;
 using Leads.Application.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ERP.API.Controllers.Leads
 {
     [ApiController]
+    [Authorize(Policy = PermissionPolicyNames.LeadsView)]
     [Produces("application/json")]
     [Route("api/leads/lookups")]
     public class LeadLookupsController : ControllerBase

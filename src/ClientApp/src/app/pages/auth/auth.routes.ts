@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { guestGuard } from '@/core/auth/auth.guard';
 import { Access } from './access';
 import { Login } from './login';
 import { Error } from './error';
@@ -6,5 +7,5 @@ import { Error } from './error';
 export default [
     { path: 'access', component: Access },
     { path: 'error', component: Error },
-    { path: 'login', component: Login }
+    { path: 'login', component: Login, canActivate: [guestGuard] }
 ] as Routes;

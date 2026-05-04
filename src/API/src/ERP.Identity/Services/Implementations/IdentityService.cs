@@ -152,6 +152,11 @@ namespace ERP.Identity.Services.Implementations
                         UserId = identityUser.Id,
                         FullName = identityUser.FullName,
                         Roles = roles,
+                        Permissions = claims
+                            .Where(claim => claim.Type == IdentityClaimTypes.Permission)
+                            .Select(claim => claim.Value)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList(),
                         StatusCode = 200,
                         Succeded = true
                     };
@@ -694,6 +699,121 @@ namespace ERP.Identity.Services.Implementations
             }).ToList();
         }
 
+        public async Task<RolePermissionViewModel> GetRolePermissionsAsync(Guid roleId, CancellationToken cancellationToken)
+        {
+            var role = await _roleManager.FindByIdAsync(roleId.ToString());
+            if (role == null)
+                throw new KeyNotFoundException($"Role with ID '{roleId}' not found.");
+
+            var permissionClaims = await GetRolePermissionClaimsAsync(role);
+            return new RolePermissionViewModel
+            {
+                RoleId = role.Id,
+                RoleName = role.Name ?? string.Empty,
+                Modules = BuildPermissionMatrix(permissionClaims)
+            };
+        }
+
+        public async Task<RolePermissionViewModel> UpdateRolePermissionsAsync(Guid roleId, UpdateRolePermissionsRequest request, CancellationToken cancellationToken)
+        {
+            if (request.RoleId != Guid.Empty && request.RoleId != roleId)
+                throw new ArgumentException("Route role id and request role id do not match.");
+
+            if (request.Permissions.Count == 0)
+                throw new ArgumentException("At least one permission set is required.");
+
+            var role = await _roleManager.FindByIdAsync(roleId.ToString());
+            if (role == null)
+                throw new KeyNotFoundException($"Role with ID '{roleId}' not found.");
+
+            if (role.IsSystemRole)
+                throw new InvalidOperationException("System role permissions are protected.");
+
+            var duplicateModule = request.Permissions
+                .GroupBy(permission => permission.ModuleCode.Trim().ToLowerInvariant())
+                .FirstOrDefault(group => group.Count() > 1);
+
+            if (duplicateModule != null)
+                throw new ArgumentException($"Duplicate permission entry for module '{duplicateModule.Key}'.");
+
+            var requestedClaimValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var permission in request.Permissions)
+            {
+                var moduleCode = permission.ModuleCode.Trim().ToLowerInvariant();
+                if (!PermissionCatalog.IsValidModule(moduleCode))
+                    throw new ArgumentException($"Module code '{permission.ModuleCode}' is not valid.");
+
+                AddPermissionIfAllowed(requestedClaimValues, moduleCode, PermissionActions.View, permission.CanView);
+                AddPermissionIfAllowed(requestedClaimValues, moduleCode, PermissionActions.Create, permission.CanCreate);
+                AddPermissionIfAllowed(requestedClaimValues, moduleCode, PermissionActions.Edit, permission.CanEdit);
+                AddPermissionIfAllowed(requestedClaimValues, moduleCode, PermissionActions.Delete, permission.CanDelete);
+                AddPermissionIfAllowed(requestedClaimValues, moduleCode, PermissionActions.Approve, permission.CanApprove);
+                AddPermissionIfAllowed(requestedClaimValues, moduleCode, PermissionActions.Export, permission.CanExport);
+            }
+
+            var existingPermissionClaims = (await _roleManager.GetClaimsAsync(role))
+                .Where(claim => claim.Type == IdentityClaimTypes.Permission)
+                .ToList();
+
+            foreach (var claim in existingPermissionClaims)
+            {
+                var removeResult = await _roleManager.RemoveClaimAsync(role, claim);
+                if (!removeResult.Succeeded)
+                    throw new InvalidOperationException($"Failed to remove permission: {string.Join(", ", removeResult.Errors.Select(error => error.Description))}");
+            }
+
+            foreach (var claimValue in requestedClaimValues.OrderBy(value => value))
+            {
+                var addResult = await _roleManager.AddClaimAsync(role, new Claim(IdentityClaimTypes.Permission, claimValue));
+                if (!addResult.Succeeded)
+                    throw new InvalidOperationException($"Failed to add permission: {string.Join(", ", addResult.Errors.Select(error => error.Description))}");
+            }
+
+            role.UpdatedOn = DateTime.UtcNow;
+            role.UpdatedBy = _userContextService.GetUserId() ?? Guid.Empty;
+            var updateResult = await _roleManager.UpdateAsync(role);
+            if (!updateResult.Succeeded)
+                throw new InvalidOperationException($"Failed to update role audit data: {string.Join(", ", updateResult.Errors.Select(error => error.Description))}");
+
+            return new RolePermissionViewModel
+            {
+                RoleId = role.Id,
+                RoleName = role.Name ?? string.Empty,
+                Modules = BuildPermissionMatrix(requestedClaimValues)
+            };
+        }
+
+        public async Task<UserPermissionViewModel> GetUserPermissionsAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null)
+                throw new KeyNotFoundException($"User with ID '{userId}' not found.");
+
+            var roles = (await _userManager.GetRolesAsync(user)).ToList();
+            var permissionClaims = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var roleName in roles)
+            {
+                var role = await _roleManager.FindByNameAsync(roleName);
+                if (role == null || !role.IsActive)
+                {
+                    continue;
+                }
+
+                foreach (var permission in await GetRolePermissionClaimsAsync(role))
+                {
+                    permissionClaims.Add(permission);
+                }
+            }
+
+            return new UserPermissionViewModel
+            {
+                UserId = user.Id,
+                Roles = roles,
+                Permissions = BuildPermissionMatrix(permissionClaims)
+            };
+        }
+
         private async Task ValidateRoleCanBeDeactivatedAsync(ApplicationRole role, CancellationToken cancellationToken)
         {
             if (role.IsSystemRole)
@@ -740,6 +860,40 @@ namespace ERP.Identity.Services.Implementations
         private static string? CleanOptional(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
+        private async Task<HashSet<string>> GetRolePermissionClaimsAsync(ApplicationRole role)
+        {
+            return (await _roleManager.GetClaimsAsync(role))
+                .Where(claim => claim.Type == IdentityClaimTypes.Permission)
+                .Select(claim => claim.Value)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static List<PermissionMatrixItemViewModel> BuildPermissionMatrix(IReadOnlySet<string> permissionClaims)
+        {
+            return PermissionCatalog.GetModules()
+                .Select(module => new PermissionMatrixItemViewModel
+                {
+                    ModuleCode = module.ModuleCode,
+                    ModuleName = module.ModuleName,
+                    CanView = permissionClaims.Contains(PermissionCatalog.ToClaimValue(module.ModuleCode, PermissionActions.View)),
+                    CanCreate = permissionClaims.Contains(PermissionCatalog.ToClaimValue(module.ModuleCode, PermissionActions.Create)),
+                    CanEdit = permissionClaims.Contains(PermissionCatalog.ToClaimValue(module.ModuleCode, PermissionActions.Edit)),
+                    CanDelete = permissionClaims.Contains(PermissionCatalog.ToClaimValue(module.ModuleCode, PermissionActions.Delete)),
+                    CanApprove = permissionClaims.Contains(PermissionCatalog.ToClaimValue(module.ModuleCode, PermissionActions.Approve)),
+                    CanExport = permissionClaims.Contains(PermissionCatalog.ToClaimValue(module.ModuleCode, PermissionActions.Export))
+                })
+                .ToList();
+        }
+
+        private static void AddPermissionIfAllowed(HashSet<string> permissions, string moduleCode, string actionCode, bool isAllowed)
+        {
+            if (isAllowed)
+            {
+                permissions.Add(PermissionCatalog.ToClaimValue(moduleCode, actionCode));
+            }
         }
     }
 }

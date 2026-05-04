@@ -6,6 +6,8 @@ import { DialogModule } from 'primeng/dialog';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
+import { AuthService } from '@/core/auth/auth.service';
+import { Permissions } from '@/core/auth/permissions';
 import { Crud, CrudSaveEvent } from '@/shared/components/crud/crud';
 import { DynamicField } from '@/shared/dynamic-form/models/dynamicFields/field.model';
 import { RoleColumns } from '../../config/role-columns.config';
@@ -13,8 +15,12 @@ import { RoleFields } from '../../config/role-fields.config';
 import { CreateRoleRequest } from '../../dtos/create-role.request';
 import { UpdateRoleRequest } from '../../dtos/update-role.request';
 import { RoleApiService } from '../../services/role-api.service';
+import { PermissionMatrixItemViewModel } from '../../view-models/permission-matrix-item.view-model';
 import { RoleDetailViewModel } from '../../view-models/role-detail.view-model';
 import { RoleListItemViewModel } from '../../view-models/role-list-item.view-model';
+import { RolePermissionViewModel } from '../../view-models/role-permission.view-model';
+
+type PermissionFlagKey = 'canView' | 'canCreate' | 'canEdit' | 'canDelete' | 'canApprove' | 'canExport';
 
 @Component({
     selector: 'app-role-list',
@@ -32,7 +38,15 @@ export class RoleList implements OnInit {
     dataNotFound = false;
     errorMessage = 'No roles found.';
     detailDialog = false;
+    permissionDialog = false;
     selectedRole?: RoleDetailViewModel;
+    selectedPermissionRole?: RolePermissionViewModel;
+    canCreate = false;
+    canEdit = false;
+    canDelete = false;
+    canExport = false;
+    canManagePermissions = false;
+    canViewPermissions = false;
     rowActionLabel = 'Deactivate';
     rowActionIcon = 'pi pi-ban';
     rowActionLabelResolver = (row: Record<string, unknown>) => (row['isActive'] === true ? 'Deactivate' : 'Activate');
@@ -40,10 +54,17 @@ export class RoleList implements OnInit {
 
     constructor(
         private readonly roleApiService: RoleApiService,
-        private readonly messageService: MessageService
+        private readonly messageService: MessageService,
+        private readonly authService: AuthService
     ) {}
 
     ngOnInit(): void {
+        this.canCreate = this.authService.hasPermission(Permissions.roles.create);
+        this.canEdit = this.authService.hasPermission(Permissions.roles.edit);
+        this.canDelete = this.authService.hasPermission(Permissions.roles.delete);
+        this.canExport = this.authService.hasPermission(Permissions.roles.export);
+        this.canManagePermissions = this.authService.hasPermission(Permissions.permissions.edit);
+        this.canViewPermissions = this.authService.hasPermission(Permissions.permissions.view);
         this.loadRoles();
     }
 
@@ -127,6 +148,50 @@ export class RoleList implements OnInit {
             },
             error: (error) => this.showError(error, 'Detail failed')
         });
+    }
+
+    openPermissionMatrix(row: Record<string, unknown>): void {
+        const id = this.getRowId(row);
+        if (!id) {
+            this.messageService.add({ severity: 'error', summary: 'Permissions failed', detail: 'Role id is missing.', life: 4000 });
+            return;
+        }
+
+        this.openPermissionMatrixById(id);
+    }
+
+    openPermissionMatrixById(id: string): void {
+        this.roleApiService.getRolePermissions(id).subscribe({
+            next: (permissions) => {
+                this.selectedPermissionRole = permissions;
+                this.permissionDialog = true;
+            },
+            error: (error) => this.showError(error, 'Permissions failed')
+        });
+    }
+
+    savePermissions(): void {
+        if (!this.selectedPermissionRole) {
+            return;
+        }
+
+        this.roleApiService
+            .updateRolePermissions(this.selectedPermissionRole.roleId, {
+                roleId: this.selectedPermissionRole.roleId,
+                permissions: this.selectedPermissionRole.modules
+            })
+            .subscribe({
+                next: (permissions) => {
+                    this.selectedPermissionRole = permissions;
+                    this.messageService.add({ severity: 'success', summary: 'Permissions saved', detail: 'Role permissions were updated successfully.', life: 3000 });
+                    this.permissionDialog = false;
+                },
+                error: (error) => this.showError(error, 'Save permissions failed')
+            });
+    }
+
+    togglePermission(item: PermissionMatrixItemViewModel, field: PermissionFlagKey, event: Event): void {
+        item[field] = (event.target as HTMLInputElement).checked;
     }
 
     private loadRoles(): void {

@@ -2,9 +2,11 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from 'src/environments/environment';
 import { CreateRoleRequest } from '../dtos/create-role.request';
+import { UpdateRolePermissionsRequest } from '../dtos/update-role-permissions.request';
 import { UpdateRoleRequest } from '../dtos/update-role.request';
 import { RoleDetailViewModel } from '../view-models/role-detail.view-model';
 import { RoleListItemViewModel } from '../view-models/role-list-item.view-model';
+import { RolePermissionViewModel } from '../view-models/role-permission.view-model';
 import { RoleUserListItemViewModel } from '../view-models/role-user-list-item.view-model';
 
 @Injectable({ providedIn: 'root' })
@@ -39,5 +41,13 @@ export class RoleApiService {
 
     getRoleUsers(id: string) {
         return this.http.get<RoleUserListItemViewModel[]>(`${this.rolesUrl}/${id}/users`);
+    }
+
+    getRolePermissions(id: string) {
+        return this.http.get<RolePermissionViewModel>(`${this.rolesUrl}/${id}/permissions`);
+    }
+
+    updateRolePermissions(id: string, request: UpdateRolePermissionsRequest) {
+        return this.http.put<RolePermissionViewModel>(`${this.rolesUrl}/${id}/permissions`, request);
     }
 }

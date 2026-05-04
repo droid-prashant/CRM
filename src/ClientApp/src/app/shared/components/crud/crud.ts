@@ -67,6 +67,11 @@ export class Crud implements OnChanges {
     @Input() rowActionLabelResolver?: (row: Record<string, unknown>) => string;
     @Input() rowActionIconResolver?: (row: Record<string, unknown>) => string;
     @Input() enableViewAction = false;
+    @Input() canCreate = true;
+    @Input() canEdit = true;
+    @Input() canRowAction = true;
+    @Input() canBulkAction = true;
+    @Input() canExport = true;
 
     @Output() save = new EventEmitter<CrudSaveEvent>();
     @Output() delete = new EventEmitter<Record<string, unknown>>();
@@ -108,7 +113,7 @@ export class Crud implements OnChanges {
 
     get fieldSections(): { title: string; fields: DynamicField[] }[] {
         const sections = new Map<string, DynamicField[]>();
-        this.fields.forEach((field) => {
+        this.fields.filter((field) => this.isFieldVisible(field)).forEach((field) => {
             const title = field.section ?? 'Details';
             sections.set(title, [...(sections.get(title) ?? []), field]);
         });
@@ -224,18 +229,21 @@ export class Crud implements OnChanges {
             });
         }
 
-        items.push(
-            {
+        if (this.canEdit) {
+            items.push({
                 label: 'Edit',
                 icon: 'pi pi-pencil',
                 command: () => this.openEdit(row)
-            },
-            {
+            });
+        }
+
+        if (this.canRowAction) {
+            items.push({
                 label: this.rowActionLabelResolver?.(row) ?? this.rowActionLabel,
                 icon: this.rowActionIconResolver?.(row) ?? this.rowActionIcon,
                 command: () => this.confirmDelete(row)
-            }
-        );
+            });
+        }
 
         return items;
     }
@@ -255,6 +263,10 @@ export class Crud implements OnChanges {
             default:
                 return 'col-span-12 md:col-span-6 xl:col-span-4';
         }
+    }
+
+    private isFieldVisible(field: DynamicField): boolean {
+        return !field.visibleOn || field.visibleOn === 'both' || field.visibleOn === this.mode;
     }
 
     private buildForm(): FormGroup {

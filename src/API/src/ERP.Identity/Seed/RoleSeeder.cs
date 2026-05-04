@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -25,6 +26,28 @@ namespace ERP.Identity.Seed
                 if (!string.IsNullOrWhiteSpace(role.Name) && !await roleManager.RoleExistsAsync(role.Name))
                 {
                     await roleManager.CreateAsync(role);
+                }
+            }
+
+            foreach (var roleName in new[] { DefaultRoles.SuperAdmin, DefaultRoles.Admin })
+            {
+                var role = await roleManager.FindByNameAsync(roleName);
+                if (role == null)
+                {
+                    continue;
+                }
+
+                var existingPermissions = (await roleManager.GetClaimsAsync(role))
+                    .Where(claim => claim.Type == IdentityClaimTypes.Permission)
+                    .Select(claim => claim.Value)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var permission in PermissionCatalog.GetFullAccessClaimValues())
+                {
+                    if (!existingPermissions.Contains(permission))
+                    {
+                        await roleManager.AddClaimAsync(role, new Claim(IdentityClaimTypes.Permission, permission));
+                    }
                 }
             }
         }

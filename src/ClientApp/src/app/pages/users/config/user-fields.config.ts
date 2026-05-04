@@ -11,6 +11,6 @@ export function buildUserFields(roles: SelectOption[]): DynamicField[] {
         { key: 'phoneNumber', label: 'Phone Number', type: 'text', colSpan: 4, section: 'Organization', placeholder: 'Phone number' },
         { key: 'departmentId', label: 'Department Id', type: 'text', colSpan: 4, section: 'Organization', placeholder: 'Optional department id' },
         { key: 'managerId', label: 'Manager Id', type: 'text', colSpan: 4, section: 'Organization', placeholder: 'Optional manager user id' },
-        { key: 'isActive', label: 'Active', type: 'checkbox', colSpan: 12, section: 'Status', defaultValue: true }
+        { key: 'isActive', label: 'Active', type: 'checkbox', colSpan: 12, section: 'Status', defaultValue: true, visibleOn: 'update' }
     ];
 }

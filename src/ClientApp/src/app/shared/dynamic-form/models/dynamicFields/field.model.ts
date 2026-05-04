@@ -15,4 +15,5 @@ export interface DynamicField {
     section?: string;
     placeholder?: string;
     defaultValue?: unknown;
+    visibleOn?: 'create' | 'update' | 'both';
 }

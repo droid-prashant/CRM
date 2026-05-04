@@ -30,6 +30,7 @@ export class AuthService {
                     userId: response.userId,
                     fullName: response.fullName,
                     roles: response.roles,
+                    permissions: response.permissions ?? [],
                     expiration: response.expiration
                 };
 
@@ -41,10 +42,14 @@ export class AuthService {
     }
 
     logout(): void {
+        this.clearSession();
+        this.router.navigate(['/auth/login']);
+    }
+
+    clearSession(): void {
         this.storage?.removeItem(tokenStorageKey);
         this.storage?.removeItem(userStorageKey);
         this.currentUserSignal.set(null);
-        this.router.navigate(['/auth/login']);
     }
 
     getToken(): string | null {
@@ -56,6 +61,20 @@ export class AuthService {
         return !!user && roles.some((role) => user.roles.includes(role));
     }
 
+    hasPermission(permission: string): boolean {
+        const user = this.currentUserSignal();
+        return !!user && (this.hasAnyRole(['Admin', 'SuperAdmin']) || user.permissions.includes(permission));
+    }
+
+    hasAnyPermission(permissions: string[]): boolean {
+        return permissions.some((permission) => this.hasPermission(permission));
+    }
+
+    isTokenExpired(): boolean {
+        const user = this.currentUserSignal();
+        return !user || new Date(user.expiration).getTime() <= Date.now();
+    }
+
     private readUser(): AuthUser | null {
         const raw = this.storage?.getItem(userStorageKey);
         if (!raw) {
@@ -64,6 +83,7 @@ export class AuthService {
 
         try {
             const user = JSON.parse(raw) as AuthUser;
+            user.permissions ??= [];
             return new Date(user.expiration).getTime() > Date.now() ? user : null;
         } catch {
             this.storage?.removeItem(userStorageKey);

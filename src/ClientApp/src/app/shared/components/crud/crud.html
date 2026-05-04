@@ -1,11 +1,17 @@
 <p-toolbar styleClass="mb-6">
     <ng-template #start>
-        <p-button label="New" icon="pi pi-plus" severity="secondary" class="mr-2" (onClick)="openNew()" />
-        <p-button [label]="bulkActionLabel" icon="pi pi-trash" severity="secondary" outlined (onClick)="confirmBulkDelete()" [disabled]="!selectedRows.length" />
+        @if (canCreate) {
+            <p-button label="New" icon="pi pi-plus" severity="secondary" class="mr-2" (onClick)="openNew()" />
+        }
+        @if (canBulkAction) {
+            <p-button [label]="bulkActionLabel" icon="pi pi-trash" severity="secondary" outlined (onClick)="confirmBulkDelete()" [disabled]="!selectedRows.length" />
+        }
     </ng-template>
 
     <ng-template #end>
-        <p-button label="Export" icon="pi pi-upload" severity="secondary" (onClick)="exportCSV()" />
+        @if (canExport) {
+            <p-button label="Export" icon="pi pi-upload" severity="secondary" (onClick)="exportCSV()" />
+        }
     </ng-template>
 </p-toolbar>
 
@@ -47,7 +53,9 @@
                         }
                     </th>
                 }
-                <th style="width: 4rem" class="text-center"></th>
+                @if (enableViewAction || canEdit || canRowAction) {
+                    <th style="width: 4rem" class="text-center"></th>
+                }
             </tr>
         </ng-template>
 
@@ -72,9 +80,11 @@
                         }
                     </td>
                 }
-                <td class="text-center">
-                    <p-button icon="pi pi-ellipsis-v" severity="secondary" [rounded]="true" [text]="true" ariaLabel="Row actions" (onClick)="toggleRowActions(rowActions, row, $event)" />
-                </td>
+                @if (enableViewAction || canEdit || canRowAction) {
+                    <td class="text-center">
+                        <p-button icon="pi pi-ellipsis-v" severity="secondary" [rounded]="true" [text]="true" ariaLabel="Row actions" (onClick)="toggleRowActions(rowActions, row, $event)" />
+                    </td>
+                }
             </tr>
         </ng-template>
     </p-table>

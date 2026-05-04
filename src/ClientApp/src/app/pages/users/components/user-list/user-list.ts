@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { MessageService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
+import { AuthService } from '@/core/auth/auth.service';
+import { Permissions } from '@/core/auth/permissions';
 import { Crud, CrudSaveEvent } from '@/shared/components/crud/crud';
 import { DynamicField, SelectOption } from '@/shared/dynamic-form/models/dynamicFields/field.model';
 import { UserColumns } from '../../config/user-columns.config';
@@ -29,15 +31,24 @@ export class UserList implements OnInit {
     errorMessage = 'No users found.';
     rowActionLabel = 'Deactivate';
     rowActionIcon = 'pi pi-ban';
+    canCreate = false;
+    canEdit = false;
+    canDelete = false;
+    canExport = false;
     rowActionLabelResolver = (row: Record<string, unknown>) => (row['isActive'] === true ? 'Deactivate' : 'Activate');
     rowActionIconResolver = (row: Record<string, unknown>) => (row['isActive'] === true ? 'pi pi-ban' : 'pi pi-check-circle');
 
     constructor(
         private readonly userApiService: UserApiService,
-        private readonly messageService: MessageService
+        private readonly messageService: MessageService,
+        private readonly authService: AuthService
     ) {}
 
     ngOnInit(): void {
+        this.canCreate = this.authService.hasPermission(Permissions.users.create);
+        this.canEdit = this.authService.hasPermission(Permissions.users.edit);
+        this.canDelete = this.authService.hasPermission(Permissions.users.delete);
+        this.canExport = this.authService.hasPermission(Permissions.users.export);
         this.loadPage();
     }
 

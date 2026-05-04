@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { MessageService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
+import { AuthService } from '@/core/auth/auth.service';
+import { Permissions } from '@/core/auth/permissions';
 import { Crud, CrudSaveEvent } from '@/shared/components/crud/crud';
 import { DynamicField, SelectOption } from '@/shared/dynamic-form/models/dynamicFields/field.model';
 import { buildLeadFields } from '../../config/lead-fields.config';
@@ -25,13 +27,20 @@ export class LeadList implements OnInit {
     isLoading = true;
     dataNotFound = false;
     errorMessage = 'No leads found.';
+    canCreate = false;
+    canDelete = false;
+    canExport = false;
 
     constructor(
         private readonly leadApiService: LeadApiService,
-        private readonly messageService: MessageService
+        private readonly messageService: MessageService,
+        private readonly authService: AuthService
     ) {}
 
     ngOnInit(): void {
+        this.canCreate = this.authService.hasPermission(Permissions.leads.create);
+        this.canDelete = this.authService.hasPermission(Permissions.leads.delete);
+        this.canExport = this.authService.hasPermission(Permissions.leads.export);
         this.loadPage();
     }
 

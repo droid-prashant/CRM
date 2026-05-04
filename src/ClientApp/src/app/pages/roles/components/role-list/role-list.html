@@ -14,6 +14,11 @@
         [rowActionLabelResolver]="rowActionLabelResolver"
         [rowActionIconResolver]="rowActionIconResolver"
         [enableViewAction]="true"
+        [canCreate]="canCreate"
+        [canEdit]="canEdit"
+        [canRowAction]="canDelete"
+        [canBulkAction]="canDelete"
+        [canExport]="canExport"
         (save)="saveRole($event)"
         (delete)="toggleRoleStatus($event)"
         (bulkDelete)="deactivateRoles($event)"
@@ -75,4 +80,55 @@
             </ng-template>
         </p-table>
     }
+
+    <ng-template #footer>
+        @if (selectedRole && canViewPermissions) {
+            <p-button label="Permissions" icon="pi pi-key" (onClick)="openPermissionMatrixById(selectedRole.id)" />
+        }
+        <p-button label="Close" icon="pi pi-times" text (onClick)="detailDialog = false" />
+    </ng-template>
+</p-dialog>
+
+<p-dialog [(visible)]="permissionDialog" [style]="{ width: 'min(1100px, 96vw)' }" [modal]="true" header="Permission Matrix">
+    @if (selectedPermissionRole) {
+        <div class="mb-4">
+            <div class="text-sm text-surface-500">Role</div>
+            <div class="text-lg font-semibold">{{ selectedPermissionRole.roleName }}</div>
+        </div>
+
+        <p-table [value]="selectedPermissionRole.modules" [tableStyle]="{ 'min-width': '64rem' }">
+            <ng-template #header>
+                <tr>
+                    <th>Module</th>
+                    <th class="text-center">View</th>
+                    <th class="text-center">Create</th>
+                    <th class="text-center">Edit</th>
+                    <th class="text-center">Delete</th>
+                    <th class="text-center">Approve</th>
+                    <th class="text-center">Export</th>
+                </tr>
+            </ng-template>
+            <ng-template #body let-module>
+                <tr>
+                    <td>
+                        <div class="font-semibold">{{ module.moduleName }}</div>
+                        <div class="text-sm text-surface-500">{{ module.moduleCode }}</div>
+                    </td>
+                    <td class="text-center"><input type="checkbox" [checked]="module.canView" [disabled]="!canManagePermissions" (change)="togglePermission(module, 'canView', $event)" /></td>
+                    <td class="text-center"><input type="checkbox" [checked]="module.canCreate" [disabled]="!canManagePermissions" (change)="togglePermission(module, 'canCreate', $event)" /></td>
+                    <td class="text-center"><input type="checkbox" [checked]="module.canEdit" [disabled]="!canManagePermissions" (change)="togglePermission(module, 'canEdit', $event)" /></td>
+                    <td class="text-center"><input type="checkbox" [checked]="module.canDelete" [disabled]="!canManagePermissions" (change)="togglePermission(module, 'canDelete', $event)" /></td>
+                    <td class="text-center"><input type="checkbox" [checked]="module.canApprove" [disabled]="!canManagePermissions" (change)="togglePermission(module, 'canApprove', $event)" /></td>
+                    <td class="text-center"><input type="checkbox" [checked]="module.canExport" [disabled]="!canManagePermissions" (change)="togglePermission(module, 'canExport', $event)" /></td>
+                </tr>
+            </ng-template>
+        </p-table>
+    }
+
+    <ng-template #footer>
+        <p-button label="Close" icon="pi pi-times" text (onClick)="permissionDialog = false" />
+        @if (canManagePermissions) {
+            <p-button label="Save Permissions" icon="pi pi-check" (onClick)="savePermissions()" />
+        }
+    </ng-template>
 </p-dialog>

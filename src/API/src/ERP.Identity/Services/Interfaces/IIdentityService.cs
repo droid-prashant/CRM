@@ -30,5 +30,8 @@ namespace ERP.Identity.Services.Interfaces
         Task ActivateRoleAsync(Guid roleId, CancellationToken cancellationToken);
         Task DeactivateRoleAsync(Guid roleId, CancellationToken cancellationToken);
         Task<List<RoleUserListItemViewModel>> GetRoleUsersAsync(Guid roleId, CancellationToken cancellationToken);
+        Task<RolePermissionViewModel> GetRolePermissionsAsync(Guid roleId, CancellationToken cancellationToken);
+        Task<RolePermissionViewModel> UpdateRolePermissionsAsync(Guid roleId, UpdateRolePermissionsRequest request, CancellationToken cancellationToken);
+        Task<UserPermissionViewModel> GetUserPermissionsAsync(Guid userId, CancellationToken cancellationToken);
     }
 }

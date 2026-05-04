@@ -2,6 +2,8 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { MenuItem } from 'primeng/api';
+import { AuthService } from '@/core/auth/auth.service';
+import { Permissions } from '@/core/auth/permissions';
 import { AppMenuitem } from './app.menuitem';
 
 @Component({
@@ -22,22 +24,24 @@ import { AppMenuitem } from './app.menuitem';
 export class AppMenu {
     model: MenuItem[] = [];
 
+    constructor(private readonly authService: AuthService) {}
+
     ngOnInit() {
         this.model = [
             {
                 label: 'CRM',
                 items: [
                     { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/'] },
-                    { label: 'Leads', icon: 'pi pi-fw pi-briefcase', routerLink: ['/pages/leads'] }
+                    ...(this.authService.hasPermission(Permissions.leads.view) ? [{ label: 'Leads', icon: 'pi pi-fw pi-briefcase', routerLink: ['/pages/leads'] }] : [])
                 ]
             },
             {
                 label: 'Administration',
                 items: [
-                    { label: 'Users', icon: 'pi pi-fw pi-users', routerLink: ['/pages/users'] },
-                    { label: 'Roles', icon: 'pi pi-fw pi-shield', routerLink: ['/pages/roles'] }
+                    ...(this.authService.hasPermission(Permissions.users.view) ? [{ label: 'Users', icon: 'pi pi-fw pi-users', routerLink: ['/pages/users'] }] : []),
+                    ...(this.authService.hasPermission(Permissions.roles.view) ? [{ label: 'Roles', icon: 'pi pi-fw pi-shield', routerLink: ['/pages/roles'] }] : [])
                 ]
             }
-        ];
+        ].filter((group) => !!group.items?.length);
     }
 }

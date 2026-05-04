@@ -9,6 +9,7 @@ export interface LoginResponse {
     userId: string;
     fullName: string;
     roles: string[];
+    permissions: string[];
     succeded: boolean;
     error?: string;
     statusCode: number;
@@ -18,5 +19,6 @@ export interface AuthUser {
     userId: string;
     fullName: string;
     roles: string[];
+    permissions: string[];
     expiration: string;
 }
