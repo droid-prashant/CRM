@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { environment } from 'src/environments/environment';
+import { apiUrl } from '@/core/http/api-url';
 import { CreateUserRequest } from '../dtos/create-user.request';
 import { UpdateUserRequest } from '../dtos/update-user.request';
 import { RoleListItemViewModel } from '../view-models/role-list-item.view-model';
@@ -8,8 +8,8 @@ import { UserListItemViewModel } from '../view-models/user-list-item.view-model'
 
 @Injectable({ providedIn: 'root' })
 export class UserApiService {
-    private readonly usersUrl = `${environment.apiUrl}/users`;
-    private readonly rolesUrl = `${environment.apiUrl}/roles`;
+    private readonly usersUrl = apiUrl('/users');
+    private readonly rolesUrl = apiUrl('/roles');
 
     constructor(private readonly http: HttpClient) {}
 

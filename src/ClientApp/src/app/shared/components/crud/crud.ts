@@ -72,6 +72,7 @@ export class Crud implements OnChanges {
     @Input() canRowAction = true;
     @Input() canBulkAction = true;
     @Input() canExport = true;
+    @Input() canEditRowResolver?: (row: Record<string, unknown>) => boolean;
 
     @Output() save = new EventEmitter<CrudSaveEvent>();
     @Output() delete = new EventEmitter<Record<string, unknown>>();
@@ -229,7 +230,7 @@ export class Crud implements OnChanges {
             });
         }
 
-        if (this.canEdit) {
+        if (this.canEdit && (this.canEditRowResolver?.(row) ?? true)) {
             items.push({
                 label: 'Edit',
                 icon: 'pi pi-pencil',

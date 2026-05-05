@@ -7,22 +7,25 @@ import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
+import { forkJoin, of } from 'rxjs';
 import { AuthService } from '@/core/auth/auth.service';
 import { Permissions } from '@/core/auth/permissions';
 import { UserApiService } from '@/pages/users/services/user-api.service';
 import { UserListItemViewModel } from '@/pages/users/view-models/user-list-item.view-model';
-import { ConvertLeadRequest, LeadApiService, LeadConversionViewModel } from '../../services/lead.api-service';
+import { UpdateLeadRequest } from '../../dtos/update-lead.request';
+import { ConvertLeadRequest, LeadApiService, LeadConversionViewModel, LeadLookupBundle } from '../../services/lead.api-service';
 import { LeadDetailViewModel } from '../../view-models/lead-detail.view-model';
 
 @Component({
     selector: 'app-lead-detail',
     standalone: true,
-    imports: [ButtonModule, CommonModule, DialogModule, InputNumberModule, InputTextModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, TextareaModule, ToastModule],
+    imports: [ButtonModule, CommonModule, DialogModule, InputNumberModule, InputTextModule, MultiSelectModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, TextareaModule, ToastModule],
     templateUrl: './lead-detail.html',
     providers: [MessageService]
 })
@@ -32,14 +35,17 @@ export class LeadDetail implements OnInit {
     isSavingStatus = false;
     isAssigning = false;
     isConverting = false;
+    isSavingLead = false;
     errorMessage = '';
     canEditLead = false;
     canApproveLead = false;
     qualificationDialog = false;
     disqualificationDialog = false;
     assignmentDialog = false;
+    editDialog = false;
     conversionDialog = false;
     conversion?: LeadConversionViewModel;
+    leadLookups?: LeadLookupBundle;
     users: UserListItemViewModel[] = [];
     readonly conversionModeOptions = [
         { label: 'Create New', value: 'new' },
@@ -61,6 +67,26 @@ export class LeadDetail implements OnInit {
     assignmentForm = this.fb.group({
         assignedToUserId: ['', Validators.required],
         remarks: ['', [Validators.maxLength(1000)]]
+    });
+
+    editForm = this.fb.group({
+        sourceId: ['', Validators.required],
+        categoryId: ['', Validators.required],
+        partnerId: [''],
+        campaignName: [''],
+        companyName: ['', Validators.required],
+        website: [''],
+        contactPersonName: ['', Validators.required],
+        jobTitle: [''],
+        email: [''],
+        phone: [''],
+        alternatePhone: [''],
+        countryId: ['', Validators.required],
+        address: [''],
+        industryId: [''],
+        notes: [''],
+        leadScore: [null as number | null],
+        productIds: [[] as string[], Validators.required]
     });
 
     conversionForm = this.fb.group({
@@ -138,7 +164,11 @@ export class LeadDetail implements OnInit {
     }
 
     get canShowQualificationActions(): boolean {
-        return this.canEditLead && !['qualified', 'disqualified'].includes(this.lead?.status?.toLowerCase() ?? '');
+        return this.canEditLead && ['new', 'assigned'].includes(this.lead?.status?.toLowerCase() ?? '');
+    }
+
+    get canShowEditActions(): boolean {
+        return this.canEditLead && this.lead?.status?.toLowerCase() !== 'converted';
     }
 
     openQualificationDialog(): void {
@@ -168,6 +198,47 @@ export class LeadDetail implements OnInit {
             error: (error) => {
                 this.handleStatusError(error);
                 this.isAssigning = false;
+            }
+        });
+    }
+
+    openEditDialog(): void {
+        if (!this.lead) {
+            return;
+        }
+
+        this.isSavingLead = true;
+        forkJoin({
+            lookups: this.leadLookups ? of(this.leadLookups) : this.leadApiService.getLookupBundle(),
+            lead: this.leadApiService.getLeadForEdit(this.lead.id)
+        }).subscribe({
+            next: ({ lookups, lead }) => {
+                this.leadLookups = lookups;
+                this.editForm.reset({
+                    sourceId: lead.sourceId,
+                    categoryId: lead.categoryId,
+                    partnerId: lead.partnerId ?? '',
+                    campaignName: lead.campaignName ?? '',
+                    companyName: lead.companyName,
+                    website: lead.website ?? '',
+                    contactPersonName: lead.contactPersonName,
+                    jobTitle: lead.jobTitle ?? '',
+                    email: lead.email ?? '',
+                    phone: lead.phone ?? '',
+                    alternatePhone: lead.alternatePhone ?? '',
+                    countryId: lead.countryId,
+                    address: lead.address ?? '',
+                    industryId: lead.industryId ?? '',
+                    notes: lead.notes ?? '',
+                    leadScore: lead.leadScore ?? null,
+                    productIds: lead.selectedProductIds
+                });
+                this.editDialog = true;
+                this.isSavingLead = false;
+            },
+            error: (error) => {
+                this.handleStatusError(error);
+                this.isSavingLead = false;
             }
         });
     }
@@ -321,6 +392,31 @@ export class LeadDetail implements OnInit {
         });
     }
 
+    updateLead(): void {
+        if (!this.lead) {
+            return;
+        }
+
+        this.editForm.markAllAsTouched();
+        if (this.editForm.invalid) {
+            return;
+        }
+
+        this.isSavingLead = true;
+        this.leadApiService.updateLead(this.lead.id, this.buildUpdateLeadRequest()).subscribe({
+            next: (lead) => {
+                this.editDialog = false;
+                this.messageService.add({ severity: 'success', summary: 'Lead updated', detail: `${lead.leadNumber} was updated successfully.`, life: 4000 });
+                this.loadLead();
+                this.isSavingLead = false;
+            },
+            error: (error) => {
+                this.handleStatusError(error);
+                this.isSavingLead = false;
+            }
+        });
+    }
+
     backToList(): void {
         this.router.navigate(['/pages/leads']);
     }
@@ -344,6 +440,29 @@ export class LeadDetail implements OnInit {
 
     get useExistingContact(): boolean {
         return this.conversionForm.controls.contactMode.value === 'existing';
+    }
+
+    private buildUpdateLeadRequest(): UpdateLeadRequest {
+        const value = this.editForm.getRawValue();
+        return {
+            sourceId: value.sourceId ?? '',
+            categoryId: value.categoryId ?? '',
+            partnerId: this.optionalFormString(value.partnerId),
+            campaignName: this.optionalFormString(value.campaignName),
+            companyName: value.companyName ?? '',
+            website: this.optionalFormString(value.website),
+            contactPersonName: value.contactPersonName ?? '',
+            jobTitle: this.optionalFormString(value.jobTitle),
+            email: this.optionalFormString(value.email),
+            phone: this.optionalFormString(value.phone),
+            alternatePhone: this.optionalFormString(value.alternatePhone),
+            countryId: value.countryId ?? '',
+            address: this.optionalFormString(value.address),
+            industryId: this.optionalFormString(value.industryId),
+            notes: this.optionalFormString(value.notes),
+            leadScore: value.leadScore,
+            productIds: value.productIds ?? []
+        };
     }
 
     private buildConversionRequest(): ConvertLeadRequest {
@@ -388,6 +507,10 @@ export class LeadDetail implements OnInit {
     private lastName(fullName: string): string {
         const parts = fullName.trim().split(/\s+/);
         return parts.length > 1 ? parts.slice(1).join(' ') : '-';
+    }
+
+    private optionalFormString(value: string | null | undefined): string | null {
+        return value?.trim() ? value : null;
     }
 
     private handleStatusError(error: { error?: { errors?: string[] }; status?: number }): void {

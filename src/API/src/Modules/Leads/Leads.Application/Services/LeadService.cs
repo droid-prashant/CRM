@@ -43,6 +43,34 @@ namespace Leads.Application.Services
             return new CreateLeadResult { Lead = lead };
         }
 
+        public async Task<CreateLeadResult> UpdateLeadAsync(Guid id, UpdateLeadRequest request, CancellationToken cancellationToken)
+        {
+            var existingLead = await _leadRepository.GetLeadDetailAsync(id, cancellationToken);
+            if (existingLead == null)
+            {
+                return new CreateLeadResult { Errors = new List<string> { "Lead was not found." } };
+            }
+
+            if (existingLead.Status.Equals(LeadStatus.Converted.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return new CreateLeadResult { Errors = new List<string> { "Converted leads cannot be updated." } };
+            }
+
+            var errors = await ValidateUpdateRequestAsync(request, cancellationToken);
+            if (errors.Count > 0)
+            {
+                return new CreateLeadResult { Errors = errors };
+            }
+
+            var lead = await _leadRepository.UpdateLeadAsync(id, request, cancellationToken);
+            if (lead == null)
+            {
+                return new CreateLeadResult { Errors = new List<string> { "Lead cannot be updated." } };
+            }
+
+            return new CreateLeadResult { Lead = lead };
+        }
+
         public Task<LeadQualificationResult> QualifyLeadAsync(Guid id, QualifyLeadRequest request, CancellationToken cancellationToken)
         {
             return UpdateLeadStatusAsync(id, new UpdateLeadStatusRequest
@@ -172,6 +200,77 @@ namespace Leads.Application.Services
 
             var activeProductIds = await _leadRepository.GetActiveProductIdsAsync(request.ProductIds, cancellationToken);
             var inactiveOrMissingProducts = request.ProductIds.Except(activeProductIds).ToList();
+            if (inactiveOrMissingProducts.Count > 0)
+            {
+                errors.Add("All ProductIds must exist in active product master data.");
+            }
+
+            return errors;
+        }
+
+        private Task<List<string>> ValidateUpdateRequestAsync(UpdateLeadRequest request, CancellationToken cancellationToken)
+        {
+            return ValidateLeadFieldsAsync(
+                request.SourceId,
+                request.CategoryId,
+                request.PartnerId,
+                request.CompanyName,
+                request.ContactPersonName,
+                request.Email,
+                request.Phone,
+                request.CountryId,
+                request.IndustryId,
+                request.ProductIds,
+                cancellationToken);
+        }
+
+        private async Task<List<string>> ValidateLeadFieldsAsync(
+            Guid sourceId,
+            Guid categoryId,
+            Guid? partnerId,
+            string companyName,
+            string contactPersonName,
+            string? email,
+            string? phone,
+            Guid countryId,
+            Guid? industryId,
+            List<Guid> productIds,
+            CancellationToken cancellationToken)
+        {
+            var errors = new List<string>();
+
+            if (sourceId == Guid.Empty) errors.Add("SourceId is required.");
+            if (categoryId == Guid.Empty) errors.Add("CategoryId is required.");
+            if (countryId == Guid.Empty) errors.Add("CountryId is required.");
+            if (string.IsNullOrWhiteSpace(companyName)) errors.Add("CompanyName is required.");
+            if (string.IsNullOrWhiteSpace(contactPersonName)) errors.Add("ContactPersonName is required.");
+            if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(phone)) errors.Add("At least one contact method, Email or Phone, is required.");
+            if (productIds.Count == 0) errors.Add("At least one product interest is required.");
+            if (productIds.Count != productIds.Distinct().Count()) errors.Add("ProductIds must be unique.");
+
+            if (!string.IsNullOrWhiteSpace(email) && !IsValidEmail(email))
+            {
+                errors.Add("Email must be valid.");
+            }
+
+            if (errors.Count > 0)
+            {
+                return errors;
+            }
+
+            if (!await _leadRepository.SourceExistsAsync(sourceId, cancellationToken)) errors.Add("SourceId is invalid.");
+            if (!await _leadRepository.CategoryExistsAsync(categoryId, cancellationToken)) errors.Add("CategoryId is invalid.");
+            if (!await _leadRepository.CountryExistsAsync(countryId, cancellationToken)) errors.Add("CountryId is invalid.");
+            if (partnerId.HasValue && !await _leadRepository.PartnerExistsAsync(partnerId.Value, cancellationToken)) errors.Add("PartnerId is invalid.");
+            if (industryId.HasValue && !await _leadRepository.IndustryExistsAsync(industryId.Value, cancellationToken)) errors.Add("IndustryId is invalid.");
+
+            if (await _leadRepository.SourceRequiresPartnerAsync(sourceId, cancellationToken) && !partnerId.HasValue)
+            {
+                errors.Add("PartnerId is required when Source is Partner.");
+            }
+
+            var activeProductIds = await _leadRepository.GetActiveProductIdsAsync(productIds, cancellationToken);
+            var inactiveOrMissingProducts = productIds.Except(activeProductIds).ToList();
             if (inactiveOrMissingProducts.Count > 0)
             {
                 errors.Add("All ProductIds must exist in active product master data.");

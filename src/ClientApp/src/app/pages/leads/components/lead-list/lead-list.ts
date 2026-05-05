@@ -9,6 +9,7 @@ import { DynamicField, SelectOption } from '@/shared/dynamic-form/models/dynamic
 import { buildLeadFields } from '../../config/lead-fields.config';
 import { LeadColumns } from '../../config/lead-columns.config';
 import { CreateLeadRequest } from '../../dtos/create-lead.request';
+import { UpdateLeadRequest } from '../../dtos/update-lead.request';
 import { LeadApiService, LeadLookupBundle } from '../../services/lead.api-service';
 import { LeadListItemViewModel } from '../../view-models/lead-list-item.view-model';
 import { LookupViewModel } from '../../view-models/lookup.view-model';
@@ -29,8 +30,10 @@ export class LeadList implements OnInit {
     dataNotFound = false;
     errorMessage = 'No leads found.';
     canCreate = false;
+    canEdit = false;
     canDelete = false;
     canExport = false;
+    canEditLeadRow = (row: Record<string, unknown>): boolean => String(row['status'] ?? '').toLowerCase() !== 'converted';
 
     constructor(
         private readonly leadApiService: LeadApiService,
@@ -41,18 +44,23 @@ export class LeadList implements OnInit {
 
     ngOnInit(): void {
         this.canCreate = this.authService.hasPermission(Permissions.leads.create);
+        this.canEdit = this.authService.hasPermission(Permissions.leads.edit);
         this.canDelete = this.authService.hasPermission(Permissions.leads.delete);
         this.canExport = this.authService.hasPermission(Permissions.leads.export);
         this.loadPage();
     }
 
     saveLead(event: CrudSaveEvent): void {
-        if (event.mode !== 'create') {
-            this.messageService.add({ severity: 'info', summary: 'Not available', detail: 'Lead editing will be handled in a separate story.', life: 3000 });
+        if (event.mode === 'create') {
+            this.createLead(event.value as Record<string, unknown>);
             return;
         }
 
-        this.leadApiService.createLead(this.toCreateLeadRequest(event.value as Record<string, unknown>)).subscribe({
+        this.updateLead(event);
+    }
+
+    private createLead(value: Record<string, unknown>): void {
+        this.leadApiService.createLead(this.toLeadRequest(value)).subscribe({
             next: (lead) => {
                 this.messageService.add({
                     severity: lead.hasDuplicateWarning ? 'warn' : 'success',
@@ -64,6 +72,26 @@ export class LeadList implements OnInit {
             },
             error: (error) => {
                 const detail = error.error?.errors?.join?.(' ') ?? 'Failed to create lead.';
+                this.messageService.add({ severity: 'error', summary: 'Validation failed', detail, life: 6000 });
+            }
+        });
+    }
+
+    private updateLead(event: CrudSaveEvent): void {
+        const id = event.original ? this.getRowId(event.original) : null;
+
+        if (!id) {
+            this.messageService.add({ severity: 'error', summary: 'Update failed', detail: 'Lead id is missing.', life: 4000 });
+            return;
+        }
+
+        this.leadApiService.updateLead(id, this.toLeadRequest(event.value as Record<string, unknown>)).subscribe({
+            next: (lead) => {
+                this.messageService.add({ severity: 'success', summary: 'Lead updated', detail: `${lead.leadNumber} was updated successfully.`, life: 4000 });
+                this.loadLeads();
+            },
+            error: (error) => {
+                const detail = error.error?.errors?.join?.(' ') ?? 'Failed to update lead.';
                 this.messageService.add({ severity: 'error', summary: 'Validation failed', detail, life: 6000 });
             }
         });
@@ -148,7 +176,7 @@ export class LeadList implements OnInit {
         });
     }
 
-    private toCreateLeadRequest(value: Record<string, unknown>): CreateLeadRequest {
+    private toLeadRequest(value: Record<string, unknown>): CreateLeadRequest | UpdateLeadRequest {
         return {
             sourceId: String(value['sourceId']),
             categoryId: String(value['categoryId']),

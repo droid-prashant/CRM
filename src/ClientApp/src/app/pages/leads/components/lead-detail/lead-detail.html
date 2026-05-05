@@ -26,7 +26,8 @@
                 <p-button label="Qualify" icon="pi pi-check-circle" severity="success" outlined (onClick)="openQualificationDialog()" />
                 <p-button label="Disqualify" icon="pi pi-times-circle" severity="danger" outlined (onClick)="openDisqualificationDialog()" />
             }
-            @if (canEditLead) {
+            @if (canShowEditActions) {
+                <p-button label="Edit" icon="pi pi-pencil" severity="secondary" outlined [loading]="isSavingLead" (onClick)="openEditDialog()" />
                 <p-button label="Assign" icon="pi pi-user-plus" severity="secondary" outlined [loading]="isAssigning" (onClick)="openAssignmentDialog()" />
             }
             @if (canShowConvert) {
@@ -247,6 +248,91 @@
         <ng-template #footer>
             <p-button label="Cancel" icon="pi pi-times" text [disabled]="isAssigning" (onClick)="assignmentDialog = false" />
             <p-button label="Assign" icon="pi pi-user-plus" [loading]="isAssigning" (onClick)="assignLead()" />
+        </ng-template>
+    </p-dialog>
+
+    <p-dialog [(visible)]="editDialog" [modal]="true" [style]="{ width: 'min(1120px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" header="Edit Lead">
+        @if (leadLookups) {
+            <form [formGroup]="editForm" class="grid grid-cols-12 gap-4">
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Source <span class="text-red-500">*</span></label>
+                    <p-select [options]="leadLookups.sources" optionLabel="name" optionValue="id" appendTo="body" formControlName="sourceId" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Category <span class="text-red-500">*</span></label>
+                    <p-select [options]="leadLookups.categories" optionLabel="name" optionValue="id" appendTo="body" formControlName="categoryId" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Partner</label>
+                    <p-select [options]="leadLookups.partners" optionLabel="name" optionValue="id" appendTo="body" formControlName="partnerId" class="w-full" />
+                </div>
+
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Company Name <span class="text-red-500">*</span></label>
+                    <input pInputText formControlName="companyName" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Website</label>
+                    <input pInputText formControlName="website" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Campaign</label>
+                    <input pInputText formControlName="campaignName" class="w-full" />
+                </div>
+
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Contact Person <span class="text-red-500">*</span></label>
+                    <input pInputText formControlName="contactPersonName" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Job Title</label>
+                    <input pInputText formControlName="jobTitle" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Lead Score</label>
+                    <p-inputnumber formControlName="leadScore" [useGrouping]="false" class="w-full" />
+                </div>
+
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Email</label>
+                    <input pInputText formControlName="email" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Phone</label>
+                    <input pInputText formControlName="phone" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Alternate Phone</label>
+                    <input pInputText formControlName="alternatePhone" class="w-full" />
+                </div>
+
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Country <span class="text-red-500">*</span></label>
+                    <p-select [options]="leadLookups.countries" optionLabel="name" optionValue="id" appendTo="body" formControlName="countryId" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Industry</label>
+                    <p-select [options]="leadLookups.industries" optionLabel="name" optionValue="id" appendTo="body" formControlName="industryId" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Products <span class="text-red-500">*</span></label>
+                    <p-multiselect [options]="leadLookups.products" optionLabel="name" optionValue="id" appendTo="body" formControlName="productIds" display="chip" class="w-full" />
+                </div>
+
+                <div class="col-span-12">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Address</label>
+                    <textarea pTextarea rows="2" formControlName="address" class="w-full"></textarea>
+                </div>
+                <div class="col-span-12">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Notes</label>
+                    <textarea pTextarea rows="3" formControlName="notes" class="w-full"></textarea>
+                </div>
+            </form>
+        }
+
+        <ng-template #footer>
+            <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSavingLead" (onClick)="editDialog = false" />
+            <p-button label="Save" icon="pi pi-check" [loading]="isSavingLead" (onClick)="updateLead()" />
         </ng-template>
     </p-dialog>
 

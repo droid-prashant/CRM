@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { environment } from 'src/environments/environment';
+import { apiUrl } from '@/core/http/api-url';
 import { CreateRoleRequest } from '../dtos/create-role.request';
 import { UpdateRolePermissionsRequest } from '../dtos/update-role-permissions.request';
 import { UpdateRoleRequest } from '../dtos/update-role.request';
@@ -11,7 +11,7 @@ import { RoleUserListItemViewModel } from '../view-models/role-user-list-item.vi
 
 @Injectable({ providedIn: 'root' })
 export class RoleApiService {
-    private readonly rolesUrl = `${environment.apiUrl}/roles`;
+    private readonly rolesUrl = apiUrl('/roles');
 
     constructor(private readonly http: HttpClient) {}
 

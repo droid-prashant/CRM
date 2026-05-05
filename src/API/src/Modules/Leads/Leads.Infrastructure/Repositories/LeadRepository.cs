@@ -254,6 +254,50 @@ namespace Leads.Infrastructure.Repositories
             return detail;
         }
 
+        public async Task<LeadDetailViewModel?> UpdateLeadAsync(Guid id, UpdateLeadRequest request, CancellationToken cancellationToken)
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            var lead = await _dbContext.Leads
+                .Include(x => x.ProductInterests)
+                .Include(x => x.TimelineEntries)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+
+            if (lead == null || lead.Status == LeadStatus.Converted)
+            {
+                return null;
+            }
+
+            lead.SourceId = request.SourceId;
+            lead.CategoryId = request.CategoryId;
+            lead.PartnerId = request.PartnerId;
+            lead.CampaignName = Clean(request.CampaignName);
+            lead.CompanyName = request.CompanyName.Trim();
+            lead.Website = Clean(request.Website);
+            lead.ContactPersonName = request.ContactPersonName.Trim();
+            lead.JobTitle = Clean(request.JobTitle);
+            lead.Email = Clean(request.Email);
+            lead.Phone = Clean(request.Phone);
+            lead.AlternatePhone = Clean(request.AlternatePhone);
+            lead.CountryId = request.CountryId;
+            lead.Address = Clean(request.Address);
+            lead.IndustryId = request.IndustryId;
+            lead.Notes = Clean(request.Notes);
+            lead.LeadScore = request.LeadScore;
+
+            UpdateProductInterests(lead, request.ProductIds);
+            lead.TimelineEntries.Add(new LeadTimelineEntry
+            {
+                EventType = "LeadUpdated",
+                Description = "Lead details were updated."
+            });
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return await GetLeadDetailAsync(id, cancellationToken);
+        }
+
         public async Task<LeadQualificationViewModel?> GetLeadQualificationAsync(Guid id, CancellationToken cancellationToken)
         {
             var lead = await _dbContext.Leads
@@ -744,6 +788,25 @@ namespace Leads.Infrastructure.Repositories
                 Email = Clean(request.Email),
                 Phone = Clean(request.Phone)
             };
+        }
+
+        private static void UpdateProductInterests(Lead lead, List<Guid> productIds)
+        {
+            var selectedIds = productIds.Distinct().ToHashSet();
+
+            foreach (var existingInterest in lead.ProductInterests)
+            {
+                existingInterest.IsActive = selectedIds.Contains(existingInterest.ProductId);
+            }
+
+            var existingIds = lead.ProductInterests.Select(x => x.ProductId).ToHashSet();
+            foreach (var newProductId in selectedIds.Except(existingIds))
+            {
+                lead.ProductInterests.Add(new LeadProductInterest
+                {
+                    ProductId = newProductId
+                });
+            }
         }
 
         private Task<List<ContactLookupViewModel>> GetContactLookupsAsync(CancellationToken cancellationToken)

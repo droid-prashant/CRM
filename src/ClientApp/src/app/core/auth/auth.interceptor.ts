@@ -2,14 +2,14 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
-import { environment } from 'src/environments/environment';
+import { isApiUrl } from '@/core/http/api-url';
 import { AuthService } from './auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
     const authService = inject(AuthService);
     const router = inject(Router);
     const token = authService.getToken();
-    const isApiRequest = request.url.startsWith(environment.apiUrl);
+    const isApiRequest = isApiUrl(request.url);
     const isAuthRequest = request.url.includes('/auth/login');
 
     if (isApiRequest && !isAuthRequest && authService.isTokenExpired()) {

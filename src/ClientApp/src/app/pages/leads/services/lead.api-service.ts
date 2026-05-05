@@ -2,7 +2,9 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { forkJoin, Observable } from 'rxjs';
 import { CreateLeadRequest } from '../dtos/create-lead.request';
+import { UpdateLeadRequest } from '../dtos/update-lead.request';
 import { LeadDetailViewModel } from '../view-models/lead-detail.view-model';
+import { LeadEditViewModel } from '../view-models/lead-edit.view-model';
 import { LeadListItemViewModel } from '../view-models/lead-list-item.view-model';
 import { LookupViewModel } from '../view-models/lookup.view-model';
 import { LeadEndpointService } from './lead.endpoint.service';
@@ -140,8 +142,16 @@ export class LeadApiService {
         return this.http.get<LeadDetailViewModel>(`${this.endpoints.leads}/${id}`);
     }
 
+    getLeadForEdit(id: string): Observable<LeadEditViewModel> {
+        return this.http.get<LeadEditViewModel>(`${this.endpoints.leads}/${id}/edit`);
+    }
+
     createLead(request: CreateLeadRequest): Observable<LeadDetailViewModel> {
         return this.http.post<LeadDetailViewModel>(this.endpoints.leads, request);
+    }
+
+    updateLead(id: string, request: UpdateLeadRequest): Observable<LeadDetailViewModel> {
+        return this.http.put<LeadDetailViewModel>(`${this.endpoints.leads}/${id}`, request);
     }
 
     qualifyLead(id: string, request: QualifyLeadRequest): Observable<LeadQualificationResultViewModel> {

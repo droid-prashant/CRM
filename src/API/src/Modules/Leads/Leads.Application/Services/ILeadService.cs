@@ -10,6 +10,7 @@ namespace Leads.Application.Services
         Task<LeadEditViewModel?> GetLeadEditAsync(Guid id, CancellationToken cancellationToken);
         Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(CancellationToken cancellationToken);
         Task<CreateLeadResult> CreateLeadAsync(CreateLeadRequest request, CancellationToken cancellationToken);
+        Task<CreateLeadResult> UpdateLeadAsync(Guid id, UpdateLeadRequest request, CancellationToken cancellationToken);
         Task<LeadQualificationViewModel?> GetLeadQualificationAsync(Guid id, CancellationToken cancellationToken);
         Task<LeadQualificationResult> QualifyLeadAsync(Guid id, QualifyLeadRequest request, CancellationToken cancellationToken);
         Task<LeadQualificationResult> DisqualifyLeadAsync(Guid id, DisqualifyLeadRequest request, CancellationToken cancellationToken);

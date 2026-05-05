@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs';
-import { environment } from 'src/environments/environment';
+import { apiUrl } from '@/core/http/api-url';
 import { AuthUser, LoginRequest, LoginResponse } from './auth.models';
 
 const tokenStorageKey = 'crm.auth.token';
@@ -24,7 +24,7 @@ export class AuthService {
     ) {}
 
     login(request: LoginRequest) {
-        return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, request).pipe(
+        return this.http.post<LoginResponse>(apiUrl('/auth/login'), request).pipe(
             tap((response) => {
                 const user: AuthUser = {
                     userId: response.userId,

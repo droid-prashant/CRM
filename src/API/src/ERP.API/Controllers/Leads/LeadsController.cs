@@ -44,6 +44,24 @@ namespace ERP.API.Controllers.Leads
             return CreatedAtAction(nameof(GetLead), new { id = result.Lead!.Id }, result.Lead);
         }
 
+        [HttpPut("{id:guid}")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsEdit)]
+        public async Task<ActionResult<LeadDetailViewModel>> UpdateLead(Guid id, [FromBody] UpdateLeadRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _leadService.UpdateLeadAsync(id, request, cancellationToken);
+            if (result.Succeeded)
+            {
+                return result.Lead!;
+            }
+
+            if (result.Errors.Any(x => x.Contains("not found", StringComparison.OrdinalIgnoreCase)))
+            {
+                return NotFound(new { errors = result.Errors });
+            }
+
+            return BadRequest(new { errors = result.Errors });
+        }
+
         [HttpDelete("{id:guid}")]
         [Authorize(Policy = PermissionPolicyNames.LeadsDelete)]
         public async Task<IActionResult> DeleteLead(Guid id, CancellationToken cancellationToken)

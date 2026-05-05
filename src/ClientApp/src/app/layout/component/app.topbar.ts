@@ -34,7 +34,7 @@ import { AuthService } from '@/core/auth/auth.service';
                         />
                     </g>
                 </svg>
-                <span>EasyMeal</span>
+                <span>CRM</span>
             </a>
         </div>
 
