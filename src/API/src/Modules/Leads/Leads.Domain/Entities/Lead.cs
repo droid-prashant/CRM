@@ -27,12 +27,14 @@ namespace Leads.Domain.Entities
         public DateTime? AssignedAt { get; set; }
         public DateTime? QualificationDate { get; set; }
         public string? DisqualificationReason { get; set; }
+        public Guid? ConvertedOpportunityId { get; set; }
 
         public LeadSource? Source { get; set; }
         public LeadCategory? Category { get; set; }
         public Partner? Partner { get; set; }
         public Country? Country { get; set; }
         public Industry? Industry { get; set; }
+        public Opportunity? ConvertedOpportunity { get; set; }
         public ICollection<LeadProductInterest> ProductInterests { get; set; } = new List<LeadProductInterest>();
         public ICollection<LeadTimelineEntry> TimelineEntries { get; set; } = new List<LeadTimelineEntry>();
     }

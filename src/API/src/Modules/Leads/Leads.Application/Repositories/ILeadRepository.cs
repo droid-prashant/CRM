@@ -29,6 +29,14 @@ namespace Leads.Application.Repositories
         Task<LeadQualificationViewModel?> GetLeadQualificationAsync(Guid id, CancellationToken cancellationToken);
         Task<LeadQualificationResultViewModel?> UpdateLeadStatusAsync(Guid id, string status, string? disqualificationReason, string? remarks, CancellationToken cancellationToken);
         Task<List<LeadStatusHistoryItemViewModel>?> GetLeadStatusHistoryAsync(Guid id, CancellationToken cancellationToken);
+        Task<LeadConversionViewModel?> GetLeadConversionAsync(Guid id, CancellationToken cancellationToken);
+        Task<OpportunityCreatedViewModel?> ConvertLeadAsync(Guid id, ConvertLeadRequest request, string opportunityNumber, CancellationToken cancellationToken);
+        Task<LeadAssignmentResultViewModel?> AssignLeadAsync(Guid id, AssignLeadRequest request, CancellationToken cancellationToken);
+        Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken);
+        Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken);
+        Task<bool> ClientExistsAsync(Guid clientId, CancellationToken cancellationToken);
+        Task<bool> ContactBelongsToClientAsync(Guid contactId, Guid clientId, CancellationToken cancellationToken);
+        Task<bool> UserExistsAsync(Guid userId);
         Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken);
     }
 }

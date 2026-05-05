@@ -34,6 +34,91 @@ export interface LeadQualificationResultViewModel {
     convertToOpportunityAllowed: boolean;
 }
 
+export interface LeadConversionViewModel {
+    leadId: string;
+    leadNumber: string;
+    companyName: string;
+    contactPersonName: string;
+    email?: string;
+    phone?: string;
+    productInterests: { productId: string; productCode: string; productName: string; productCategoryName?: string }[];
+    existingClients: ClientLookupViewModel[];
+    existingContacts: ContactLookupViewModel[];
+    countries: LookupViewModel[];
+    industries: LookupViewModel[];
+    currencies: CurrencyLookupViewModel[];
+    defaultOwnerUserId?: string;
+    defaultOwnerUserName?: string;
+    canConvert: boolean;
+}
+
+export interface ClientLookupViewModel {
+    id: string;
+    name: string;
+    country: string;
+}
+
+export interface ContactLookupViewModel {
+    id: string;
+    clientId: string;
+    fullName: string;
+    email?: string;
+}
+
+export interface CurrencyLookupViewModel {
+    id: string;
+    code: string;
+    name: string;
+}
+
+export interface ConvertLeadRequest {
+    productId: string;
+    clientId?: string;
+    newClient?: {
+        name: string;
+        countryId: string;
+        industryId?: string;
+    };
+    contactId?: string;
+    newContact?: {
+        firstName: string;
+        lastName: string;
+        email?: string;
+        phone?: string;
+    };
+    opportunityTitle: string;
+    estimatedValue: number;
+    currencyId: string;
+    expectedCloseDate?: string;
+    ownerUserId: string;
+}
+
+export interface OpportunityCreatedViewModel {
+    opportunityId: string;
+    opportunityNumber: string;
+    title: string;
+    clientName: string;
+    productName: string;
+    estimatedValue: number;
+    ownerUserName?: string;
+    stage: string;
+    createdAt: string;
+}
+
+export interface AssignLeadRequest {
+    assignedToUserId: string;
+    remarks?: string;
+}
+
+export interface LeadAssignmentResultViewModel {
+    leadId: string;
+    leadNumber: string;
+    status: string;
+    assignedToUserId: string;
+    assignedToUserName?: string;
+    assignedAt: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class LeadApiService {
     constructor(
@@ -59,6 +144,18 @@ export class LeadApiService {
 
     disqualifyLead(id: string, request: DisqualifyLeadRequest): Observable<LeadQualificationResultViewModel> {
         return this.http.patch<LeadQualificationResultViewModel>(`${this.endpoints.leads}/${id}/disqualify`, request);
+    }
+
+    getLeadConversion(id: string): Observable<LeadConversionViewModel> {
+        return this.http.get<LeadConversionViewModel>(`${this.endpoints.leads}/${id}/conversion`);
+    }
+
+    convertLead(id: string, request: ConvertLeadRequest): Observable<OpportunityCreatedViewModel> {
+        return this.http.post<OpportunityCreatedViewModel>(`${this.endpoints.leads}/${id}/convert`, request);
+    }
+
+    assignLead(id: string, request: AssignLeadRequest): Observable<LeadAssignmentResultViewModel> {
+        return this.http.patch<LeadAssignmentResultViewModel>(`${this.endpoints.leads}/${id}/assign`, request);
     }
 
     deleteLead(id: string): Observable<void> {

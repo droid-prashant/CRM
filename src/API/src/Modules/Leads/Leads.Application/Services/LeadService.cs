@@ -21,6 +21,9 @@ namespace Leads.Application.Services
         public Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(CancellationToken cancellationToken) => _leadRepository.GetLeadLookupsAsync(cancellationToken);
         public Task<LeadQualificationViewModel?> GetLeadQualificationAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadQualificationAsync(id, cancellationToken);
         public Task<List<LeadStatusHistoryItemViewModel>?> GetLeadStatusHistoryAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadStatusHistoryAsync(id, cancellationToken);
+        public Task<LeadConversionViewModel?> GetLeadConversionAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadConversionAsync(id, cancellationToken);
+        public Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken) => _leadRepository.GetClientLookupsAsync(cancellationToken);
+        public Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken) => _leadRepository.GetClientContactsAsync(clientId, cancellationToken);
         public Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.DeleteLeadAsync(id, cancellationToken);
 
         public async Task<CreateLeadResult> CreateLeadAsync(CreateLeadRequest request, CancellationToken cancellationToken)
@@ -96,6 +99,41 @@ namespace Leads.Application.Services
             }
 
             return new LeadQualificationResult { Qualification = qualification };
+        }
+
+        public async Task<LeadConversionResult> ConvertLeadAsync(Guid id, ConvertLeadRequest request, CancellationToken cancellationToken)
+        {
+            var errors = await ValidateConversionRequestAsync(id, request, cancellationToken);
+            if (errors.Count > 0)
+            {
+                return new LeadConversionResult { Errors = errors };
+            }
+
+            var opportunityNumber = await GenerateNextOpportunityNumberAsync(cancellationToken);
+            var opportunity = await _leadRepository.ConvertLeadAsync(id, request, opportunityNumber, cancellationToken);
+            if (opportunity == null)
+            {
+                return new LeadConversionResult { Errors = new List<string> { "Lead could not be converted." } };
+            }
+
+            return new LeadConversionResult { Opportunity = opportunity };
+        }
+
+        public async Task<LeadAssignmentResult> AssignLeadAsync(Guid id, AssignLeadRequest request, CancellationToken cancellationToken)
+        {
+            var errors = await ValidateAssignmentRequestAsync(request);
+            if (errors.Count > 0)
+            {
+                return new LeadAssignmentResult { Errors = errors };
+            }
+
+            var assignment = await _leadRepository.AssignLeadAsync(id, request, cancellationToken);
+            if (assignment == null)
+            {
+                return new LeadAssignmentResult { Errors = new List<string> { "Lead was not found or cannot be assigned." } };
+            }
+
+            return new LeadAssignmentResult { Assignment = assignment };
         }
 
         private async Task<List<string>> ValidateCreateRequestAsync(CreateLeadRequest request, CancellationToken cancellationToken)
@@ -184,6 +222,125 @@ namespace Leads.Application.Services
             }
 
             return errors;
+        }
+
+        private async Task<List<string>> ValidateConversionRequestAsync(Guid id, ConvertLeadRequest request, CancellationToken cancellationToken)
+        {
+            var errors = new List<string>();
+            var conversion = await _leadRepository.GetLeadConversionAsync(id, cancellationToken);
+
+            if (conversion == null)
+            {
+                return new List<string> { "Lead was not found." };
+            }
+
+            if (!conversion.CanConvert)
+            {
+                errors.Add("Only qualified, not-yet-converted leads can be converted.");
+            }
+
+            if (!conversion.ProductInterests.Any(x => x.ProductId == request.ProductId))
+            {
+                errors.Add("ProductId must be one of the lead product interests.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.OpportunityTitle))
+            {
+                errors.Add("OpportunityTitle is required.");
+            }
+
+            if (request.EstimatedValue < 0)
+            {
+                errors.Add("EstimatedValue must be greater than or equal to 0.");
+            }
+
+            if (request.CurrencyId == Guid.Empty)
+            {
+                errors.Add("CurrencyId is required.");
+            }
+
+            if (request.OwnerUserId == Guid.Empty || !await _leadRepository.UserExistsAsync(request.OwnerUserId))
+            {
+                errors.Add("OwnerUserId is invalid.");
+            }
+
+            if (!request.ClientId.HasValue && request.NewClient == null)
+            {
+                errors.Add("ClientId or NewClient is required.");
+            }
+
+            if (request.ClientId.HasValue && request.NewClient != null)
+            {
+                errors.Add("Provide either ClientId or NewClient, not both.");
+            }
+
+            if (request.ClientId.HasValue && !await _leadRepository.ClientExistsAsync(request.ClientId.Value, cancellationToken))
+            {
+                errors.Add("ClientId is invalid.");
+            }
+
+            if (request.NewClient != null)
+            {
+                if (string.IsNullOrWhiteSpace(request.NewClient.Name)) errors.Add("NewClient.Name is required.");
+                if (request.NewClient.CountryId == Guid.Empty || !await _leadRepository.CountryExistsAsync(request.NewClient.CountryId, cancellationToken)) errors.Add("NewClient.CountryId is invalid.");
+                if (request.NewClient.IndustryId.HasValue && !await _leadRepository.IndustryExistsAsync(request.NewClient.IndustryId.Value, cancellationToken)) errors.Add("NewClient.IndustryId is invalid.");
+            }
+
+            if (!request.ContactId.HasValue && request.NewContact == null)
+            {
+                errors.Add("ContactId or NewContact is required.");
+            }
+
+            if (request.ContactId.HasValue && request.NewContact != null)
+            {
+                errors.Add("Provide either ContactId or NewContact, not both.");
+            }
+
+            if (request.ContactId.HasValue && !request.ClientId.HasValue)
+            {
+                errors.Add("Existing contact selection requires an existing ClientId.");
+            }
+
+            if (request.ContactId.HasValue && request.ClientId.HasValue && !await _leadRepository.ContactBelongsToClientAsync(request.ContactId.Value, request.ClientId.Value, cancellationToken))
+            {
+                errors.Add("ContactId does not belong to the selected client.");
+            }
+
+            if (request.NewContact != null)
+            {
+                if (string.IsNullOrWhiteSpace(request.NewContact.FirstName)) errors.Add("NewContact.FirstName is required.");
+                if (string.IsNullOrWhiteSpace(request.NewContact.LastName)) errors.Add("NewContact.LastName is required.");
+                if (!string.IsNullOrWhiteSpace(request.NewContact.Email) && !IsValidEmail(request.NewContact.Email)) errors.Add("NewContact.Email must be valid.");
+            }
+
+            return errors;
+        }
+
+        private async Task<List<string>> ValidateAssignmentRequestAsync(AssignLeadRequest request)
+        {
+            var errors = new List<string>();
+
+            if (request.AssignedToUserId == Guid.Empty)
+            {
+                errors.Add("AssignedToUserId is required.");
+            }
+            else if (!await _leadRepository.UserExistsAsync(request.AssignedToUserId))
+            {
+                errors.Add("AssignedToUserId is invalid.");
+            }
+
+            if (request.Remarks?.Length > 1000)
+            {
+                errors.Add("Remarks must be 1000 characters or fewer.");
+            }
+
+            return errors;
+        }
+
+        private async Task<string> GenerateNextOpportunityNumberAsync(CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            return $"OPP-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
         }
 
         private static bool IsValidEmail(string email)

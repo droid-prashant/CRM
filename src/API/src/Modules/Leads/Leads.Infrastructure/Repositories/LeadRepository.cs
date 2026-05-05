@@ -347,6 +347,228 @@ namespace Leads.Infrastructure.Repositories
             return history;
         }
 
+        public async Task<LeadConversionViewModel?> GetLeadConversionAsync(Guid id, CancellationToken cancellationToken)
+        {
+            var lead = await _dbContext.Leads
+                .AsNoTracking()
+                .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+
+            if (lead == null)
+            {
+                return null;
+            }
+
+            return new LeadConversionViewModel
+            {
+                LeadId = lead.Id,
+                LeadNumber = lead.LeadNumber,
+                CompanyName = lead.CompanyName,
+                ContactPersonName = lead.ContactPersonName,
+                Email = lead.Email,
+                Phone = lead.Phone,
+                ProductInterests = lead.ProductInterests
+                    .Where(x => x.IsActive)
+                    .Select(x => new LeadProductInterestViewModel
+                    {
+                        ProductId = x.ProductId,
+                        ProductCode = x.Product?.Code ?? string.Empty,
+                        ProductName = x.Product?.Name ?? string.Empty,
+                        ProductCategoryName = x.Product?.CategoryName
+                    }).ToList(),
+                ExistingClients = await GetClientLookupsAsync(cancellationToken),
+                ExistingContacts = await GetContactLookupsAsync(cancellationToken),
+                Countries = await GetCountryLookupsAsync(cancellationToken),
+                Industries = await GetIndustryLookupsAsync(cancellationToken),
+                Currencies = GetCurrencyLookups(),
+                DefaultOwnerUserId = lead.AssignedToUserId,
+                DefaultOwnerUserName = await GetUserFullNameAsync(lead.AssignedToUserId),
+                CanConvert = lead.Status == LeadStatus.Qualified && !lead.ConvertedOpportunityId.HasValue
+            };
+        }
+
+        public async Task<OpportunityCreatedViewModel?> ConvertLeadAsync(Guid id, ConvertLeadRequest request, string opportunityNumber, CancellationToken cancellationToken)
+        {
+            var lead = await _dbContext.Leads
+                .Include(x => x.ProductInterests)
+                .Include(x => x.TimelineEntries)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+
+            if (lead == null || lead.Status != LeadStatus.Qualified || lead.ConvertedOpportunityId.HasValue)
+            {
+                return null;
+            }
+
+            if (!lead.ProductInterests.Any(x => x.IsActive && x.ProductId == request.ProductId))
+            {
+                return null;
+            }
+
+            var client = request.ClientId.HasValue
+                ? await _dbContext.Clients.FirstOrDefaultAsync(x => x.Id == request.ClientId.Value && x.IsActive, cancellationToken)
+                : CreateClient(request.NewClient!);
+
+            if (client == null)
+            {
+                return null;
+            }
+
+            if (!request.ClientId.HasValue)
+            {
+                _dbContext.Clients.Add(client);
+            }
+
+            var contact = request.ContactId.HasValue
+                ? await _dbContext.ClientContacts.FirstOrDefaultAsync(x => x.Id == request.ContactId.Value && x.ClientId == client.Id && x.IsActive, cancellationToken)
+                : CreateContact(client, request.NewContact!);
+
+            if (contact == null)
+            {
+                return null;
+            }
+
+            if (!request.ContactId.HasValue)
+            {
+                _dbContext.ClientContacts.Add(contact);
+            }
+
+            var opportunity = new Opportunity
+            {
+                OpportunityNumber = opportunityNumber,
+                LeadId = lead.Id,
+                ProductId = request.ProductId,
+                Client = client,
+                Contact = contact,
+                Title = request.OpportunityTitle.Trim(),
+                EstimatedValue = request.EstimatedValue,
+                CurrencyId = request.CurrencyId,
+                ExpectedCloseDate = request.ExpectedCloseDate,
+                OwnerUserId = request.OwnerUserId
+            };
+
+            _dbContext.Opportunities.Add(opportunity);
+            lead.Status = LeadStatus.Converted;
+            lead.ConvertedOpportunity = opportunity;
+            lead.TimelineEntries.Add(new LeadTimelineEntry
+            {
+                EventType = "LeadConverted",
+                Description = $"Lead converted to opportunity {opportunityNumber}."
+            });
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            var productName = await _dbContext.Products
+                .Where(x => x.Id == opportunity.ProductId)
+                .Select(x => x.Name)
+                .FirstAsync(cancellationToken);
+
+            return new OpportunityCreatedViewModel
+            {
+                OpportunityId = opportunity.Id,
+                OpportunityNumber = opportunity.OpportunityNumber,
+                Title = opportunity.Title,
+                ClientName = client.Name,
+                ProductName = productName,
+                EstimatedValue = opportunity.EstimatedValue,
+                OwnerUserName = await GetUserFullNameAsync(opportunity.OwnerUserId),
+                Stage = opportunity.Stage,
+                CreatedAt = opportunity.CreatedOn
+            };
+        }
+
+        public async Task<LeadAssignmentResultViewModel?> AssignLeadAsync(Guid id, AssignLeadRequest request, CancellationToken cancellationToken)
+        {
+            var lead = await _dbContext.Leads
+                .Include(x => x.TimelineEntries)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+
+            if (lead == null || lead.Status == LeadStatus.Converted)
+            {
+                return null;
+            }
+
+            lead.AssignedToUserId = request.AssignedToUserId;
+            lead.AssignedAt = DateTime.UtcNow;
+
+            if (lead.Status == LeadStatus.New)
+            {
+                lead.Status = LeadStatus.Assigned;
+            }
+
+            var assigneeName = await GetUserFullNameAsync(request.AssignedToUserId);
+            lead.TimelineEntries.Add(new LeadTimelineEntry
+            {
+                EventType = "LeadAssigned",
+                Description = BuildAssignmentDescription(assigneeName, request.Remarks)
+            });
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return new LeadAssignmentResultViewModel
+            {
+                LeadId = lead.Id,
+                LeadNumber = lead.LeadNumber,
+                Status = lead.Status.ToString(),
+                AssignedToUserId = request.AssignedToUserId,
+                AssignedToUserName = assigneeName,
+                AssignedAt = lead.AssignedAt.Value
+            };
+        }
+
+        public Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken)
+        {
+            return _dbContext.Clients
+                .AsNoTracking()
+                .Include(x => x.Country)
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.Name)
+                .Select(x => new ClientLookupViewModel
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    Country = x.Country != null ? x.Country.Name : string.Empty
+                })
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken)
+        {
+            var clientExists = await ClientExistsAsync(clientId, cancellationToken);
+            if (!clientExists)
+            {
+                return null;
+            }
+
+            return await _dbContext.ClientContacts
+                .AsNoTracking()
+                .Where(x => x.ClientId == clientId && x.IsActive)
+                .OrderBy(x => x.FirstName)
+                .ThenBy(x => x.LastName)
+                .Select(x => new ContactLookupViewModel
+                {
+                    Id = x.Id,
+                    ClientId = x.ClientId,
+                    FullName = (x.FirstName + " " + x.LastName).Trim(),
+                    Email = x.Email
+                })
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<bool> ClientExistsAsync(Guid clientId, CancellationToken cancellationToken)
+        {
+            return _dbContext.Clients.AnyAsync(x => x.Id == clientId && x.IsActive, cancellationToken);
+        }
+
+        public Task<bool> ContactBelongsToClientAsync(Guid contactId, Guid clientId, CancellationToken cancellationToken)
+        {
+            return _dbContext.ClientContacts.AnyAsync(x => x.Id == contactId && x.ClientId == clientId && x.IsActive, cancellationToken);
+        }
+
+        public async Task<bool> UserExistsAsync(Guid userId)
+        {
+            return await _userManager.FindByIdAsync(userId.ToString()) != null;
+        }
+
         public async Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken)
         {
             var lead = await _dbContext.Leads
@@ -422,6 +644,7 @@ namespace Leads.Infrastructure.Repositories
                 AssignedAt = lead.AssignedAt,
                 QualificationDate = lead.QualificationDate,
                 DisqualificationReason = lead.DisqualificationReason,
+                ConvertedOpportunityId = lead.ConvertedOpportunityId,
                 CreatedAt = lead.CreatedOn,
                 CreatedBy = lead.CreatedBy,
                 UpdatedAt = lead.UpdatedOn,
@@ -484,6 +707,62 @@ namespace Leads.Infrastructure.Repositories
         private static string BuildStatusChangeDescription(string previousStatus, string newStatus, string? remarks)
         {
             return $"PreviousStatus={previousStatus};NewStatus={newStatus};Remarks={Clean(remarks) ?? string.Empty}";
+        }
+
+        private static string BuildAssignmentDescription(string? assigneeName, string? remarks)
+        {
+            var description = $"Lead assigned to {assigneeName ?? "selected user"}.";
+            var cleanRemarks = Clean(remarks);
+            return cleanRemarks == null ? description : $"{description} Remarks: {cleanRemarks}";
+        }
+
+        private static Client CreateClient(NewClientRequest request)
+        {
+            return new Client
+            {
+                Name = request.Name.Trim(),
+                CountryId = request.CountryId,
+                IndustryId = request.IndustryId
+            };
+        }
+
+        private static ClientContact CreateContact(Client client, NewContactRequest request)
+        {
+            return new ClientContact
+            {
+                Client = client,
+                FirstName = request.FirstName.Trim(),
+                LastName = request.LastName.Trim(),
+                Email = Clean(request.Email),
+                Phone = Clean(request.Phone)
+            };
+        }
+
+        private Task<List<ContactLookupViewModel>> GetContactLookupsAsync(CancellationToken cancellationToken)
+        {
+            return _dbContext.ClientContacts
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.FirstName)
+                .ThenBy(x => x.LastName)
+                .Select(x => new ContactLookupViewModel
+                {
+                    Id = x.Id,
+                    ClientId = x.ClientId,
+                    FullName = (x.FirstName + " " + x.LastName).Trim(),
+                    Email = x.Email
+                })
+                .ToListAsync(cancellationToken);
+        }
+
+        private static List<CurrencyLookupViewModel> GetCurrencyLookups()
+        {
+            return new List<CurrencyLookupViewModel>
+            {
+                new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000001"), Code = "NPR", Name = "Nepalese Rupee" },
+                new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000002"), Code = "USD", Name = "US Dollar" },
+                new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000003"), Code = "INR", Name = "Indian Rupee" }
+            };
         }
 
         private static (string PreviousStatus, string NewStatus, string? Remarks) ParseStatusChangeDescription(string description)

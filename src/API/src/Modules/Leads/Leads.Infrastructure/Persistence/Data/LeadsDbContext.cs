@@ -24,6 +24,9 @@ namespace Leads.Infrastructure.Persistence.Data
         public DbSet<Partner> Partners { get; set; }
         public DbSet<Country> Countries { get; set; }
         public DbSet<Industry> Industries { get; set; }
+        public DbSet<Client> Clients { get; set; }
+        public DbSet<ClientContact> ClientContacts { get; set; }
+        public DbSet<Opportunity> Opportunities { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -45,6 +48,7 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.Property(x => x.Email).HasMaxLength(250);
                 entity.Property(x => x.Phone).HasMaxLength(50);
                 entity.Property(x => x.Status).HasConversion<int>();
+                entity.HasOne(x => x.ConvertedOpportunity).WithMany().HasForeignKey(x => x.ConvertedOpportunityId);
                 entity.HasMany(x => x.ProductInterests).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
                 entity.HasMany(x => x.TimelineEntries).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
             });
@@ -53,6 +57,37 @@ namespace Leads.Infrastructure.Persistence.Data
             {
                 entity.HasIndex(x => new { x.LeadId, x.ProductId }).IsUnique();
                 entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId);
+            });
+
+            modelBuilder.Entity<Client>(entity =>
+            {
+                entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
+                entity.HasIndex(x => x.Name);
+                entity.HasOne(x => x.Country).WithMany().HasForeignKey(x => x.CountryId);
+                entity.HasOne(x => x.Industry).WithMany().HasForeignKey(x => x.IndustryId);
+                entity.HasMany(x => x.Contacts).WithOne(x => x.Client).HasForeignKey(x => x.ClientId);
+            });
+
+            modelBuilder.Entity<ClientContact>(entity =>
+            {
+                entity.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
+                entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
+                entity.Property(x => x.Email).HasMaxLength(250);
+                entity.Property(x => x.Phone).HasMaxLength(50);
+                entity.HasIndex(x => new { x.ClientId, x.Email });
+            });
+
+            modelBuilder.Entity<Opportunity>(entity =>
+            {
+                entity.HasIndex(x => x.OpportunityNumber).IsUnique();
+                entity.Property(x => x.OpportunityNumber).HasMaxLength(30).IsRequired();
+                entity.Property(x => x.Title).HasMaxLength(250).IsRequired();
+                entity.Property(x => x.EstimatedValue).HasPrecision(18, 2);
+                entity.Property(x => x.Stage).HasMaxLength(50).IsRequired();
+                entity.HasOne(x => x.Lead).WithMany().HasForeignKey(x => x.LeadId);
+                entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId);
+                entity.HasOne(x => x.Client).WithMany().HasForeignKey(x => x.ClientId);
+                entity.HasOne(x => x.Contact).WithMany().HasForeignKey(x => x.ContactId);
             });
 
             ConfigureLookup<LeadSource>(modelBuilder);

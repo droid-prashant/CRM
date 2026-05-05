@@ -100,6 +100,50 @@ namespace ERP.API.Controllers.Leads
             return history == null ? NotFound() : history;
         }
 
+        [HttpGet("{id:guid}/conversion")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsView)]
+        public async Task<ActionResult<LeadConversionViewModel>> GetLeadConversion(Guid id, CancellationToken cancellationToken)
+        {
+            var lead = await _leadService.GetLeadConversionAsync(id, cancellationToken);
+            return lead == null ? NotFound() : lead;
+        }
+
+        [HttpPost("{id:guid}/convert")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsApprove)]
+        public async Task<ActionResult<OpportunityCreatedViewModel>> ConvertLead(Guid id, [FromBody] ConvertLeadRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _leadService.ConvertLeadAsync(id, request, cancellationToken);
+            if (result.Succeeded)
+            {
+                return result.Opportunity!;
+            }
+
+            if (result.Errors.Any(x => x.Contains("not found", StringComparison.OrdinalIgnoreCase)))
+            {
+                return NotFound(new { errors = result.Errors });
+            }
+
+            return BadRequest(new { errors = result.Errors });
+        }
+
+        [HttpPatch("{id:guid}/assign")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsEdit)]
+        public async Task<ActionResult<LeadAssignmentResultViewModel>> AssignLead(Guid id, [FromBody] AssignLeadRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _leadService.AssignLeadAsync(id, request, cancellationToken);
+            if (result.Succeeded)
+            {
+                return result.Assignment!;
+            }
+
+            if (result.Errors.Any(x => x.Contains("not found", StringComparison.OrdinalIgnoreCase)))
+            {
+                return NotFound(new { errors = result.Errors });
+            }
+
+            return BadRequest(new { errors = result.Errors });
+        }
+
         [HttpGet("lookups")]
         [Authorize(Policy = PermissionPolicyNames.LeadsView)]
         public async Task<ActionResult<List<LeadLookupViewModel>>> GetLeadLookups(CancellationToken cancellationToken)

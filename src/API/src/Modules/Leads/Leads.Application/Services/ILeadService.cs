@@ -15,6 +15,11 @@ namespace Leads.Application.Services
         Task<LeadQualificationResult> DisqualifyLeadAsync(Guid id, DisqualifyLeadRequest request, CancellationToken cancellationToken);
         Task<LeadQualificationResult> UpdateLeadStatusAsync(Guid id, UpdateLeadStatusRequest request, CancellationToken cancellationToken);
         Task<List<LeadStatusHistoryItemViewModel>?> GetLeadStatusHistoryAsync(Guid id, CancellationToken cancellationToken);
+        Task<LeadConversionViewModel?> GetLeadConversionAsync(Guid id, CancellationToken cancellationToken);
+        Task<LeadConversionResult> ConvertLeadAsync(Guid id, ConvertLeadRequest request, CancellationToken cancellationToken);
+        Task<LeadAssignmentResult> AssignLeadAsync(Guid id, AssignLeadRequest request, CancellationToken cancellationToken);
+        Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken);
+        Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken);
         Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken);
     }
 }

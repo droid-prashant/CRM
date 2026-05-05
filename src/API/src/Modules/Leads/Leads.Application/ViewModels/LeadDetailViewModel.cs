@@ -31,6 +31,7 @@ namespace Leads.Application.ViewModels
         public DateTime? AssignedAt { get; set; }
         public DateTime? QualificationDate { get; set; }
         public string? DisqualificationReason { get; set; }
+        public Guid? ConvertedOpportunityId { get; set; }
         public List<LeadProductInterestViewModel> ProductInterests { get; set; } = new();
         public List<LeadTimelineEntryViewModel> TimelineEntries { get; set; } = new();
         public DateTime CreatedAt { get; set; }

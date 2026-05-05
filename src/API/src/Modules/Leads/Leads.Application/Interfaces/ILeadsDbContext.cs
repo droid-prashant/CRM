@@ -14,6 +14,9 @@ namespace Leads.Application.Interfaces
         DbSet<Partner> Partners { get; set; }
         DbSet<Country> Countries { get; set; }
         DbSet<Industry> Industries { get; set; }
+        DbSet<Client> Clients { get; set; }
+        DbSet<ClientContact> ClientContacts { get; set; }
+        DbSet<Opportunity> Opportunities { get; set; }
         Task<int> SaveChangesAsync(CancellationToken cancellationToken);
     }
 }

@@ -28,6 +28,7 @@ export interface LeadDetailViewModel {
     assignedAt?: string;
     qualificationDate?: string;
     disqualificationReason?: string;
+    convertedOpportunityId?: string;
     productInterests: LeadProductInterestViewModel[];
     timelineEntries: LeadTimelineEntryViewModel[];
     createdAt: string;
