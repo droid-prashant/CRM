@@ -14,6 +14,7 @@ namespace Leads.Application.ViewModels
         public List<LookupViewModel> Countries { get; set; } = new();
         public List<LookupViewModel> Industries { get; set; } = new();
         public List<CurrencyLookupViewModel> Currencies { get; set; } = new();
+        public List<LeadUserLookupViewModel> OwnerUsers { get; set; } = new();
         public Guid? DefaultOwnerUserId { get; set; }
         public string? DefaultOwnerUserName { get; set; }
         public bool CanConvert { get; set; }
@@ -39,5 +40,11 @@ namespace Leads.Application.ViewModels
         public Guid Id { get; set; }
         public string Code { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
+    }
+
+    public class LeadUserLookupViewModel
+    {
+        public Guid Id { get; set; }
+        public string FullName { get; set; } = string.Empty;
     }
 }

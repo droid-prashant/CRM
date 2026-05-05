@@ -47,6 +47,7 @@ export interface LeadConversionViewModel {
     countries: LookupViewModel[];
     industries: LookupViewModel[];
     currencies: CurrencyLookupViewModel[];
+    ownerUsers: LeadUserLookupViewModel[];
     defaultOwnerUserId?: string;
     defaultOwnerUserName?: string;
     canConvert: boolean;
@@ -69,6 +70,11 @@ export interface CurrencyLookupViewModel {
     id: string;
     code: string;
     name: string;
+}
+
+export interface LeadUserLookupViewModel {
+    id: string;
+    fullName: string;
 }
 
 export interface ConvertLeadRequest {

@@ -6,6 +6,7 @@ using Leads.Application.Services;
 using Leads.Application.ViewModels;
 using Leads.Domain.Entities;
 using Leads.Domain.Enums;
+using Leads.Infrastructure.Persistence.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,11 +14,11 @@ namespace Leads.Infrastructure.Repositories
 {
     public class LeadRepository : ILeadRepository
     {
-        private readonly ILeadsDbContext _dbContext;
+        private readonly LeadsDbContext _dbContext;
         private readonly ILeadAssignmentService _leadAssignmentService;
         private readonly UserManager<ApplicationUser> _userManager;
 
-        public LeadRepository(ILeadsDbContext dbContext, ILeadAssignmentService leadAssignmentService, UserManager<ApplicationUser> userManager)
+        public LeadRepository(LeadsDbContext dbContext, ILeadAssignmentService leadAssignmentService, UserManager<ApplicationUser> userManager)
         {
             _dbContext = dbContext;
             _leadAssignmentService = leadAssignmentService;
@@ -381,6 +382,7 @@ namespace Leads.Infrastructure.Repositories
                 Countries = await GetCountryLookupsAsync(cancellationToken),
                 Industries = await GetIndustryLookupsAsync(cancellationToken),
                 Currencies = GetCurrencyLookups(),
+                OwnerUsers = await GetActiveUserLookupsAsync(cancellationToken),
                 DefaultOwnerUserId = lead.AssignedToUserId,
                 DefaultOwnerUserName = await GetUserFullNameAsync(lead.AssignedToUserId),
                 CanConvert = lead.Status == LeadStatus.Qualified && !lead.ConvertedOpportunityId.HasValue
@@ -389,6 +391,8 @@ namespace Leads.Infrastructure.Repositories
 
         public async Task<OpportunityCreatedViewModel?> ConvertLeadAsync(Guid id, ConvertLeadRequest request, string opportunityNumber, CancellationToken cancellationToken)
         {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
             var lead = await _dbContext.Leads
                 .Include(x => x.ProductInterests)
                 .Include(x => x.TimelineEntries)
@@ -447,8 +451,10 @@ namespace Leads.Infrastructure.Repositories
             };
 
             _dbContext.Opportunities.Add(opportunity);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
             lead.Status = LeadStatus.Converted;
-            lead.ConvertedOpportunity = opportunity;
+            lead.ConvertedOpportunityId = opportunity.Id;
             lead.TimelineEntries.Add(new LeadTimelineEntry
             {
                 EventType = "LeadConverted",
@@ -456,6 +462,7 @@ namespace Leads.Infrastructure.Repositories
             });
 
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
             var productName = await _dbContext.Products
                 .Where(x => x.Id == opportunity.ProductId)
@@ -566,7 +573,8 @@ namespace Leads.Infrastructure.Repositories
 
         public async Task<bool> UserExistsAsync(Guid userId)
         {
-            return await _userManager.FindByIdAsync(userId.ToString()) != null;
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            return user?.IsActive == true;
         }
 
         public async Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken)
@@ -763,6 +771,20 @@ namespace Leads.Infrastructure.Repositories
                 new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000002"), Code = "USD", Name = "US Dollar" },
                 new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000003"), Code = "INR", Name = "Indian Rupee" }
             };
+        }
+
+        private Task<List<LeadUserLookupViewModel>> GetActiveUserLookupsAsync(CancellationToken cancellationToken)
+        {
+            return _userManager.Users
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.FullName)
+                .Select(x => new LeadUserLookupViewModel
+                {
+                    Id = x.Id,
+                    FullName = x.FullName
+                })
+                .ToListAsync(cancellationToken);
         }
 
         private static (string PreviousStatus, string NewStatus, string? Remarks) ParseStatusChangeDescription(string description)

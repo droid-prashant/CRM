@@ -279,8 +279,8 @@
                 </div>
 
                 <div class="col-span-12">
-                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Owner User Id <span class="text-red-500">*</span></label>
-                    <input pInputText formControlName="ownerUserId" class="w-full" />
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Owner <span class="text-red-500">*</span></label>
+                    <p-select [options]="conversion.ownerUsers" optionLabel="fullName" optionValue="id" appendTo="body" formControlName="ownerUserId" class="w-full" />
                 </div>
 
                 <div class="col-span-12 md:col-span-6">

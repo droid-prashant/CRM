@@ -183,6 +183,7 @@ export class LeadDetail implements OnInit {
                 this.conversion = conversion;
                 const firstProduct = conversion.productInterests[0]?.productId ?? '';
                 const firstCurrency = conversion.currencies[0]?.id ?? '';
+                const defaultOwnerUserId = conversion.defaultOwnerUserId ?? conversion.ownerUsers[0]?.id ?? '';
                 this.conversionForm.reset({
                     productId: firstProduct,
                     clientMode: 'new',
@@ -200,7 +201,7 @@ export class LeadDetail implements OnInit {
                     estimatedValue: 0,
                     currencyId: firstCurrency,
                     expectedCloseDate: '',
-                    ownerUserId: conversion.defaultOwnerUserId ?? ''
+                    ownerUserId: defaultOwnerUserId
                 });
                 this.conversionDialog = true;
                 this.isConverting = false;
