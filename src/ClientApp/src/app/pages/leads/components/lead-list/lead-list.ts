@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/core/auth/auth.service';
@@ -34,7 +35,8 @@ export class LeadList implements OnInit {
     constructor(
         private readonly leadApiService: LeadApiService,
         private readonly messageService: MessageService,
-        private readonly authService: AuthService
+        private readonly authService: AuthService,
+        private readonly router: Router
     ) {}
 
     ngOnInit(): void {
@@ -103,6 +105,16 @@ export class LeadList implements OnInit {
                 this.messageService.add({ severity: 'error', summary: 'Delete failed', detail: 'Unable to delete the selected leads.', life: 5000 });
             }
         });
+    }
+
+    viewLead(row: Record<string, unknown>): void {
+        const id = this.getRowId(row);
+        if (!id) {
+            this.messageService.add({ severity: 'error', summary: 'Detail failed', detail: 'Lead id is missing.', life: 4000 });
+            return;
+        }
+
+        this.router.navigate(['/pages/leads', id]);
     }
 
     private loadPage(): void {

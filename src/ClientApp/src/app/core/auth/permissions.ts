@@ -20,7 +20,9 @@ export const Permissions = {
     leads: {
         view: 'leads:view',
         create: 'leads:create',
+        edit: 'leads:edit',
         delete: 'leads:delete',
+        approve: 'leads:approve',
         export: 'leads:export'
     }
 } as const;

@@ -32,11 +32,20 @@ namespace Leads.Application.ViewModels
         public DateTime? QualificationDate { get; set; }
         public string? DisqualificationReason { get; set; }
         public List<LeadProductInterestViewModel> ProductInterests { get; set; } = new();
+        public List<LeadTimelineEntryViewModel> TimelineEntries { get; set; } = new();
         public DateTime CreatedAt { get; set; }
         public Guid CreatedBy { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public Guid? UpdatedBy { get; set; }
         public bool HasDuplicateWarning { get; set; }
         public string? DuplicateWarning { get; set; }
+    }
+
+    public class LeadTimelineEntryViewModel
+    {
+        public Guid Id { get; set; }
+        public string EventType { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
     }
 }

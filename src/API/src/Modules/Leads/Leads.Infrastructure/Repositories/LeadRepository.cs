@@ -1,3 +1,4 @@
+using ERP.Identity.Entities;
 using Leads.Application.DTOs;
 using Leads.Application.Interfaces;
 using Leads.Application.Repositories;
@@ -5,6 +6,7 @@ using Leads.Application.Services;
 using Leads.Application.ViewModels;
 using Leads.Domain.Entities;
 using Leads.Domain.Enums;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace Leads.Infrastructure.Repositories
@@ -13,11 +15,13 @@ namespace Leads.Infrastructure.Repositories
     {
         private readonly ILeadsDbContext _dbContext;
         private readonly ILeadAssignmentService _leadAssignmentService;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public LeadRepository(ILeadsDbContext dbContext, ILeadAssignmentService leadAssignmentService)
+        public LeadRepository(ILeadsDbContext dbContext, ILeadAssignmentService leadAssignmentService, UserManager<ApplicationUser> userManager)
         {
             _dbContext = dbContext;
             _leadAssignmentService = leadAssignmentService;
+            _userManager = userManager;
         }
 
         public async Task<List<LeadListItemViewModel>> GetLeadListAsync(CancellationToken cancellationToken)
@@ -72,9 +76,17 @@ namespace Leads.Infrastructure.Repositories
                 .Include(x => x.Country)
                 .Include(x => x.Industry)
                 .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
+                .Include(x => x.TimelineEntries)
                 .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
 
-            return lead == null ? null : MapDetail(lead, false);
+            if (lead == null)
+            {
+                return null;
+            }
+
+            var detail = MapDetail(lead, false);
+            await PopulateAssignedUserNameAsync(detail);
+            return detail;
         }
 
         public async Task<LeadEditViewModel?> GetLeadEditAsync(Guid id, CancellationToken cancellationToken)
@@ -329,6 +341,16 @@ namespace Leads.Infrastructure.Repositories
                         ProductCode = x.Product?.Code ?? string.Empty,
                         ProductName = x.Product?.Name ?? string.Empty,
                         ProductCategoryName = x.Product?.CategoryName
+                    }).ToList(),
+                TimelineEntries = lead.TimelineEntries
+                    .Where(x => x.IsActive)
+                    .OrderByDescending(x => x.CreatedOn)
+                    .Select(x => new LeadTimelineEntryViewModel
+                    {
+                        Id = x.Id,
+                        EventType = x.EventType,
+                        Description = x.Description,
+                        CreatedAt = x.CreatedOn
                     }).ToList()
             };
         }
@@ -336,6 +358,17 @@ namespace Leads.Infrastructure.Repositories
         private static string? Clean(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
+        private async Task PopulateAssignedUserNameAsync(LeadDetailViewModel detail)
+        {
+            if (!detail.AssignedToUserId.HasValue)
+            {
+                return;
+            }
+
+            var user = await _userManager.FindByIdAsync(detail.AssignedToUserId.Value.ToString());
+            detail.AssignedToUserName = user?.FullName;
         }
     }
 }

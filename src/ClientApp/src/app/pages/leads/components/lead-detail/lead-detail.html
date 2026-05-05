@@ -1,0 +1,191 @@
+@if (isLoading) {
+    <div class="card text-surface-600 dark:text-surface-300">Loading lead...</div>
+} @else if (errorMessage) {
+    <div class="card">
+        <p class="m-0 text-red-600">{{ errorMessage }}</p>
+        <p-button label="Back to Leads" icon="pi pi-arrow-left" text (onClick)="backToList()" />
+    </div>
+} @else if (lead) {
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <button type="button" class="mb-2 border-0 bg-transparent p-0 text-primary cursor-pointer" (click)="backToList()">Back to Leads</button>
+            <h2 class="m-0 text-2xl font-semibold">{{ lead.companyName }}</h2>
+            <div class="mt-1 flex flex-wrap items-center gap-2 text-surface-600 dark:text-surface-300">
+                <span>{{ lead.leadNumber }}</span>
+                <span>&middot;</span>
+                <span>{{ lead.contactPersonName }}</span>
+                <p-tag [severity]="statusSeverity" [value]="lead.status" />
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+            @if (canShowQualificationActions) {
+                <p-button label="Qualify" icon="pi pi-check-circle" severity="success" outlined />
+                <p-button label="Disqualify" icon="pi pi-times-circle" severity="danger" outlined />
+            }
+            @if (canEditLead) {
+                <p-button label="Assign" icon="pi pi-user-plus" severity="secondary" outlined />
+            }
+            @if (canShowConvert) {
+                <p-button label="Convert" icon="pi pi-arrow-right-arrow-left" />
+            }
+        </div>
+    </div>
+
+    <div class="grid grid-cols-12 gap-4">
+        <section class="col-span-12 xl:col-span-8">
+            <div class="card">
+                <h3 class="mt-0">Lead Information</h3>
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-12 md:col-span-6">
+                        <div class="text-sm text-surface-500">Source</div>
+                        <div class="font-medium">{{ lead.sourceName }}</div>
+                    </div>
+                    <div class="col-span-12 md:col-span-6">
+                        <div class="text-sm text-surface-500">Category</div>
+                        <div class="font-medium">{{ lead.categoryName }}</div>
+                    </div>
+                    <div class="col-span-12 md:col-span-6">
+                        <div class="text-sm text-surface-500">Campaign</div>
+                        <div class="font-medium">{{ optional(lead.campaignName) }}</div>
+                    </div>
+                    <div class="col-span-12 md:col-span-6">
+                        <div class="text-sm text-surface-500">Partner</div>
+                        <div class="font-medium">{{ optional(lead.partnerName) }}</div>
+                    </div>
+                    <div class="col-span-12 md:col-span-6">
+                        <div class="text-sm text-surface-500">Industry</div>
+                        <div class="font-medium">{{ optional(lead.industryName) }}</div>
+                    </div>
+                    <div class="col-span-12 md:col-span-6">
+                        <div class="text-sm text-surface-500">Country</div>
+                        <div class="font-medium">{{ lead.countryName }}</div>
+                    </div>
+                    <div class="col-span-12">
+                        <div class="text-sm text-surface-500">Address</div>
+                        <div class="font-medium">{{ optional(lead.address) }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <h3 class="mt-0">Product Interests</h3>
+                <p-table [value]="lead.productInterests" [tableStyle]="{ 'min-width': '42rem' }">
+                    <ng-template #header>
+                        <tr>
+                            <th>Code</th>
+                            <th>Product</th>
+                            <th>Category</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template #body let-product>
+                        <tr>
+                            <td>{{ product.productCode }}</td>
+                            <td>{{ product.productName }}</td>
+                            <td>{{ optional(product.productCategoryName) }}</td>
+                        </tr>
+                    </ng-template>
+                    <ng-template #emptymessage>
+                        <tr>
+                            <td colspan="3">No product interests recorded.</td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+            </div>
+
+            <div class="card mt-4">
+                <h3 class="mt-0">Notes</h3>
+                <p class="mb-0 whitespace-pre-line">{{ optional(lead.notes) }}</p>
+            </div>
+        </section>
+
+        <aside class="col-span-12 xl:col-span-4">
+            <div class="card">
+                <h3 class="mt-0">Contact</h3>
+                <div class="flex flex-col gap-3">
+                    <div>
+                        <div class="text-sm text-surface-500">Name</div>
+                        <div class="font-medium">{{ lead.contactPersonName }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-surface-500">Job Title</div>
+                        <div class="font-medium">{{ optional(lead.jobTitle) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-surface-500">Email</div>
+                        <div class="font-medium">{{ optional(lead.email) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-surface-500">Phone</div>
+                        <div class="font-medium">{{ optional(lead.phone) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-surface-500">Alternate Phone</div>
+                        <div class="font-medium">{{ optional(lead.alternatePhone) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-surface-500">Website</div>
+                        <div class="font-medium">{{ optional(lead.website) }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <h3 class="mt-0">Assignment</h3>
+                <div class="flex flex-col gap-3">
+                    <div>
+                        <div class="text-sm text-surface-500">Assigned To</div>
+                        <div class="font-medium">{{ optional(lead.assignedToUserName || lead.assignedToUserId) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-surface-500">Assigned At</div>
+                        <div class="font-medium">{{ formatDate(lead.assignedAt) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-surface-500">Lead Score</div>
+                        <div class="font-medium">{{ optional(lead.leadScore) }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <h3 class="mt-0">History</h3>
+                <div class="flex flex-col gap-3">
+                    <div>
+                        <div class="text-sm text-surface-500">Created At</div>
+                        <div class="font-medium">{{ formatDate(lead.createdAt) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-surface-500">Updated At</div>
+                        <div class="font-medium">{{ formatDate(lead.updatedAt) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-surface-500">Qualified At</div>
+                        <div class="font-medium">{{ formatDate(lead.qualificationDate) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-surface-500">Disqualification Reason</div>
+                        <div class="font-medium">{{ optional(lead.disqualificationReason) }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <h3 class="mt-0">Timeline</h3>
+                @if (lead.timelineEntries.length) {
+                    <div class="flex flex-col gap-3">
+                        @for (entry of lead.timelineEntries; track entry.id) {
+                            <div class="border-l-2 border-primary pl-3">
+                                <div class="font-medium">{{ entry.eventType }}</div>
+                                <div class="text-sm text-surface-600 dark:text-surface-300">{{ entry.description }}</div>
+                                <div class="mt-1 text-xs text-surface-500">{{ formatDate(entry.createdAt) }}</div>
+                            </div>
+                        }
+                    </div>
+                } @else {
+                    <p class="m-0 text-surface-600 dark:text-surface-300">No timeline entries recorded.</p>
+                }
+            </div>
+        </aside>
+    </div>
+}

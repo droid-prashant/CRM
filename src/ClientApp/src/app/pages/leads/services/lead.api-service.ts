@@ -27,6 +27,10 @@ export class LeadApiService {
         return this.http.get<LeadListItemViewModel[]>(this.endpoints.leads);
     }
 
+    getLead(id: string): Observable<LeadDetailViewModel> {
+        return this.http.get<LeadDetailViewModel>(`${this.endpoints.leads}/${id}`);
+    }
+
     createLead(request: CreateLeadRequest): Observable<LeadDetailViewModel> {
         return this.http.post<LeadDetailViewModel>(this.endpoints.leads, request);
     }

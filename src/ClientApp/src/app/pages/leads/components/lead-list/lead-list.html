@@ -13,8 +13,10 @@
         [canRowAction]="canDelete"
         [canBulkAction]="canDelete"
         [canExport]="canExport"
+        [enableViewAction]="true"
         (save)="saveLead($event)"
         (delete)="deleteLead($event)"
         (bulkDelete)="deleteLeads($event)"
+        (view)="viewLead($event)"
     />
 }
