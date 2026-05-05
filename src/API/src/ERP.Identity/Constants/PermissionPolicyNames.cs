@@ -14,7 +14,10 @@ namespace ERP.Identity.Constants
         public const string PermissionsEdit = "Permission:permissions:edit";
         public const string LeadsView = "Permission:leads:view";
         public const string LeadsCreate = "Permission:leads:create";
+        public const string LeadsEdit = "Permission:leads:edit";
         public const string LeadsDelete = "Permission:leads:delete";
+        public const string LeadsApprove = "Permission:leads:approve";
+        public const string LeadsExport = "Permission:leads:export";
 
         public static string For(string moduleCode, string actionCode) => $"Permission:{moduleCode}:{actionCode}";
     }

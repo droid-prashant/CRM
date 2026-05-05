@@ -253,6 +253,100 @@ namespace Leads.Infrastructure.Repositories
             return detail;
         }
 
+        public async Task<LeadQualificationViewModel?> GetLeadQualificationAsync(Guid id, CancellationToken cancellationToken)
+        {
+            var lead = await _dbContext.Leads
+                .AsNoTracking()
+                .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
+                .Include(x => x.TimelineEntries)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+
+            if (lead == null)
+            {
+                return null;
+            }
+
+            var assignedToUserName = await GetUserFullNameAsync(lead.AssignedToUserId);
+            return MapQualification(lead, assignedToUserName);
+        }
+
+        public async Task<LeadQualificationResultViewModel?> UpdateLeadStatusAsync(Guid id, string status, string? disqualificationReason, string? remarks, CancellationToken cancellationToken)
+        {
+            var lead = await _dbContext.Leads
+                .Include(x => x.TimelineEntries)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+
+            if (lead == null || lead.Status == LeadStatus.Converted)
+            {
+                return null;
+            }
+
+            var previousStatus = lead.Status;
+            var newStatus = Enum.Parse<LeadStatus>(status, true);
+            lead.Status = newStatus;
+
+            if (newStatus == LeadStatus.Qualified)
+            {
+                lead.QualificationDate = DateTime.UtcNow;
+                lead.DisqualificationReason = null;
+            }
+            else if (newStatus == LeadStatus.Disqualified)
+            {
+                lead.DisqualificationReason = Clean(disqualificationReason);
+            }
+
+            lead.TimelineEntries.Add(new LeadTimelineEntry
+            {
+                EventType = "LeadStatusChanged",
+                Description = BuildStatusChangeDescription(previousStatus.ToString(), newStatus.ToString(), remarks)
+            });
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return new LeadQualificationResultViewModel
+            {
+                LeadId = lead.Id,
+                LeadNumber = lead.LeadNumber,
+                Status = lead.Status.ToString(),
+                QualificationDate = lead.QualificationDate,
+                DisqualificationReason = lead.DisqualificationReason,
+                ConvertToOpportunityAllowed = lead.Status == LeadStatus.Qualified
+            };
+        }
+
+        public async Task<List<LeadStatusHistoryItemViewModel>?> GetLeadStatusHistoryAsync(Guid id, CancellationToken cancellationToken)
+        {
+            var leadExists = await _dbContext.Leads.AsNoTracking().AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
+            if (!leadExists)
+            {
+                return null;
+            }
+
+            var entries = await _dbContext.LeadTimelineEntries
+                .AsNoTracking()
+                .Where(x => x.LeadId == id && x.IsActive && x.EventType == "LeadStatusChanged")
+                .OrderByDescending(x => x.CreatedOn)
+                .ToListAsync(cancellationToken);
+
+            var history = new List<LeadStatusHistoryItemViewModel>();
+            foreach (var entry in entries)
+            {
+                var values = ParseStatusChangeDescription(entry.Description);
+                history.Add(new LeadStatusHistoryItemViewModel
+                {
+                    LeadId = entry.LeadId,
+                    PreviousStatus = values.PreviousStatus,
+                    NewStatus = values.NewStatus,
+                    ChangedAt = entry.CreatedOn,
+                    ChangedByUserId = entry.CreatedBy,
+                    ChangedByUserName = await GetUserFullNameAsync(entry.CreatedBy),
+                    Remarks = values.Remarks
+                });
+            }
+
+            return history;
+        }
+
         public async Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken)
         {
             var lead = await _dbContext.Leads
@@ -360,6 +454,64 @@ namespace Leads.Infrastructure.Repositories
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
 
+        private static LeadQualificationViewModel MapQualification(Lead lead, string? assignedToUserName)
+        {
+            return new LeadQualificationViewModel
+            {
+                LeadId = lead.Id,
+                LeadNumber = lead.LeadNumber,
+                CompanyName = lead.CompanyName,
+                ContactPersonName = lead.ContactPersonName,
+                CurrentStatus = lead.Status.ToString(),
+                ProductInterests = lead.ProductInterests
+                    .Where(x => x.IsActive)
+                    .Select(x => new LeadProductInterestViewModel
+                    {
+                        ProductId = x.ProductId,
+                        ProductCode = x.Product?.Code ?? string.Empty,
+                        ProductName = x.Product?.Name ?? string.Empty,
+                        ProductCategoryName = x.Product?.CategoryName
+                    }).ToList(),
+                AssignedToUserId = lead.AssignedToUserId,
+                AssignedToUserName = assignedToUserName,
+                QualificationDate = lead.QualificationDate,
+                DisqualificationReason = lead.DisqualificationReason,
+                LastInteractionDate = lead.TimelineEntries.Where(x => x.IsActive).Max(x => (DateTime?)x.CreatedOn),
+                ConvertToOpportunityAllowed = lead.Status == LeadStatus.Qualified
+            };
+        }
+
+        private static string BuildStatusChangeDescription(string previousStatus, string newStatus, string? remarks)
+        {
+            return $"PreviousStatus={previousStatus};NewStatus={newStatus};Remarks={Clean(remarks) ?? string.Empty}";
+        }
+
+        private static (string PreviousStatus, string NewStatus, string? Remarks) ParseStatusChangeDescription(string description)
+        {
+            var values = description
+                .Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => part.Split('=', 2))
+                .Where(parts => parts.Length == 2)
+                .ToDictionary(parts => parts[0], parts => parts[1]);
+
+            values.TryGetValue("PreviousStatus", out var previousStatus);
+            values.TryGetValue("NewStatus", out var newStatus);
+            values.TryGetValue("Remarks", out var remarks);
+
+            return (previousStatus ?? string.Empty, newStatus ?? string.Empty, Clean(remarks));
+        }
+
+        private async Task<string?> GetUserFullNameAsync(Guid? userId)
+        {
+            if (!userId.HasValue || userId.Value == Guid.Empty)
+            {
+                return null;
+            }
+
+            var user = await _userManager.FindByIdAsync(userId.Value.ToString());
+            return user?.FullName;
+        }
+
         private async Task PopulateAssignedUserNameAsync(LeadDetailViewModel detail)
         {
             if (!detail.AssignedToUserId.HasValue)
@@ -367,8 +519,7 @@ namespace Leads.Infrastructure.Repositories
                 return;
             }
 
-            var user = await _userManager.FindByIdAsync(detail.AssignedToUserId.Value.ToString());
-            detail.AssignedToUserName = user?.FullName;
+            detail.AssignedToUserName = await GetUserFullNameAsync(detail.AssignedToUserId);
         }
     }
 }

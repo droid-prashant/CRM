@@ -16,6 +16,24 @@ export interface LeadLookupBundle {
     products: LookupViewModel[];
 }
 
+export interface QualifyLeadRequest {
+    qualificationRemarks?: string;
+}
+
+export interface DisqualifyLeadRequest {
+    disqualificationReason: string;
+    disqualificationRemarks?: string;
+}
+
+export interface LeadQualificationResultViewModel {
+    leadId: string;
+    leadNumber: string;
+    status: string;
+    qualificationDate?: string;
+    disqualificationReason?: string;
+    convertToOpportunityAllowed: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class LeadApiService {
     constructor(
@@ -33,6 +51,14 @@ export class LeadApiService {
 
     createLead(request: CreateLeadRequest): Observable<LeadDetailViewModel> {
         return this.http.post<LeadDetailViewModel>(this.endpoints.leads, request);
+    }
+
+    qualifyLead(id: string, request: QualifyLeadRequest): Observable<LeadQualificationResultViewModel> {
+        return this.http.patch<LeadQualificationResultViewModel>(`${this.endpoints.leads}/${id}/qualify`, request);
+    }
+
+    disqualifyLead(id: string, request: DisqualifyLeadRequest): Observable<LeadQualificationResultViewModel> {
+        return this.http.patch<LeadQualificationResultViewModel>(`${this.endpoints.leads}/${id}/disqualify`, request);
     }
 
     deleteLead(id: string): Observable<void> {

@@ -60,6 +60,46 @@ namespace ERP.API.Controllers.Leads
             return lead == null ? NotFound() : lead;
         }
 
+        [HttpGet("{id:guid}/qualification")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsView)]
+        public async Task<ActionResult<LeadQualificationViewModel>> GetLeadQualification(Guid id, CancellationToken cancellationToken)
+        {
+            var lead = await _leadService.GetLeadQualificationAsync(id, cancellationToken);
+            return lead == null ? NotFound() : lead;
+        }
+
+        [HttpPatch("{id:guid}/qualify")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsEdit)]
+        public async Task<ActionResult<LeadQualificationResultViewModel>> QualifyLead(Guid id, [FromBody] QualifyLeadRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _leadService.QualifyLeadAsync(id, request, cancellationToken);
+            return ToQualificationActionResult(result);
+        }
+
+        [HttpPatch("{id:guid}/disqualify")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsEdit)]
+        public async Task<ActionResult<LeadQualificationResultViewModel>> DisqualifyLead(Guid id, [FromBody] DisqualifyLeadRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _leadService.DisqualifyLeadAsync(id, request, cancellationToken);
+            return ToQualificationActionResult(result);
+        }
+
+        [HttpPatch("{id:guid}/status")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsEdit)]
+        public async Task<ActionResult<LeadQualificationResultViewModel>> UpdateLeadStatus(Guid id, [FromBody] UpdateLeadStatusRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _leadService.UpdateLeadStatusAsync(id, request, cancellationToken);
+            return ToQualificationActionResult(result);
+        }
+
+        [HttpGet("{id:guid}/status-history")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsView)]
+        public async Task<ActionResult<List<LeadStatusHistoryItemViewModel>>> GetLeadStatusHistory(Guid id, CancellationToken cancellationToken)
+        {
+            var history = await _leadService.GetLeadStatusHistoryAsync(id, cancellationToken);
+            return history == null ? NotFound() : history;
+        }
+
         [HttpGet("lookups")]
         [Authorize(Policy = PermissionPolicyNames.LeadsView)]
         public async Task<ActionResult<List<LeadLookupViewModel>>> GetLeadLookups(CancellationToken cancellationToken)
@@ -67,5 +107,19 @@ namespace ERP.API.Controllers.Leads
             return await _leadService.GetLeadLookupsAsync(cancellationToken);
         }
 
+        private ActionResult<LeadQualificationResultViewModel> ToQualificationActionResult(LeadQualificationResult result)
+        {
+            if (result.Succeeded)
+            {
+                return result.Qualification!;
+            }
+
+            if (result.Errors.Any(x => x.Contains("not found", StringComparison.OrdinalIgnoreCase)))
+            {
+                return NotFound(new { errors = result.Errors });
+            }
+
+            return BadRequest(new { errors = result.Errors });
+        }
     }
 }

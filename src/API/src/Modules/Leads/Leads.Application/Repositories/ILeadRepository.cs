@@ -26,6 +26,9 @@ namespace Leads.Application.Repositories
         Task<bool> DuplicateCompanyEmailExistsAsync(string companyName, string email, CancellationToken cancellationToken);
         Task<string> GenerateNextLeadNumberAsync(CancellationToken cancellationToken);
         Task<LeadDetailViewModel> CreateLeadAsync(CreateLeadRequest request, string leadNumber, bool hasDuplicateWarning, CancellationToken cancellationToken);
+        Task<LeadQualificationViewModel?> GetLeadQualificationAsync(Guid id, CancellationToken cancellationToken);
+        Task<LeadQualificationResultViewModel?> UpdateLeadStatusAsync(Guid id, string status, string? disqualificationReason, string? remarks, CancellationToken cancellationToken);
+        Task<List<LeadStatusHistoryItemViewModel>?> GetLeadStatusHistoryAsync(Guid id, CancellationToken cancellationToken);
         Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken);
     }
 }

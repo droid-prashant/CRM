@@ -1,11 +1,14 @@
 @if (isLoading) {
+    <p-toast />
     <div class="card text-surface-600 dark:text-surface-300">Loading lead...</div>
 } @else if (errorMessage) {
+    <p-toast />
     <div class="card">
         <p class="m-0 text-red-600">{{ errorMessage }}</p>
         <p-button label="Back to Leads" icon="pi pi-arrow-left" text (onClick)="backToList()" />
     </div>
 } @else if (lead) {
+    <p-toast />
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
             <button type="button" class="mb-2 border-0 bg-transparent p-0 text-primary cursor-pointer" (click)="backToList()">Back to Leads</button>
@@ -20,8 +23,8 @@
 
         <div class="flex flex-wrap gap-2">
             @if (canShowQualificationActions) {
-                <p-button label="Qualify" icon="pi pi-check-circle" severity="success" outlined />
-                <p-button label="Disqualify" icon="pi pi-times-circle" severity="danger" outlined />
+                <p-button label="Qualify" icon="pi pi-check-circle" severity="success" outlined (onClick)="openQualificationDialog()" />
+                <p-button label="Disqualify" icon="pi pi-times-circle" severity="danger" outlined (onClick)="openDisqualificationDialog()" />
             }
             @if (canEditLead) {
                 <p-button label="Assign" icon="pi pi-user-plus" severity="secondary" outlined />
@@ -188,4 +191,40 @@
             </div>
         </aside>
     </div>
+
+    <p-dialog [(visible)]="qualificationDialog" [modal]="true" [style]="{ width: 'min(560px, 94vw)' }" header="Qualify Lead">
+        <form [formGroup]="qualificationForm" class="flex flex-col gap-3">
+            <div>
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Qualification Remarks</label>
+                <textarea pTextarea rows="4" formControlName="qualificationRemarks" class="w-full"></textarea>
+            </div>
+        </form>
+
+        <ng-template #footer>
+            <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSavingStatus" (onClick)="qualificationDialog = false" />
+            <p-button label="Qualify" icon="pi pi-check-circle" severity="success" [loading]="isSavingStatus" (onClick)="qualifyLead()" />
+        </ng-template>
+    </p-dialog>
+
+    <p-dialog [(visible)]="disqualificationDialog" [modal]="true" [style]="{ width: 'min(560px, 94vw)' }" header="Disqualify Lead">
+        <form [formGroup]="disqualificationForm" class="flex flex-col gap-3">
+            <div>
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Disqualification Reason <span class="text-red-500">*</span></label>
+                <input pInputText formControlName="disqualificationReason" class="w-full" />
+                @if (disqualificationForm.get('disqualificationReason')?.errors && disqualificationForm.get('disqualificationReason')?.touched) {
+                    <span class="p-error mt-1 block text-sm text-red-600">Disqualification reason is required</span>
+                }
+            </div>
+
+            <div>
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Remarks</label>
+                <textarea pTextarea rows="4" formControlName="disqualificationRemarks" class="w-full"></textarea>
+            </div>
+        </form>
+
+        <ng-template #footer>
+            <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSavingStatus" (onClick)="disqualificationDialog = false" />
+            <p-button label="Disqualify" icon="pi pi-times-circle" severity="danger" [loading]="isSavingStatus" (onClick)="disqualifyLead()" />
+        </ng-template>
+    </p-dialog>
 }

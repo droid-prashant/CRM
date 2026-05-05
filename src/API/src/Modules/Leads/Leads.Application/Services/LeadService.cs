@@ -1,6 +1,7 @@
 using Leads.Application.DTOs;
 using Leads.Application.Repositories;
 using Leads.Application.ViewModels;
+using Leads.Domain.Enums;
 using System.Net.Mail;
 
 namespace Leads.Application.Services
@@ -18,6 +19,8 @@ namespace Leads.Application.Services
         public Task<LeadDetailViewModel?> GetLeadDetailAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadDetailAsync(id, cancellationToken);
         public Task<LeadEditViewModel?> GetLeadEditAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadEditAsync(id, cancellationToken);
         public Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(CancellationToken cancellationToken) => _leadRepository.GetLeadLookupsAsync(cancellationToken);
+        public Task<LeadQualificationViewModel?> GetLeadQualificationAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadQualificationAsync(id, cancellationToken);
+        public Task<List<LeadStatusHistoryItemViewModel>?> GetLeadStatusHistoryAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadStatusHistoryAsync(id, cancellationToken);
         public Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.DeleteLeadAsync(id, cancellationToken);
 
         public async Task<CreateLeadResult> CreateLeadAsync(CreateLeadRequest request, CancellationToken cancellationToken)
@@ -35,6 +38,64 @@ namespace Leads.Application.Services
             var lead = await _leadRepository.CreateLeadAsync(request, leadNumber, hasDuplicateWarning, cancellationToken);
 
             return new CreateLeadResult { Lead = lead };
+        }
+
+        public Task<LeadQualificationResult> QualifyLeadAsync(Guid id, QualifyLeadRequest request, CancellationToken cancellationToken)
+        {
+            return UpdateLeadStatusAsync(id, new UpdateLeadStatusRequest
+            {
+                Status = LeadStatus.Qualified.ToString(),
+                Remarks = request.QualificationRemarks
+            }, cancellationToken);
+        }
+
+        public Task<LeadQualificationResult> DisqualifyLeadAsync(Guid id, DisqualifyLeadRequest request, CancellationToken cancellationToken)
+        {
+            return UpdateLeadStatusAsync(id, new UpdateLeadStatusRequest
+            {
+                Status = LeadStatus.Disqualified.ToString(),
+                DisqualificationReason = request.DisqualificationReason,
+                Remarks = request.DisqualificationRemarks
+            }, cancellationToken);
+        }
+
+        public async Task<LeadQualificationResult> UpdateLeadStatusAsync(Guid id, UpdateLeadStatusRequest request, CancellationToken cancellationToken)
+        {
+            var errors = ValidateStatusRequest(request);
+            if (errors.Count > 0)
+            {
+                return new LeadQualificationResult { Errors = errors };
+            }
+
+            var current = await _leadRepository.GetLeadQualificationAsync(id, cancellationToken);
+            if (current == null)
+            {
+                return new LeadQualificationResult { Errors = new List<string> { "Lead was not found." } };
+            }
+
+            if (string.Equals(current.CurrentStatus, LeadStatus.Converted.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return new LeadQualificationResult { Errors = new List<string> { "Converted leads cannot be qualified or disqualified." } };
+            }
+
+            if (string.Equals(current.CurrentStatus, request.Status, StringComparison.OrdinalIgnoreCase))
+            {
+                return new LeadQualificationResult { Errors = new List<string> { $"Lead is already {current.CurrentStatus}." } };
+            }
+
+            var qualification = await _leadRepository.UpdateLeadStatusAsync(
+                id,
+                request.Status.Trim(),
+                request.DisqualificationReason,
+                request.Remarks,
+                cancellationToken);
+
+            if (qualification == null)
+            {
+                return new LeadQualificationResult { Errors = new List<string> { "Lead status could not be updated." } };
+            }
+
+            return new LeadQualificationResult { Qualification = qualification };
         }
 
         private async Task<List<string>> ValidateCreateRequestAsync(CreateLeadRequest request, CancellationToken cancellationToken)
@@ -76,6 +137,50 @@ namespace Leads.Application.Services
             if (inactiveOrMissingProducts.Count > 0)
             {
                 errors.Add("All ProductIds must exist in active product master data.");
+            }
+
+            return errors;
+        }
+
+        private static List<string> ValidateStatusRequest(UpdateLeadStatusRequest request)
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(request.Status))
+            {
+                errors.Add("Status is required.");
+                return errors;
+            }
+
+            if (!Enum.TryParse<LeadStatus>(request.Status, true, out var status))
+            {
+                errors.Add("Status is invalid.");
+                return errors;
+            }
+
+            if (status != LeadStatus.Qualified && status != LeadStatus.Disqualified)
+            {
+                errors.Add("Only Qualified or Disqualified status can be set from this story.");
+            }
+
+            if (status == LeadStatus.Disqualified && string.IsNullOrWhiteSpace(request.DisqualificationReason))
+            {
+                errors.Add("Disqualification reason is required.");
+            }
+
+            if (status == LeadStatus.Qualified && !string.IsNullOrWhiteSpace(request.DisqualificationReason))
+            {
+                errors.Add("Qualification request cannot include disqualification reason.");
+            }
+
+            if (request.Remarks?.Length > 1000)
+            {
+                errors.Add("Remarks must be 1000 characters or fewer.");
+            }
+
+            if (request.DisqualificationReason?.Length > 500)
+            {
+                errors.Add("Disqualification reason must be 500 characters or fewer.");
             }
 
             return errors;
