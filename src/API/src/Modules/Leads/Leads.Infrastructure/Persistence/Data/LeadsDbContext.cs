@@ -18,6 +18,7 @@ namespace Leads.Infrastructure.Persistence.Data
         public DbSet<Lead> Leads { get; set; }
         public DbSet<LeadProductInterest> LeadProductInterests { get; set; }
         public DbSet<LeadTimelineEntry> LeadTimelineEntries { get; set; }
+        public DbSet<LeadInteraction> LeadInteractions { get; set; }
         public DbSet<LeadSource> LeadSources { get; set; }
         public DbSet<LeadCategory> LeadCategories { get; set; }
         public DbSet<Product> Products { get; set; }
@@ -51,12 +52,21 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.HasOne(x => x.ConvertedOpportunity).WithMany().HasForeignKey(x => x.ConvertedOpportunityId);
                 entity.HasMany(x => x.ProductInterests).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
                 entity.HasMany(x => x.TimelineEntries).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
+                entity.HasMany(x => x.Interactions).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
             });
 
             modelBuilder.Entity<LeadProductInterest>(entity =>
             {
                 entity.HasIndex(x => new { x.LeadId, x.ProductId }).IsUnique();
                 entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId);
+            });
+
+            modelBuilder.Entity<LeadInteraction>(entity =>
+            {
+                entity.Property(x => x.InteractionType).HasConversion<string>().HasMaxLength(30).IsRequired();
+                entity.Property(x => x.Subject).HasMaxLength(250);
+                entity.Property(x => x.Notes).HasMaxLength(2000).IsRequired();
+                entity.HasIndex(x => new { x.LeadId, x.InteractionDate });
             });
 
             modelBuilder.Entity<Client>(entity =>

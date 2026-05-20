@@ -19,6 +19,8 @@ namespace Leads.Application.Services
         Task<LeadConversionViewModel?> GetLeadConversionAsync(Guid id, CancellationToken cancellationToken);
         Task<LeadConversionResult> ConvertLeadAsync(Guid id, ConvertLeadRequest request, CancellationToken cancellationToken);
         Task<LeadAssignmentResult> AssignLeadAsync(Guid id, AssignLeadRequest request, CancellationToken cancellationToken);
+        Task<List<LeadInteractionViewModel>?> GetLeadInteractionsAsync(Guid id, CancellationToken cancellationToken);
+        Task<LeadInteractionResult> CreateLeadInteractionAsync(Guid id, CreateLeadInteractionRequest request, CancellationToken cancellationToken);
         Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken);
         Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken);
         Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken);

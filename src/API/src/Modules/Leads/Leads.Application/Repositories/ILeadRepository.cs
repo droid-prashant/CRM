@@ -17,6 +17,7 @@ namespace Leads.Application.Repositories
         Task<List<LookupViewModel>> GetCountryLookupsAsync(CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetIndustryLookupsAsync(CancellationToken cancellationToken);
         Task<bool> SourceRequiresPartnerAsync(Guid sourceId, CancellationToken cancellationToken);
+        Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken);
         Task<bool> SourceExistsAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken);
         Task<bool> CountryExistsAsync(Guid countryId, CancellationToken cancellationToken);
@@ -33,6 +34,8 @@ namespace Leads.Application.Repositories
         Task<LeadConversionViewModel?> GetLeadConversionAsync(Guid id, CancellationToken cancellationToken);
         Task<OpportunityCreatedViewModel?> ConvertLeadAsync(Guid id, ConvertLeadRequest request, string opportunityNumber, CancellationToken cancellationToken);
         Task<LeadAssignmentResultViewModel?> AssignLeadAsync(Guid id, AssignLeadRequest request, CancellationToken cancellationToken);
+        Task<List<LeadInteractionViewModel>?> GetLeadInteractionsAsync(Guid id, CancellationToken cancellationToken);
+        Task<LeadInteractionViewModel?> CreateLeadInteractionAsync(Guid id, CreateLeadInteractionRequest request, CancellationToken cancellationToken);
         Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken);
         Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken);
         Task<bool> ClientExistsAsync(Guid clientId, CancellationToken cancellationToken);

@@ -162,6 +162,32 @@ namespace ERP.API.Controllers.Leads
             return BadRequest(new { errors = result.Errors });
         }
 
+        [HttpGet("{id:guid}/interactions")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsView)]
+        public async Task<ActionResult<List<LeadInteractionViewModel>>> GetLeadInteractions(Guid id, CancellationToken cancellationToken)
+        {
+            var interactions = await _leadService.GetLeadInteractionsAsync(id, cancellationToken);
+            return interactions == null ? NotFound() : interactions;
+        }
+
+        [HttpPost("{id:guid}/interactions")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsEdit)]
+        public async Task<ActionResult<LeadInteractionViewModel>> CreateLeadInteraction(Guid id, [FromBody] CreateLeadInteractionRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _leadService.CreateLeadInteractionAsync(id, request, cancellationToken);
+            if (result.Succeeded)
+            {
+                return CreatedAtAction(nameof(GetLeadInteractions), new { id }, result.Interaction);
+            }
+
+            if (result.Errors.Any(x => x.Contains("not found", StringComparison.OrdinalIgnoreCase)))
+            {
+                return NotFound(new { errors = result.Errors });
+            }
+
+            return BadRequest(new { errors = result.Errors });
+        }
+
         [HttpGet("lookups")]
         [Authorize(Policy = PermissionPolicyNames.LeadsView)]
         public async Task<ActionResult<List<LeadLookupViewModel>>> GetLeadLookups(CancellationToken cancellationToken)

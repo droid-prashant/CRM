@@ -164,6 +164,33 @@ namespace Leads.Application.Services
             return new LeadAssignmentResult { Assignment = assignment };
         }
 
+        public Task<List<LeadInteractionViewModel>?> GetLeadInteractionsAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return _leadRepository.GetLeadInteractionsAsync(id, cancellationToken);
+        }
+
+        public async Task<LeadInteractionResult> CreateLeadInteractionAsync(Guid id, CreateLeadInteractionRequest request, CancellationToken cancellationToken)
+        {
+            var errors = ValidateInteractionRequest(id, request);
+            if (errors.Count > 0)
+            {
+                return new LeadInteractionResult { Errors = errors };
+            }
+
+            if (!await _leadRepository.LeadExistsAsync(id, cancellationToken))
+            {
+                return new LeadInteractionResult { Errors = new List<string> { "Lead was not found." } };
+            }
+
+            var interaction = await _leadRepository.CreateLeadInteractionAsync(id, request, cancellationToken);
+            if (interaction == null)
+            {
+                return new LeadInteractionResult { Errors = new List<string> { "Lead interaction could not be saved." } };
+            }
+
+            return new LeadInteractionResult { Interaction = interaction };
+        }
+
         private async Task<List<string>> ValidateCreateRequestAsync(CreateLeadRequest request, CancellationToken cancellationToken)
         {
             var errors = new List<string>();
@@ -431,6 +458,51 @@ namespace Leads.Application.Services
             if (request.Remarks?.Length > 1000)
             {
                 errors.Add("Remarks must be 1000 characters or fewer.");
+            }
+
+            return errors;
+        }
+
+        private static List<string> ValidateInteractionRequest(Guid leadId, CreateLeadInteractionRequest request)
+        {
+            var errors = new List<string>();
+
+            if (leadId == Guid.Empty)
+            {
+                errors.Add("LeadId is required.");
+            }
+
+            if (request.LeadId == Guid.Empty)
+            {
+                errors.Add("LeadId is required.");
+            }
+            else if (request.LeadId != leadId)
+            {
+                errors.Add("LeadId must match the route lead id.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.InteractionType))
+            {
+                errors.Add("InteractionType is required.");
+            }
+            else if (!Enum.TryParse<LeadInteractionType>(request.InteractionType, true, out _))
+            {
+                errors.Add("InteractionType is invalid.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Notes))
+            {
+                errors.Add("Notes is required.");
+            }
+
+            if (request.Subject?.Length > 250)
+            {
+                errors.Add("Subject must be 250 characters or fewer.");
+            }
+
+            if (request.Notes?.Length > 2000)
+            {
+                errors.Add("Notes must be 2000 characters or fewer.");
             }
 
             return errors;

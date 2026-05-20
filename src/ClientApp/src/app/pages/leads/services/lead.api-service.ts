@@ -127,6 +127,26 @@ export interface LeadAssignmentResultViewModel {
     assignedAt: string;
 }
 
+export interface CreateLeadInteractionRequest {
+    leadId: string;
+    interactionType: string;
+    subject?: string;
+    notes: string;
+    interactionDate?: string;
+    nextFollowUpDate?: string;
+}
+
+export interface LeadInteractionViewModel {
+    id: string;
+    leadId: string;
+    interactionType: string;
+    subject?: string;
+    notes: string;
+    interactionDate: string;
+    nextFollowUpDate?: string;
+    createdByUserName?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class LeadApiService {
     constructor(
@@ -172,6 +192,14 @@ export class LeadApiService {
 
     assignLead(id: string, request: AssignLeadRequest): Observable<LeadAssignmentResultViewModel> {
         return this.http.patch<LeadAssignmentResultViewModel>(`${this.endpoints.leads}/${id}/assign`, request);
+    }
+
+    getLeadInteractions(id: string): Observable<LeadInteractionViewModel[]> {
+        return this.http.get<LeadInteractionViewModel[]>(`${this.endpoints.leads}/${id}/interactions`);
+    }
+
+    createLeadInteraction(id: string, request: CreateLeadInteractionRequest): Observable<LeadInteractionViewModel> {
+        return this.http.post<LeadInteractionViewModel>(`${this.endpoints.leads}/${id}/interactions`, request);
     }
 
     deleteLead(id: string): Observable<void> {

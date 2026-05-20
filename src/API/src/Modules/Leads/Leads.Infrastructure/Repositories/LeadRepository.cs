@@ -148,6 +148,7 @@ namespace Leads.Infrastructure.Repositories
             return _dbContext.LeadSources.AnyAsync(x => x.Id == sourceId && x.IsActive && x.RequiresPartner, cancellationToken);
         }
 
+        public Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Leads.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
         public Task<bool> SourceExistsAsync(Guid sourceId, CancellationToken cancellationToken) => _dbContext.LeadSources.AnyAsync(x => x.Id == sourceId && x.IsActive, cancellationToken);
         public Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken) => _dbContext.LeadCategories.AnyAsync(x => x.Id == categoryId && x.IsActive, cancellationToken);
         public Task<bool> CountryExistsAsync(Guid countryId, CancellationToken cancellationToken) => _dbContext.Countries.AnyAsync(x => x.Id == countryId && x.IsActive, cancellationToken);
@@ -566,6 +567,62 @@ namespace Leads.Infrastructure.Repositories
             };
         }
 
+        public async Task<List<LeadInteractionViewModel>?> GetLeadInteractionsAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await LeadExistsAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            var interactions = await _dbContext.LeadInteractions
+                .AsNoTracking()
+                .Where(x => x.LeadId == id && x.IsActive)
+                .OrderByDescending(x => x.InteractionDate)
+                .ThenByDescending(x => x.CreatedOn)
+                .ToListAsync(cancellationToken);
+
+            var viewModels = new List<LeadInteractionViewModel>();
+            foreach (var interaction in interactions)
+            {
+                viewModels.Add(await MapInteractionAsync(interaction));
+            }
+
+            return viewModels;
+        }
+
+        public async Task<LeadInteractionViewModel?> CreateLeadInteractionAsync(Guid id, CreateLeadInteractionRequest request, CancellationToken cancellationToken)
+        {
+            var lead = await _dbContext.Leads
+                .Include(x => x.TimelineEntries)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+
+            if (lead == null)
+            {
+                return null;
+            }
+
+            var interactionType = Enum.Parse<LeadInteractionType>(request.InteractionType, true);
+            var interaction = new LeadInteraction
+            {
+                LeadId = lead.Id,
+                InteractionType = interactionType,
+                Subject = Clean(request.Subject),
+                Notes = request.Notes.Trim(),
+                InteractionDate = request.InteractionDate?.ToUniversalTime() ?? DateTime.UtcNow,
+                NextFollowUpDate = request.NextFollowUpDate?.ToUniversalTime()
+            };
+
+            _dbContext.LeadInteractions.Add(interaction);
+            lead.TimelineEntries.Add(new LeadTimelineEntry
+            {
+                EventType = "LeadInteraction",
+                Description = BuildInteractionDescription(interaction)
+            });
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return await MapInteractionAsync(interaction);
+        }
+
         public Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken)
         {
             return _dbContext.Clients
@@ -768,6 +825,16 @@ namespace Leads.Infrastructure.Repositories
             return cleanRemarks == null ? description : $"{description} Remarks: {cleanRemarks}";
         }
 
+        private static string BuildInteractionDescription(LeadInteraction interaction)
+        {
+            var subject = Clean(interaction.Subject) ?? "No subject";
+            var followUp = interaction.NextFollowUpDate.HasValue
+                ? $" Next follow-up: {interaction.NextFollowUpDate.Value:yyyy-MM-dd}."
+                : string.Empty;
+
+            return $"{interaction.InteractionType} logged: {subject}.{followUp}";
+        }
+
         private static Client CreateClient(NewClientRequest request)
         {
             return new Client
@@ -874,6 +941,21 @@ namespace Leads.Infrastructure.Repositories
 
             var user = await _userManager.FindByIdAsync(userId.Value.ToString());
             return user?.FullName;
+        }
+
+        private async Task<LeadInteractionViewModel> MapInteractionAsync(LeadInteraction interaction)
+        {
+            return new LeadInteractionViewModel
+            {
+                Id = interaction.Id,
+                LeadId = interaction.LeadId,
+                InteractionType = interaction.InteractionType.ToString(),
+                Subject = interaction.Subject,
+                Notes = interaction.Notes,
+                InteractionDate = interaction.InteractionDate,
+                NextFollowUpDate = interaction.NextFollowUpDate,
+                CreatedByUserName = await GetUserFullNameAsync(interaction.CreatedBy)
+            };
         }
 
         private async Task PopulateAssignedUserNameAsync(LeadDetailViewModel detail)

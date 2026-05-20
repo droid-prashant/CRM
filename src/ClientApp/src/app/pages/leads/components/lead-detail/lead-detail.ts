@@ -19,7 +19,7 @@ import { Permissions } from '@/core/auth/permissions';
 import { UserApiService } from '@/pages/users/services/user-api.service';
 import { UserListItemViewModel } from '@/pages/users/view-models/user-list-item.view-model';
 import { UpdateLeadRequest } from '../../dtos/update-lead.request';
-import { ConvertLeadRequest, LeadApiService, LeadConversionViewModel, LeadLookupBundle } from '../../services/lead.api-service';
+import { ConvertLeadRequest, CreateLeadInteractionRequest, LeadApiService, LeadConversionViewModel, LeadInteractionViewModel, LeadLookupBundle } from '../../services/lead.api-service';
 import { LeadDetailViewModel } from '../../view-models/lead-detail.view-model';
 
 @Component({
@@ -36,6 +36,7 @@ export class LeadDetail implements OnInit {
     isAssigning = false;
     isConverting = false;
     isSavingLead = false;
+    isSavingInteraction = false;
     errorMessage = '';
     canEditLead = false;
     canApproveLead = false;
@@ -44,9 +45,16 @@ export class LeadDetail implements OnInit {
     assignmentDialog = false;
     editDialog = false;
     conversionDialog = false;
+    interactionDialog = false;
     conversion?: LeadConversionViewModel;
+    interactions: LeadInteractionViewModel[] = [];
     leadLookups?: LeadLookupBundle;
     users: UserListItemViewModel[] = [];
+    readonly interactionTypeOptions = [
+        { label: 'Call', value: 'Call' },
+        { label: 'Meeting', value: 'Meeting' },
+        { label: 'Note', value: 'Note' }
+    ];
     readonly conversionModeOptions = [
         { label: 'Create New', value: 'new' },
         { label: 'Use Existing', value: 'existing' }
@@ -67,6 +75,14 @@ export class LeadDetail implements OnInit {
     assignmentForm = this.fb.group({
         assignedToUserId: ['', Validators.required],
         remarks: ['', [Validators.maxLength(1000)]]
+    });
+
+    interactionForm = this.fb.group({
+        interactionType: ['Call', Validators.required],
+        subject: ['', [Validators.maxLength(250)]],
+        notes: ['', [Validators.required, Validators.maxLength(2000)]],
+        interactionDate: [''],
+        nextFollowUpDate: ['']
     });
 
     editForm = this.fb.group({
@@ -131,9 +147,13 @@ export class LeadDetail implements OnInit {
             return;
         }
 
-        this.leadApiService.getLead(id).subscribe({
-            next: (lead) => {
+        forkJoin({
+            lead: this.leadApiService.getLead(id),
+            interactions: this.leadApiService.getLeadInteractions(id)
+        }).subscribe({
+            next: ({ lead, interactions }) => {
                 this.lead = lead;
+                this.interactions = interactions;
                 this.isLoading = false;
                 this.errorMessage = '';
             },
@@ -169,6 +189,65 @@ export class LeadDetail implements OnInit {
 
     get canShowEditActions(): boolean {
         return this.canEditLead && this.lead?.status?.toLowerCase() !== 'converted';
+    }
+
+    get canShowInteractionAction(): boolean {
+        return this.canShowEditActions;
+    }
+
+    get leadInitials(): string {
+        return this.getInitials(this.lead?.companyName ?? '');
+    }
+
+    get latestInteraction(): LeadInteractionViewModel | undefined {
+        return this.interactions[0];
+    }
+
+    get nextFollowUpDate(): string | undefined {
+        return this.interactions
+            .filter((interaction) => !!interaction.nextFollowUpDate)
+            .map((interaction) => interaction.nextFollowUpDate!)
+            .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
+    }
+
+    get openActivityCount(): number {
+        return this.interactions.filter((interaction) => !!interaction.nextFollowUpDate).length;
+    }
+
+    interactionSeverity(type?: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
+        switch (type?.toLowerCase()) {
+            case 'call':
+                return 'info';
+            case 'meeting':
+                return 'success';
+            case 'note':
+                return 'secondary';
+            default:
+                return 'warn';
+        }
+    }
+
+    interactionIcon(type?: string): string {
+        switch (type?.toLowerCase()) {
+            case 'call':
+                return 'pi pi-phone';
+            case 'meeting':
+                return 'pi pi-calendar';
+            case 'note':
+                return 'pi pi-file-edit';
+            default:
+                return 'pi pi-comments';
+        }
+    }
+
+    timelineIcon(eventType?: string): string {
+        const normalized = eventType?.toLowerCase() ?? '';
+        if (normalized.includes('created')) return 'pi pi-plus';
+        if (normalized.includes('assigned')) return 'pi pi-user-plus';
+        if (normalized.includes('status') || normalized.includes('qualified')) return 'pi pi-check-circle';
+        if (normalized.includes('converted')) return 'pi pi-arrow-right-arrow-left';
+        if (normalized.includes('interaction')) return 'pi pi-comments';
+        return 'pi pi-clock';
     }
 
     openQualificationDialog(): void {
@@ -241,6 +320,17 @@ export class LeadDetail implements OnInit {
                 this.isSavingLead = false;
             }
         });
+    }
+
+    openInteractionDialog(): void {
+        this.interactionForm.reset({
+            interactionType: 'Call',
+            subject: '',
+            notes: '',
+            interactionDate: this.formatDateTimeInput(new Date()),
+            nextFollowUpDate: ''
+        });
+        this.interactionDialog = true;
     }
 
     openConversionDialog(): void {
@@ -366,6 +456,31 @@ export class LeadDetail implements OnInit {
             });
     }
 
+    addInteraction(): void {
+        if (!this.lead) {
+            return;
+        }
+
+        this.interactionForm.markAllAsTouched();
+        if (this.interactionForm.invalid) {
+            return;
+        }
+
+        this.isSavingInteraction = true;
+        this.leadApiService.createLeadInteraction(this.lead.id, this.buildInteractionRequest()).subscribe({
+            next: () => {
+                this.interactionDialog = false;
+                this.messageService.add({ severity: 'success', summary: 'Interaction saved', detail: 'The interaction was added to the lead timeline.', life: 4000 });
+                this.loadLead();
+                this.isSavingInteraction = false;
+            },
+            error: (error) => {
+                this.handleActionError(error, 'Interaction failed', 'Lead interaction could not be saved.');
+                this.isSavingInteraction = false;
+            }
+        });
+    }
+
     convertLead(): void {
         if (!this.lead) {
             return;
@@ -429,6 +544,10 @@ export class LeadDetail implements OnInit {
         return value === undefined || value === null || value === '' ? 'Not set' : String(value);
     }
 
+    formatDateOnly(value?: string): string {
+        return value ? new Date(value).toLocaleDateString() : 'Not set';
+    }
+
     get filteredContacts() {
         const clientId = this.conversionForm.controls.clientId.value;
         return this.conversion?.existingContacts.filter((contact) => contact.clientId === clientId) ?? [];
@@ -440,6 +559,18 @@ export class LeadDetail implements OnInit {
 
     get useExistingContact(): boolean {
         return this.conversionForm.controls.contactMode.value === 'existing';
+    }
+
+    private buildInteractionRequest(): CreateLeadInteractionRequest {
+        const value = this.interactionForm.getRawValue();
+        return {
+            leadId: this.lead?.id ?? '',
+            interactionType: value.interactionType ?? '',
+            subject: this.optionalFormString(value.subject) ?? undefined,
+            notes: value.notes ?? '',
+            interactionDate: value.interactionDate ? new Date(value.interactionDate).toISOString() : undefined,
+            nextFollowUpDate: value.nextFollowUpDate ? new Date(value.nextFollowUpDate).toISOString() : undefined
+        };
     }
 
     private buildUpdateLeadRequest(): UpdateLeadRequest {
@@ -509,6 +640,24 @@ export class LeadDetail implements OnInit {
         return parts.length > 1 ? parts.slice(1).join(' ') : '-';
     }
 
+    private getInitials(value: string): string {
+        const words = value.trim().split(/\s+/).filter(Boolean);
+        if (!words.length) {
+            return 'LD';
+        }
+
+        return words
+            .slice(0, 2)
+            .map((word) => word[0])
+            .join('')
+            .toUpperCase();
+    }
+
+    private formatDateTimeInput(value: Date): string {
+        const offsetMs = value.getTimezoneOffset() * 60_000;
+        return new Date(value.getTime() - offsetMs).toISOString().slice(0, 16);
+    }
+
     private optionalFormString(value: string | null | undefined): string | null {
         return value?.trim() ? value : null;
     }
@@ -517,5 +666,10 @@ export class LeadDetail implements OnInit {
         const detail = error.error?.errors?.join(' ') ?? 'Lead status could not be updated.';
         this.messageService.add({ severity: 'error', summary: 'Status update failed', detail, life: 5000 });
         this.isSavingStatus = false;
+    }
+
+    private handleActionError(error: { error?: { errors?: string[] }; status?: number }, summary: string, fallback: string): void {
+        const detail = error.error?.errors?.join(' ') ?? fallback;
+        this.messageService.add({ severity: 'error', summary, detail, life: 5000 });
     }
 }

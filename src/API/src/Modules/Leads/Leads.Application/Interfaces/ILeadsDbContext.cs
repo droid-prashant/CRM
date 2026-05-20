@@ -8,6 +8,7 @@ namespace Leads.Application.Interfaces
         DbSet<Lead> Leads { get; set; }
         DbSet<LeadProductInterest> LeadProductInterests { get; set; }
         DbSet<LeadTimelineEntry> LeadTimelineEntries { get; set; }
+        DbSet<LeadInteraction> LeadInteractions { get; set; }
         DbSet<LeadSource> LeadSources { get; set; }
         DbSet<LeadCategory> LeadCategories { get; set; }
         DbSet<Product> Products { get; set; }
