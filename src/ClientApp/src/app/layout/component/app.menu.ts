@@ -32,7 +32,8 @@ export class AppMenu {
                 label: 'CRM',
                 items: [
                     { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/'] },
-                    ...(this.authService.hasPermission(Permissions.leads.view) ? [{ label: 'Leads', icon: 'pi pi-fw pi-briefcase', routerLink: ['/pages/leads'] }] : [])
+                    ...(this.authService.hasPermission(Permissions.leads.view) ? [{ label: 'Leads', icon: 'pi pi-fw pi-briefcase', routerLink: ['/pages/leads'] }] : []),
+                    ...(this.authService.hasPermission(Permissions.opportunities.view) ? [{ label: 'Opportunities', icon: 'pi pi-fw pi-chart-line', routerLink: ['/pages/opportunities'] }] : [])
                 ]
             },
             {

@@ -9,6 +9,7 @@ using Leads.Domain.Enums;
 using Leads.Infrastructure.Persistence.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Opportunities.Domain.Entities;
 
 namespace Leads.Infrastructure.Repositories
 {
@@ -481,13 +482,15 @@ namespace Leads.Infrastructure.Repositories
                 _dbContext.ClientContacts.Add(contact);
             }
 
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
             var opportunity = new Opportunity
             {
                 OpportunityNumber = opportunityNumber,
                 LeadId = lead.Id,
                 ProductId = request.ProductId,
-                Client = client,
-                Contact = contact,
+                ClientId = client.Id,
+                ContactId = contact.Id,
                 Title = request.OpportunityTitle.Trim(),
                 EstimatedValue = request.EstimatedValue,
                 CurrencyId = request.CurrencyId,

@@ -1,11 +1,11 @@
 using ERP.Core.Entities;
 
-namespace Leads.Domain.Entities
+namespace Opportunities.Domain.Entities
 {
     public class Opportunity : BaseEntity
     {
         public string OpportunityNumber { get; set; } = string.Empty;
-        public Guid LeadId { get; set; }
+        public Guid? LeadId { get; set; }
         public Guid ProductId { get; set; }
         public Guid ClientId { get; set; }
         public Guid ContactId { get; set; }
@@ -15,10 +15,5 @@ namespace Leads.Domain.Entities
         public DateTime? ExpectedCloseDate { get; set; }
         public Guid OwnerUserId { get; set; }
         public string Stage { get; set; } = "New";
-
-        public Lead? Lead { get; set; }
-        public Product? Product { get; set; }
-        public Client? Client { get; set; }
-        public ClientContact? Contact { get; set; }
     }
 }

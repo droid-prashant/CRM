@@ -17,9 +17,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\ERP.Identity\ERP.Identity.csproj" />
-    <ProjectReference Include="..\Leads.Application\Leads.Application.csproj" />
-    <ProjectReference Include="..\Leads.Domain\Leads.Domain.csproj" />
-    <ProjectReference Include="..\..\Opportunities\Opportunities.Domain\Opportunities.Domain.csproj" />
+    <ProjectReference Include="..\..\Leads\Leads.Domain\Leads.Domain.csproj" />
+    <ProjectReference Include="..\Opportunities.Application\Opportunities.Application.csproj" />
+    <ProjectReference Include="..\Opportunities.Domain\Opportunities.Domain.csproj" />
   </ItemGroup>
 
 </Project>

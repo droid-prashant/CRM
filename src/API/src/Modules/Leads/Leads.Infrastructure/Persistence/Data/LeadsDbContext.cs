@@ -3,6 +3,7 @@ using ERP.Identity.Services.Interfaces;
 using Leads.Application.Interfaces;
 using Leads.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Opportunities.Domain.Entities;
 
 namespace Leads.Infrastructure.Persistence.Data
 {
@@ -49,7 +50,7 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.Property(x => x.Email).HasMaxLength(250);
                 entity.Property(x => x.Phone).HasMaxLength(50);
                 entity.Property(x => x.Status).HasConversion<int>();
-                entity.HasOne(x => x.ConvertedOpportunity).WithMany().HasForeignKey(x => x.ConvertedOpportunityId);
+                entity.HasOne<Opportunity>().WithMany().HasForeignKey(x => x.ConvertedOpportunityId);
                 entity.HasMany(x => x.ProductInterests).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
                 entity.HasMany(x => x.TimelineEntries).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
                 entity.HasMany(x => x.Interactions).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
@@ -94,10 +95,10 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.Property(x => x.Title).HasMaxLength(250).IsRequired();
                 entity.Property(x => x.EstimatedValue).HasPrecision(18, 2);
                 entity.Property(x => x.Stage).HasMaxLength(50).IsRequired();
-                entity.HasOne(x => x.Lead).WithMany().HasForeignKey(x => x.LeadId);
-                entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId);
-                entity.HasOne(x => x.Client).WithMany().HasForeignKey(x => x.ClientId);
-                entity.HasOne(x => x.Contact).WithMany().HasForeignKey(x => x.ContactId);
+                entity.HasOne<Lead>().WithMany().HasForeignKey(x => x.LeadId);
+                entity.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId);
+                entity.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId);
+                entity.HasOne<ClientContact>().WithMany().HasForeignKey(x => x.ContactId);
             });
 
             ConfigureLookup<LeadSource>(modelBuilder);

@@ -34,7 +34,6 @@ namespace Leads.Domain.Entities
         public Partner? Partner { get; set; }
         public Country? Country { get; set; }
         public Industry? Industry { get; set; }
-        public Opportunity? ConvertedOpportunity { get; set; }
         public ICollection<LeadProductInterest> ProductInterests { get; set; } = new List<LeadProductInterest>();
         public ICollection<LeadTimelineEntry> TimelineEntries { get; set; } = new List<LeadTimelineEntry>();
         public ICollection<LeadInteraction> Interactions { get; set; } = new List<LeadInteraction>();
