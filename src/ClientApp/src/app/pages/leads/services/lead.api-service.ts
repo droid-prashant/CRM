@@ -43,6 +43,8 @@ export interface LeadConversionViewModel {
     contactPersonName: string;
     email?: string;
     phone?: string;
+    selectedClientId?: string;
+    selectedContactId?: string;
     productInterests: { productId: string; productCode: string; productName: string; productCategoryName?: string }[];
     existingClients: ClientLookupViewModel[];
     existingContacts: ContactLookupViewModel[];

@@ -8,6 +8,8 @@ namespace Leads.Application.ViewModels
         public string ContactPersonName { get; set; } = string.Empty;
         public string? Email { get; set; }
         public string? Phone { get; set; }
+        public Guid? SelectedClientId { get; set; }
+        public Guid? SelectedContactId { get; set; }
         public List<LeadProductInterestViewModel> ProductInterests { get; set; } = new();
         public List<ClientLookupViewModel> ExistingClients { get; set; } = new();
         public List<ContactLookupViewModel> ExistingContacts { get; set; } = new();

@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Opportunities.Domain.Entities;
 using Partners.Application.Services;
+using System.Text.RegularExpressions;
 
 namespace Leads.Infrastructure.Repositories
 {
@@ -416,6 +417,11 @@ namespace Leads.Infrastructure.Repositories
                 return null;
             }
 
+            var existingClients = await GetClientLookupsAsync(cancellationToken);
+            var existingContacts = await GetContactLookupsAsync(cancellationToken);
+            var selectedClientId = FindMatchingClientId(lead.CompanyName, existingClients);
+            var selectedContactId = FindMatchingContactId(lead.ContactPersonName, lead.Email, selectedClientId, existingContacts);
+
             return new LeadConversionViewModel
             {
                 LeadId = lead.Id,
@@ -424,6 +430,8 @@ namespace Leads.Infrastructure.Repositories
                 ContactPersonName = lead.ContactPersonName,
                 Email = lead.Email,
                 Phone = lead.Phone,
+                SelectedClientId = selectedClientId,
+                SelectedContactId = selectedContactId,
                 ProductInterests = lead.ProductInterests
                     .Where(x => x.IsActive)
                     .Select(x => new LeadProductInterestViewModel
@@ -433,8 +441,8 @@ namespace Leads.Infrastructure.Repositories
                         ProductName = x.Product?.Name ?? string.Empty,
                         ProductCategoryName = x.Product?.CategoryName
                     }).ToList(),
-                ExistingClients = await GetClientLookupsAsync(cancellationToken),
-                ExistingContacts = await GetContactLookupsAsync(cancellationToken),
+                ExistingClients = existingClients,
+                ExistingContacts = existingContacts,
                 Countries = await GetCountryLookupsAsync(cancellationToken),
                 Industries = await GetIndustryLookupsAsync(cancellationToken),
                 Currencies = GetCurrencyLookups(),
@@ -894,6 +902,44 @@ namespace Leads.Infrastructure.Repositories
                 Email = Clean(request.Email),
                 Phone = Clean(request.Phone)
             };
+        }
+
+        private static Guid? FindMatchingClientId(string companyName, IEnumerable<ClientLookupViewModel> clients)
+        {
+            var normalizedCompanyName = Normalize(companyName);
+            if (string.IsNullOrWhiteSpace(normalizedCompanyName))
+            {
+                return null;
+            }
+
+            return clients.FirstOrDefault(client => Normalize(client.Name) == normalizedCompanyName)?.Id;
+        }
+
+        private static Guid? FindMatchingContactId(string contactPersonName, string? email, Guid? clientId, IEnumerable<ContactLookupViewModel> contacts)
+        {
+            var candidates = clientId.HasValue ? contacts.Where(contact => contact.ClientId == clientId.Value) : contacts;
+            var normalizedEmail = Normalize(email);
+            if (!string.IsNullOrWhiteSpace(normalizedEmail))
+            {
+                var contactByEmail = candidates.FirstOrDefault(contact => Normalize(contact.Email) == normalizedEmail);
+                if (contactByEmail != null)
+                {
+                    return contactByEmail.Id;
+                }
+            }
+
+            var normalizedName = Normalize(contactPersonName);
+            if (string.IsNullOrWhiteSpace(normalizedName))
+            {
+                return null;
+            }
+
+            return candidates.FirstOrDefault(contact => Normalize(contact.FullName) == normalizedName)?.Id;
+        }
+
+        private static string Normalize(string? value)
+        {
+            return Regex.Replace(value?.Trim().ToUpperInvariant() ?? string.Empty, @"[\W_]+", string.Empty);
         }
 
         private static void UpdateProductInterests(Lead lead, List<Guid> productIds)

@@ -19,7 +19,7 @@ import { Permissions } from '@/core/auth/permissions';
 import { UserApiService } from '@/pages/users/services/user-api.service';
 import { UserListItemViewModel } from '@/pages/users/view-models/user-list-item.view-model';
 import { UpdateLeadRequest } from '../../dtos/update-lead.request';
-import { ConvertLeadRequest, CreateLeadInteractionRequest, LeadApiService, LeadConversionViewModel, LeadInteractionViewModel, LeadLookupBundle } from '../../services/lead.api-service';
+import { ClientLookupViewModel, ContactLookupViewModel, ConvertLeadRequest, CreateLeadInteractionRequest, LeadApiService, LeadConversionViewModel, LeadInteractionViewModel, LeadLookupBundle } from '../../services/lead.api-service';
 import { LeadDetailViewModel } from '../../view-models/lead-detail.view-model';
 
 @Component({
@@ -375,15 +375,17 @@ export class LeadDetail implements OnInit, OnDestroy {
                 const firstProduct = conversion.productInterests[0]?.productId ?? '';
                 const firstCurrency = conversion.currencies[0]?.id ?? '';
                 const defaultOwnerUserId = conversion.defaultOwnerUserId ?? conversion.ownerUsers[0]?.id ?? '';
+                const selectedClientId = this.resolveConversionClientId(conversion);
+                const selectedContactId = this.resolveConversionContactId(conversion, selectedClientId);
                 this.conversionForm.reset({
                     productId: firstProduct,
-                    clientMode: 'new',
-                    clientId: '',
+                    clientMode: selectedClientId ? 'existing' : 'new',
+                    clientId: selectedClientId,
                     newClientName: conversion.companyName,
                     newClientCountryId: conversion.countries[0]?.id ?? '',
                     newClientIndustryId: '',
-                    contactMode: 'new',
-                    contactId: '',
+                    contactMode: selectedContactId ? 'existing' : 'new',
+                    contactId: selectedContactId,
                     newContactFirstName: this.firstName(conversion.contactPersonName),
                     newContactLastName: this.lastName(conversion.contactPersonName),
                     newContactEmail: conversion.email ?? '',
@@ -705,6 +707,61 @@ export class LeadDetail implements OnInit, OnDestroy {
         }
 
         return request;
+    }
+
+    private resolveConversionClientId(conversion: LeadConversionViewModel): string {
+        const selectedClient = this.findClientById(conversion, conversion.selectedClientId);
+        if (selectedClient) {
+            return selectedClient.id;
+        }
+
+        const selectedContact = this.findContactById(conversion, conversion.selectedContactId);
+        if (selectedContact) {
+            return selectedContact.clientId;
+        }
+
+        return this.findMatchingClient(conversion)?.id ?? this.findMatchingContact(conversion)?.clientId ?? '';
+    }
+
+    private resolveConversionContactId(conversion: LeadConversionViewModel, clientId: string): string {
+        const selectedContact = this.findContactById(conversion, conversion.selectedContactId, clientId);
+        if (selectedContact) {
+            return selectedContact.id;
+        }
+
+        return this.findMatchingContact(conversion, clientId)?.id ?? '';
+    }
+
+    private findClientById(conversion: LeadConversionViewModel, clientId?: string): ClientLookupViewModel | undefined {
+        return clientId ? conversion.existingClients.find((client) => client.id === clientId) : undefined;
+    }
+
+    private findContactById(conversion: LeadConversionViewModel, contactId?: string, clientId?: string): ContactLookupViewModel | undefined {
+        const contact = contactId ? conversion.existingContacts.find((item) => item.id === contactId) : undefined;
+        return contact && (!clientId || contact.clientId === clientId) ? contact : undefined;
+    }
+
+    private findMatchingClient(conversion: LeadConversionViewModel): ClientLookupViewModel | undefined {
+        const companyName = this.normalizeComparisonValue(conversion.companyName);
+        return companyName ? conversion.existingClients.find((client) => this.normalizeComparisonValue(client.name) === companyName) : undefined;
+    }
+
+    private findMatchingContact(conversion: LeadConversionViewModel, clientId?: string): ContactLookupViewModel | undefined {
+        const candidates = clientId ? conversion.existingContacts.filter((contact) => contact.clientId === clientId) : conversion.existingContacts;
+        const email = this.normalizeComparisonValue(conversion.email);
+        if (email) {
+            const contactByEmail = candidates.find((contact) => this.normalizeComparisonValue(contact.email) === email);
+            if (contactByEmail) {
+                return contactByEmail;
+            }
+        }
+
+        const contactName = this.normalizeComparisonValue(conversion.contactPersonName);
+        return contactName ? candidates.find((contact) => this.normalizeComparisonValue(contact.fullName) === contactName) : undefined;
+    }
+
+    private normalizeComparisonValue(value?: string): string {
+        return value?.trim().toLowerCase().replace(/[\W_]+/g, '') ?? '';
     }
 
     private firstName(fullName: string): string {
