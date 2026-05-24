@@ -29,9 +29,9 @@ builder.Services.AddSwaggerGen(options =>
         Title = "ERP API",
         Version = "v1"
     });
+    options.CustomSchemaIds(type => type.FullName?.Replace("+", ".") ?? type.Name);
 });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 builder.Services.AddIdentityServices(builder.Configuration);
 builder.Services.AddAuthorization(options => options.AddCustomPolicies());
 builder.Services.RegisterAllModules(builder.Configuration);

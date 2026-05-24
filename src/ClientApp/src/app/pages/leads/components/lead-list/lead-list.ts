@@ -182,6 +182,8 @@ export class LeadList implements OnInit {
             categoryId: String(value['categoryId']),
             partnerId: this.optionalString(value['partnerId']),
             campaignName: this.optionalString(value['campaignName']),
+            sourceStartDate: this.optionalString(value['sourceStartDate']),
+            sourceEndDate: this.optionalString(value['sourceEndDate']),
             companyName: String(value['companyName'] ?? ''),
             website: this.optionalString(value['website']),
             contactPersonName: String(value['contactPersonName'] ?? ''),
@@ -192,7 +194,7 @@ export class LeadList implements OnInit {
             countryId: String(value['countryId']),
             address: this.optionalString(value['address']),
             industryId: this.optionalString(value['industryId']),
-            notes: this.optionalString(value['notes']),
+            notes: null,
             leadScore: typeof value['leadScore'] === 'number' ? value['leadScore'] : null,
             productIds: Array.isArray(value['productIds']) ? value['productIds'].map(String) : []
         };
@@ -210,7 +212,7 @@ export class LeadList implements OnInit {
     }
 
     private toOptions(values: LookupViewModel[]): SelectOption[] {
-        return values.map((value) => ({ label: value.name, value: value.id }));
+        return values.map((value) => ({ label: value.name, value: value.id, code: value.code }));
     }
 
     private optionalString(value: unknown): string | null {

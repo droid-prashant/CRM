@@ -50,6 +50,24 @@ namespace ERP.Identity.Seed
                     }
                 }
             }
+
+            var manager = await roleManager.FindByNameAsync(DefaultRoles.Manager);
+            if (manager != null)
+            {
+                var existingPermissions = (await roleManager.GetClaimsAsync(manager))
+                    .Where(claim => claim.Type == IdentityClaimTypes.Permission)
+                    .Select(claim => claim.Value)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var action in new[] { PermissionActions.View, PermissionActions.Create, PermissionActions.Edit, PermissionActions.Delete, PermissionActions.Export })
+                {
+                    var permission = PermissionCatalog.ToClaimValue(PermissionModules.Partners, action);
+                    if (!existingPermissions.Contains(permission))
+                    {
+                        await roleManager.AddClaimAsync(manager, new Claim(IdentityClaimTypes.Permission, permission));
+                    }
+                }
+            }
         }
     }
 }

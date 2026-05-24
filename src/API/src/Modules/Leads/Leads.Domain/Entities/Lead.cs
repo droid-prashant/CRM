@@ -10,6 +10,8 @@ namespace Leads.Domain.Entities
         public Guid CategoryId { get; set; }
         public Guid? PartnerId { get; set; }
         public string? CampaignName { get; set; }
+        public DateTime? SourceStartDate { get; set; }
+        public DateTime? SourceEndDate { get; set; }
         public string CompanyName { get; set; } = string.Empty;
         public string? Website { get; set; }
         public string ContactPersonName { get; set; } = string.Empty;
@@ -31,7 +33,6 @@ namespace Leads.Domain.Entities
 
         public LeadSource? Source { get; set; }
         public LeadCategory? Category { get; set; }
-        public Partner? Partner { get; set; }
         public Country? Country { get; set; }
         public Industry? Industry { get; set; }
         public ICollection<LeadProductInterest> ProductInterests { get; set; } = new List<LeadProductInterest>();

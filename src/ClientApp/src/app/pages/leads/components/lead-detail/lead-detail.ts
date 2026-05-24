@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
@@ -13,7 +13,7 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
-import { forkJoin, of } from 'rxjs';
+import { forkJoin, of, Subscription } from 'rxjs';
 import { AuthService } from '@/core/auth/auth.service';
 import { Permissions } from '@/core/auth/permissions';
 import { UserApiService } from '@/pages/users/services/user-api.service';
@@ -29,7 +29,7 @@ import { LeadDetailViewModel } from '../../view-models/lead-detail.view-model';
     templateUrl: './lead-detail.html',
     providers: [MessageService]
 })
-export class LeadDetail implements OnInit {
+export class LeadDetail implements OnInit, OnDestroy {
     lead?: LeadDetailViewModel;
     isLoading = true;
     isSavingStatus = false;
@@ -62,6 +62,7 @@ export class LeadDetail implements OnInit {
 
     private readonly fb = inject(FormBuilder);
     private readonly messageService = inject(MessageService);
+    private sourceSubscription?: Subscription;
 
     qualificationForm = this.fb.group({
         qualificationRemarks: ['', [Validators.maxLength(1000)]]
@@ -90,6 +91,8 @@ export class LeadDetail implements OnInit {
         categoryId: ['', Validators.required],
         partnerId: [''],
         campaignName: [''],
+        sourceStartDate: [''],
+        sourceEndDate: [''],
         companyName: ['', Validators.required],
         website: [''],
         contactPersonName: ['', Validators.required],
@@ -136,7 +139,12 @@ export class LeadDetail implements OnInit {
     ngOnInit(): void {
         this.canEditLead = this.authService.hasPermission(Permissions.leads.edit);
         this.canApproveLead = this.authService.hasPermission(Permissions.leads.approve);
+        this.sourceSubscription = this.editForm.controls.sourceId.valueChanges.subscribe(() => this.applyEditSourceRules());
         this.loadLead();
+    }
+
+    ngOnDestroy(): void {
+        this.sourceSubscription?.unsubscribe();
     }
 
     loadLead(): void {
@@ -298,6 +306,8 @@ export class LeadDetail implements OnInit {
                     categoryId: lead.categoryId,
                     partnerId: lead.partnerId ?? '',
                     campaignName: lead.campaignName ?? '',
+                    sourceStartDate: this.formatDateInput(lead.sourceStartDate),
+                    sourceEndDate: this.formatDateInput(lead.sourceEndDate),
                     companyName: lead.companyName,
                     website: lead.website ?? '',
                     contactPersonName: lead.contactPersonName,
@@ -308,10 +318,11 @@ export class LeadDetail implements OnInit {
                     countryId: lead.countryId,
                     address: lead.address ?? '',
                     industryId: lead.industryId ?? '',
-                    notes: lead.notes ?? '',
+                    notes: '',
                     leadScore: lead.leadScore ?? null,
                     productIds: lead.selectedProductIds
                 });
+                this.applyEditSourceRules();
                 this.editDialog = true;
                 this.isSavingLead = false;
             },
@@ -561,6 +572,14 @@ export class LeadDetail implements OnInit {
         return this.conversionForm.controls.contactMode.value === 'existing';
     }
 
+    get isEditCampaignSource(): boolean {
+        return this.selectedEditSourceCode() === 'campaign';
+    }
+
+    get isEditPartnerSource(): boolean {
+        return this.selectedEditSourceCode() === 'partner';
+    }
+
     private buildInteractionRequest(): CreateLeadInteractionRequest {
         const value = this.interactionForm.getRawValue();
         return {
@@ -580,6 +599,8 @@ export class LeadDetail implements OnInit {
             categoryId: value.categoryId ?? '',
             partnerId: this.optionalFormString(value.partnerId),
             campaignName: this.optionalFormString(value.campaignName),
+            sourceStartDate: this.optionalFormString(value.sourceStartDate),
+            sourceEndDate: this.optionalFormString(value.sourceEndDate),
             companyName: value.companyName ?? '',
             website: this.optionalFormString(value.website),
             contactPersonName: value.contactPersonName ?? '',
@@ -590,10 +611,41 @@ export class LeadDetail implements OnInit {
             countryId: value.countryId ?? '',
             address: this.optionalFormString(value.address),
             industryId: this.optionalFormString(value.industryId),
-            notes: this.optionalFormString(value.notes),
+            notes: null,
             leadScore: value.leadScore,
             productIds: value.productIds ?? []
         };
+    }
+
+    private applyEditSourceRules(): void {
+        this.setRequired('campaignName', this.isEditCampaignSource);
+        this.setRequired('partnerId', this.isEditPartnerSource);
+        this.setRequired('sourceStartDate', this.isEditCampaignSource);
+        this.setRequired('sourceEndDate', this.isEditCampaignSource);
+        this.setRequired('address', this.isEditCampaignSource);
+
+        if (!this.isEditCampaignSource) {
+            this.editForm.controls.campaignName.reset('', { emitEvent: false });
+            this.editForm.controls.sourceStartDate.reset('', { emitEvent: false });
+            this.editForm.controls.sourceEndDate.reset('', { emitEvent: false });
+            this.editForm.controls.address.reset('', { emitEvent: false });
+        }
+
+        if (!this.isEditPartnerSource) {
+            this.editForm.controls.partnerId.reset('', { emitEvent: false });
+        }
+    }
+
+    private setRequired(controlName: 'campaignName' | 'partnerId' | 'sourceStartDate' | 'sourceEndDate' | 'address', required: boolean): void {
+        const control = this.editForm.controls[controlName];
+        control.setValidators(required ? [Validators.required] : []);
+        control.updateValueAndValidity({ emitEvent: false });
+    }
+
+    private selectedEditSourceCode(): string {
+        const sourceId = this.editForm.controls.sourceId.value;
+        const source = this.leadLookups?.sources.find((item) => item.id === sourceId);
+        return String(source?.code ?? source?.name ?? '').trim().toLowerCase();
     }
 
     private buildConversionRequest(): ConvertLeadRequest {
@@ -656,6 +708,10 @@ export class LeadDetail implements OnInit {
     private formatDateTimeInput(value: Date): string {
         const offsetMs = value.getTimezoneOffset() * 60_000;
         return new Date(value.getTime() - offsetMs).toISOString().slice(0, 16);
+    }
+
+    private formatDateInput(value?: string): string {
+        return value ? new Date(value).toISOString().slice(0, 10) : '';
     }
 
     private optionalFormString(value: string | null | undefined): string | null {

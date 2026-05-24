@@ -13,15 +13,14 @@ namespace Leads.Application.Repositories
         Task<List<LookupViewModel>> GetLeadSourceLookupsAsync(CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetLeadCategoryLookupsAsync(CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetProductLookupsAsync(CancellationToken cancellationToken);
-        Task<List<LookupViewModel>> GetPartnerLookupsAsync(CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetCountryLookupsAsync(CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetIndustryLookupsAsync(CancellationToken cancellationToken);
         Task<bool> SourceRequiresPartnerAsync(Guid sourceId, CancellationToken cancellationToken);
+        Task<string?> GetLeadSourceCodeAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken);
         Task<bool> SourceExistsAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken);
         Task<bool> CountryExistsAsync(Guid countryId, CancellationToken cancellationToken);
-        Task<bool> PartnerExistsAsync(Guid partnerId, CancellationToken cancellationToken);
         Task<bool> IndustryExistsAsync(Guid industryId, CancellationToken cancellationToken);
         Task<List<Guid>> GetActiveProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken);
         Task<bool> DuplicateCompanyEmailExistsAsync(string companyName, string email, CancellationToken cancellationToken);

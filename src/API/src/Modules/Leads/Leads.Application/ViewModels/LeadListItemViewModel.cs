@@ -7,7 +7,10 @@ namespace Leads.Application.ViewModels
         public Guid SourceId { get; set; }
         public Guid CategoryId { get; set; }
         public Guid? PartnerId { get; set; }
+        public string? PartnerName { get; set; }
         public string? CampaignName { get; set; }
+        public DateTime? SourceStartDate { get; set; }
+        public DateTime? SourceEndDate { get; set; }
         public string CompanyName { get; set; } = string.Empty;
         public string? Website { get; set; }
         public string ContactPersonName { get; set; } = string.Empty;

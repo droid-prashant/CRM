@@ -106,7 +106,7 @@
                             <div [ngClass]="fieldGridClass(field)">
                                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">
                                     {{ field.label }}
-                                    @if (field.required) {
+                                    @if (isFieldRequired(field)) {
                                         <span class="text-red-500">*</span>
                                     }
                                 </label>
@@ -117,6 +117,9 @@
                                     }
                                     @case ('email') {
                                         <input pInputText type="email" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full" />
+                                    }
+                                    @case ('date') {
+                                        <input pInputText type="date" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full" />
                                     }
                                     @case ('textarea') {
                                         <textarea pTextarea rows="2" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full"></textarea>

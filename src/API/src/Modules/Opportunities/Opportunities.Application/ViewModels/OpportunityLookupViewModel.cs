@@ -8,6 +8,8 @@ namespace Opportunities.Application.ViewModels
         public List<OpportunityLeadLookupViewModel> Leads { get; set; } = new();
         public List<OpportunityCurrencyLookupViewModel> Currencies { get; set; } = new();
         public List<OpportunityUserLookupViewModel> OwnerUsers { get; set; } = new();
+        public List<OpportunityLookupItemViewModel> Stages { get; set; } = new();
+        public List<OpportunityLookupItemViewModel> Statuses { get; set; } = new();
     }
 
     public class OpportunityClientLookupViewModel
@@ -30,6 +32,10 @@ namespace Opportunities.Application.ViewModels
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Code { get; set; } = string.Empty;
+        public int Sequence { get; set; }
+        public bool IsFinal { get; set; }
+        public bool IsWonStage { get; set; }
+        public bool IsLostStage { get; set; }
     }
 
     public class OpportunityLeadLookupViewModel

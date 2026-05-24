@@ -2,6 +2,7 @@ using Leads.Application.DTOs;
 using Leads.Application.Repositories;
 using Leads.Application.ViewModels;
 using Leads.Domain.Enums;
+using Partners.Application.Services;
 using System.Net.Mail;
 
 namespace Leads.Application.Services
@@ -9,10 +10,12 @@ namespace Leads.Application.Services
     public class LeadService : ILeadService
     {
         private readonly ILeadRepository _leadRepository;
+        private readonly IPartnerLookupService _partnerLookupService;
 
-        public LeadService(ILeadRepository leadRepository)
+        public LeadService(ILeadRepository leadRepository, IPartnerLookupService partnerLookupService)
         {
             _leadRepository = leadRepository;
+            _partnerLookupService = partnerLookupService;
         }
 
         public Task<List<LeadListItemViewModel>> GetLeadListAsync(CancellationToken cancellationToken) => _leadRepository.GetLeadListAsync(cancellationToken);
@@ -217,13 +220,17 @@ namespace Leads.Application.Services
             if (!await _leadRepository.SourceExistsAsync(request.SourceId, cancellationToken)) errors.Add("SourceId is invalid.");
             if (!await _leadRepository.CategoryExistsAsync(request.CategoryId, cancellationToken)) errors.Add("CategoryId is invalid.");
             if (!await _leadRepository.CountryExistsAsync(request.CountryId, cancellationToken)) errors.Add("CountryId is invalid.");
-            if (request.PartnerId.HasValue && !await _leadRepository.PartnerExistsAsync(request.PartnerId.Value, cancellationToken)) errors.Add("PartnerId is invalid.");
+            if (request.PartnerId.HasValue && !await _partnerLookupService.PartnerExistsAsync(request.PartnerId.Value, cancellationToken)) errors.Add("PartnerId is invalid.");
             if (request.IndustryId.HasValue && !await _leadRepository.IndustryExistsAsync(request.IndustryId.Value, cancellationToken)) errors.Add("IndustryId is invalid.");
 
-            if (await _leadRepository.SourceRequiresPartnerAsync(request.SourceId, cancellationToken) && !request.PartnerId.HasValue)
-            {
-                errors.Add("PartnerId is required when Source is Partner.");
-            }
+            errors.AddRange(await ValidateSourceDetailsAsync(
+                request.SourceId,
+                request.PartnerId,
+                request.CampaignName,
+                request.SourceStartDate,
+                request.SourceEndDate,
+                request.Address,
+                cancellationToken));
 
             var activeProductIds = await _leadRepository.GetActiveProductIdsAsync(request.ProductIds, cancellationToken);
             var inactiveOrMissingProducts = request.ProductIds.Except(activeProductIds).ToList();
@@ -241,6 +248,10 @@ namespace Leads.Application.Services
                 request.SourceId,
                 request.CategoryId,
                 request.PartnerId,
+                request.CampaignName,
+                request.SourceStartDate,
+                request.SourceEndDate,
+                request.Address,
                 request.CompanyName,
                 request.ContactPersonName,
                 request.Email,
@@ -255,6 +266,10 @@ namespace Leads.Application.Services
             Guid sourceId,
             Guid categoryId,
             Guid? partnerId,
+            string? campaignName,
+            DateTime? sourceStartDate,
+            DateTime? sourceEndDate,
+            string? address,
             string companyName,
             string contactPersonName,
             string? email,
@@ -288,19 +303,54 @@ namespace Leads.Application.Services
             if (!await _leadRepository.SourceExistsAsync(sourceId, cancellationToken)) errors.Add("SourceId is invalid.");
             if (!await _leadRepository.CategoryExistsAsync(categoryId, cancellationToken)) errors.Add("CategoryId is invalid.");
             if (!await _leadRepository.CountryExistsAsync(countryId, cancellationToken)) errors.Add("CountryId is invalid.");
-            if (partnerId.HasValue && !await _leadRepository.PartnerExistsAsync(partnerId.Value, cancellationToken)) errors.Add("PartnerId is invalid.");
+            if (partnerId.HasValue && !await _partnerLookupService.PartnerExistsAsync(partnerId.Value, cancellationToken)) errors.Add("PartnerId is invalid.");
             if (industryId.HasValue && !await _leadRepository.IndustryExistsAsync(industryId.Value, cancellationToken)) errors.Add("IndustryId is invalid.");
 
-            if (await _leadRepository.SourceRequiresPartnerAsync(sourceId, cancellationToken) && !partnerId.HasValue)
-            {
-                errors.Add("PartnerId is required when Source is Partner.");
-            }
+            errors.AddRange(await ValidateSourceDetailsAsync(sourceId, partnerId, campaignName, sourceStartDate, sourceEndDate, address, cancellationToken));
 
             var activeProductIds = await _leadRepository.GetActiveProductIdsAsync(productIds, cancellationToken);
             var inactiveOrMissingProducts = productIds.Except(activeProductIds).ToList();
             if (inactiveOrMissingProducts.Count > 0)
             {
                 errors.Add("All ProductIds must exist in active product master data.");
+            }
+
+            return errors;
+        }
+
+        private async Task<List<string>> ValidateSourceDetailsAsync(
+            Guid sourceId,
+            Guid? partnerId,
+            string? campaignName,
+            DateTime? sourceStartDate,
+            DateTime? sourceEndDate,
+            string? address,
+            CancellationToken cancellationToken)
+        {
+            var errors = new List<string>();
+            var sourceCode = (await _leadRepository.GetLeadSourceCodeAsync(sourceId, cancellationToken))?.Trim().ToUpperInvariant();
+
+            if (sourceCode == "CAMPAIGN" && string.IsNullOrWhiteSpace(campaignName))
+            {
+                errors.Add("CampaignName is required when Source is Campaign.");
+            }
+
+            if (sourceCode == "PARTNER" && !partnerId.HasValue)
+            {
+                errors.Add("PartnerId is required when Source is Partner.");
+            }
+
+            if (sourceCode != "CAMPAIGN")
+            {
+                return errors;
+            }
+
+            if (!sourceStartDate.HasValue) errors.Add("SourceStartDate is required when Source is Campaign.");
+            if (!sourceEndDate.HasValue) errors.Add("SourceEndDate is required when Source is Campaign.");
+            if (string.IsNullOrWhiteSpace(address)) errors.Add("Address is required when Source is Campaign.");
+            if (sourceStartDate.HasValue && sourceEndDate.HasValue && sourceStartDate.Value.Date > sourceEndDate.Value.Date)
+            {
+                errors.Add("SourceStartDate must be earlier than or equal to SourceEndDate.");
             }
 
             return errors;
@@ -362,7 +412,7 @@ namespace Leads.Application.Services
 
             if (!conversion.CanConvert)
             {
-                errors.Add("Only qualified, not-yet-converted leads can be converted.");
+                errors.Add("Only qualified, assigned, not-yet-converted leads can be converted.");
             }
 
             if (!conversion.ProductInterests.Any(x => x.ProductId == request.ProductId))
@@ -385,9 +435,13 @@ namespace Leads.Application.Services
                 errors.Add("CurrencyId is required.");
             }
 
-            if (request.OwnerUserId == Guid.Empty || !await _leadRepository.UserExistsAsync(request.OwnerUserId))
+            if (!conversion.DefaultOwnerUserId.HasValue)
             {
-                errors.Add("OwnerUserId is invalid.");
+                errors.Add("Lead must be assigned before conversion.");
+            }
+            else if (request.OwnerUserId != Guid.Empty && request.OwnerUserId != conversion.DefaultOwnerUserId.Value)
+            {
+                errors.Add("Opportunity owner must match the assigned lead user.");
             }
 
             if (!request.ClientId.HasValue && request.NewClient == null)

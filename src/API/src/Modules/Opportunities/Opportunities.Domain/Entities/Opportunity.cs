@@ -15,5 +15,15 @@ namespace Opportunities.Domain.Entities
         public DateTime? ExpectedCloseDate { get; set; }
         public Guid OwnerUserId { get; set; }
         public string Stage { get; set; } = "New";
+        public Guid StageId { get; set; }
+        public string Status { get; set; } = "Open";
+        public decimal? FinalAmount { get; set; }
+        public DateTime? ClosedDate { get; set; }
+        public string? ClosingNote { get; set; }
+        public string? LostReason { get; set; }
+
+        public OpportunityStage? CurrentStage { get; set; }
+        public ICollection<OpportunityStageHistory> StageHistories { get; set; } = new List<OpportunityStageHistory>();
+        public ICollection<OpportunityActivity> Activities { get; set; } = new List<OpportunityActivity>();
     }
 }

@@ -3,6 +3,8 @@ export interface CreateLeadRequest {
     categoryId: string;
     partnerId?: string | null;
     campaignName?: string | null;
+    sourceStartDate?: string | null;
+    sourceEndDate?: string | null;
     companyName: string;
     website?: string | null;
     contactPersonName: string;

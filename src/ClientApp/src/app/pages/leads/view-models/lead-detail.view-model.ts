@@ -8,6 +8,8 @@ export interface LeadDetailViewModel {
     partnerId?: string;
     partnerName?: string;
     campaignName?: string;
+    sourceStartDate?: string;
+    sourceEndDate?: string;
     companyName: string;
     website?: string;
     contactPersonName: string;

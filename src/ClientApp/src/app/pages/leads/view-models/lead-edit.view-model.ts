@@ -4,6 +4,8 @@ export interface LeadEditViewModel {
     categoryId: string;
     partnerId?: string;
     campaignName?: string;
+    sourceStartDate?: string;
+    sourceEndDate?: string;
     companyName: string;
     website?: string;
     contactPersonName: string;

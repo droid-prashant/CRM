@@ -1,8 +1,8 @@
 using ERP.Core.Entities;
 
-namespace Leads.Domain.Entities
+namespace Partners.Infrastructure.Persistence.Data
 {
-    public class Partner : BaseEntity
+    public class CountryLookup : BaseEntity
     {
         public string Code { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;

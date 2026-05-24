@@ -10,7 +10,8 @@ namespace ERP.Identity.Constants
             new(PermissionModules.Roles, "Roles"),
             new(PermissionModules.Permissions, "Permissions"),
             new(PermissionModules.Leads, "Leads"),
-            new(PermissionModules.Opportunities, "Opportunities")
+            new(PermissionModules.Opportunities, "Opportunities"),
+            new(PermissionModules.Partners, "Partners")
         ];
 
         public static IReadOnlyList<PermissionModuleDefinition> GetModules() => Modules;

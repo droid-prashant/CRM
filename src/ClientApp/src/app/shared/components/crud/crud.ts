@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, ViewChild } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ConfirmationService, MenuItem } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
@@ -17,6 +17,7 @@ import { SelectModule } from 'primeng/select';
 import { Table, TableModule } from 'primeng/table';
 import { TextareaModule } from 'primeng/textarea';
 import { ToolbarModule } from 'primeng/toolbar';
+import { Subscription } from 'rxjs';
 import { DynamicColumn } from '@/shared/dynamic-form/models/dynamicFields/column.model';
 import { DynamicField } from '@/shared/dynamic-form/models/dynamicFields/field.model';
 
@@ -53,7 +54,7 @@ export interface CrudSaveEvent {
     templateUrl: './crud.html',
     providers: [ConfirmationService]
 })
-export class Crud implements OnChanges {
+export class Crud implements OnChanges, OnDestroy {
     @Input({ required: true }) fields: DynamicField[] = [];
     @Input({ required: true }) columns: DynamicColumn[] = [];
     @Input() data: Record<string, unknown>[] = [];
@@ -90,6 +91,7 @@ export class Crud implements OnChanges {
     private mode: CrudMode = 'create';
     private editingRow?: Record<string, unknown>;
     private selectedFiles: Record<string, File> = {};
+    private formSubscription?: Subscription;
 
     constructor(
         private readonly fb: FormBuilder,
@@ -101,11 +103,16 @@ export class Crud implements OnChanges {
     ngOnChanges(changes: SimpleChanges): void {
         if (changes['fields']) {
             this.form = this.buildForm();
+            this.registerFormStateHandler();
         }
 
         if (changes['data']) {
             this.selectedRows = this.selectedRows.filter((selectedRow) => this.data.some((row) => this.rowKey(row) === this.rowKey(selectedRow)));
         }
+    }
+
+    ngOnDestroy(): void {
+        this.formSubscription?.unsubscribe();
     }
 
     get globalFilterFields(): string[] {
@@ -128,6 +135,7 @@ export class Crud implements OnChanges {
         this.selectedFiles = {};
         this.submitted = false;
         this.form.reset(this.getDefaultFormValue());
+        this.applyConditionalFieldState();
         this.dialog = true;
     }
 
@@ -137,6 +145,7 @@ export class Crud implements OnChanges {
         this.selectedFiles = {};
         this.submitted = false;
         this.form.reset({ ...this.getDefaultFormValue(), ...row });
+        this.applyConditionalFieldState();
         this.dialog = true;
     }
 
@@ -163,7 +172,7 @@ export class Crud implements OnChanges {
     }
 
     confirmDelete(row: Record<string, unknown>): void {
-        const action = this.rowActionLabel.toLowerCase();
+        const action = (this.rowActionLabelResolver?.(row) ?? this.rowActionLabel).toLowerCase();
         this.confirmationService.confirm({
             message: `Are you sure you want to ${action} this ${this.title.toLowerCase()}?`,
             header: 'Confirm',
@@ -266,19 +275,55 @@ export class Crud implements OnChanges {
         }
     }
 
-    private isFieldVisible(field: DynamicField): boolean {
-        return !field.visibleOn || field.visibleOn === 'both' || field.visibleOn === this.mode;
+    isFieldVisible(field: DynamicField): boolean {
+        const modeVisible = !field.visibleOn || field.visibleOn === 'both' || field.visibleOn === this.mode;
+        if (!modeVisible) {
+            return false;
+        }
+
+        return field.visibleWhen ? field.visibleWhen(this.currentFormValue(), this.mode) : true;
+    }
+
+    isFieldRequired(field: DynamicField): boolean {
+        if (!this.isFieldVisible(field)) {
+            return false;
+        }
+
+        return field.required === true || (field.requiredWhen ? field.requiredWhen(this.currentFormValue(), this.mode) : false);
     }
 
     private buildForm(): FormGroup {
         const group: Record<string, unknown[]> = {};
 
         this.fields.forEach((field) => {
-            const validators = field.required ? [Validators.required] : [];
-            group[field.key] = [this.getDefaultValue(field), validators];
+            group[field.key] = [this.getDefaultValue(field), []];
         });
 
-        return this.fb.group(group);
+        const form = this.fb.group(group);
+        this.applyConditionalFieldState(form);
+        return form;
+    }
+
+    private registerFormStateHandler(): void {
+        this.formSubscription?.unsubscribe();
+        this.formSubscription = this.form.valueChanges.subscribe(() => this.applyConditionalFieldState());
+    }
+
+    private applyConditionalFieldState(form = this.form): void {
+        this.fields.forEach((field) => {
+            const control = form.get(field.key);
+            if (!control) {
+                return;
+            }
+
+            control.setValidators(this.isFieldRequired(field) ? [Validators.required] : []);
+
+            if (!this.isFieldVisible(field) && field.clearWhenHidden !== false) {
+                control.reset(this.getDefaultValue(field), { emitEvent: false });
+            }
+
+            control.updateValueAndValidity({ emitEvent: false });
+        });
     }
 
     private buildPayload(): Record<string, unknown> | FormData {
@@ -301,6 +346,10 @@ export class Crud implements OnChanges {
             accumulator[field.key] = this.getDefaultValue(field);
             return accumulator;
         }, {});
+    }
+
+    private currentFormValue(): Record<string, unknown> {
+        return this.form?.getRawValue?.() as Record<string, unknown>;
     }
 
     private getDefaultValue(field: DynamicField): unknown {

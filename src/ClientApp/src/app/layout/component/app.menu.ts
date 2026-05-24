@@ -33,7 +33,8 @@ export class AppMenu {
                 items: [
                     { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/'] },
                     ...(this.authService.hasPermission(Permissions.leads.view) ? [{ label: 'Leads', icon: 'pi pi-fw pi-briefcase', routerLink: ['/pages/leads'] }] : []),
-                    ...(this.authService.hasPermission(Permissions.opportunities.view) ? [{ label: 'Opportunities', icon: 'pi pi-fw pi-chart-line', routerLink: ['/pages/opportunities'] }] : [])
+                    ...(this.authService.hasPermission(Permissions.opportunities.view) ? [{ label: 'Opportunities', icon: 'pi pi-fw pi-chart-line', routerLink: ['/pages/opportunities'] }] : []),
+                    ...(this.authService.hasPermission(Permissions.partners.view) ? [{ label: 'Partners', icon: 'pi pi-fw pi-share-alt', routerLink: ['/pages/partners'] }] : [])
                 ]
             },
             {

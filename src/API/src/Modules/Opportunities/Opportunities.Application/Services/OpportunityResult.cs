@@ -6,6 +6,8 @@ namespace Opportunities.Application.Services
     {
         public OpportunityListItemViewModel? Opportunity { get; set; }
         public List<string> Errors { get; set; } = new();
-        public bool Succeeded => Opportunity != null && Errors.Count == 0;
+        public bool NotFound { get; set; }
+        public bool Forbidden { get; set; }
+        public bool Succeeded => Opportunity != null && Errors.Count == 0 && !NotFound && !Forbidden;
     }
 }

@@ -7,5 +7,6 @@ namespace ERP.Identity.Constants
         public const string Permissions = "permissions";
         public const string Leads = "leads";
         public const string Opportunities = "opportunities";
+        public const string Partners = "partners";
     }
 }

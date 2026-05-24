@@ -21,6 +21,9 @@ namespace Opportunities.Infrastructure.Persistence.Data
         public DbSet<Client> Clients { get; set; }
         public DbSet<ClientContact> ClientContacts { get; set; }
         public DbSet<Country> Countries { get; set; }
+        public DbSet<OpportunityStage> OpportunityStages { get; set; }
+        public DbSet<OpportunityStageHistory> OpportunityStageHistories { get; set; }
+        public DbSet<OpportunityActivity> OpportunityActivities { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -40,10 +43,43 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Property(x => x.Title).HasMaxLength(250).IsRequired();
                 entity.Property(x => x.EstimatedValue).HasPrecision(18, 2);
                 entity.Property(x => x.Stage).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
+                entity.Property(x => x.FinalAmount).HasPrecision(18, 2);
+                entity.Property(x => x.ClosingNote).HasMaxLength(1000);
+                entity.Property(x => x.LostReason).HasMaxLength(500);
                 entity.HasOne<Lead>().WithMany().HasForeignKey(x => x.LeadId);
                 entity.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId);
                 entity.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId);
                 entity.HasOne<ClientContact>().WithMany().HasForeignKey(x => x.ContactId);
+                entity.HasOne(x => x.CurrentStage).WithMany().HasForeignKey(x => x.StageId);
+            });
+
+            modelBuilder.Entity<OpportunityStage>(entity =>
+            {
+                entity.ToTable("OpportunityStages", "leads");
+                entity.Property(x => x.Name).HasMaxLength(100).IsRequired();
+                entity.HasIndex(x => x.Name).IsUnique();
+                entity.HasIndex(x => x.Sequence).IsUnique();
+            });
+
+            modelBuilder.Entity<OpportunityStageHistory>(entity =>
+            {
+                entity.ToTable("OpportunityStageHistories", "leads");
+                entity.Property(x => x.Remarks).HasMaxLength(1000);
+                entity.HasOne(x => x.Opportunity).WithMany(x => x.StageHistories).HasForeignKey(x => x.OpportunityId);
+                entity.HasOne(x => x.FromStage).WithMany().HasForeignKey(x => x.FromStageId);
+                entity.HasOne(x => x.ToStage).WithMany().HasForeignKey(x => x.ToStageId);
+                entity.HasIndex(x => new { x.OpportunityId, x.CreatedOn });
+            });
+
+            modelBuilder.Entity<OpportunityActivity>(entity =>
+            {
+                entity.ToTable("OpportunityActivities", "leads");
+                entity.Property(x => x.ActivityType).HasMaxLength(30).IsRequired();
+                entity.Property(x => x.Subject).HasMaxLength(250);
+                entity.Property(x => x.Notes).HasMaxLength(2000).IsRequired();
+                entity.HasOne(x => x.Opportunity).WithMany(x => x.Activities).HasForeignKey(x => x.OpportunityId);
+                entity.HasIndex(x => new { x.OpportunityId, x.ActivityDate });
             });
 
             modelBuilder.Entity<Lead>(entity =>
@@ -52,7 +88,6 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Property(x => x.Status).HasConversion<int>();
                 entity.Ignore(x => x.Source);
                 entity.Ignore(x => x.Category);
-                entity.Ignore(x => x.Partner);
                 entity.Ignore(x => x.Country);
                 entity.Ignore(x => x.Industry);
                 entity.Ignore(x => x.ProductInterests);

@@ -4,7 +4,10 @@ export interface LeadListItemViewModel {
     sourceId: string;
     categoryId: string;
     partnerId?: string;
+    partnerName?: string;
     campaignName?: string;
+    sourceStartDate?: string;
+    sourceEndDate?: string;
     companyName: string;
     website?: string;
     contactPersonName: string;

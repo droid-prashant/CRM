@@ -10,6 +10,7 @@ using Leads.Infrastructure.Persistence.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Opportunities.Domain.Entities;
+using Partners.Application.Services;
 
 namespace Leads.Infrastructure.Repositories
 {
@@ -17,12 +18,14 @@ namespace Leads.Infrastructure.Repositories
     {
         private readonly LeadsDbContext _dbContext;
         private readonly ILeadAssignmentService _leadAssignmentService;
+        private readonly IPartnerLookupService _partnerLookupService;
         private readonly UserManager<ApplicationUser> _userManager;
 
-        public LeadRepository(LeadsDbContext dbContext, ILeadAssignmentService leadAssignmentService, UserManager<ApplicationUser> userManager)
+        public LeadRepository(LeadsDbContext dbContext, ILeadAssignmentService leadAssignmentService, IPartnerLookupService partnerLookupService, UserManager<ApplicationUser> userManager)
         {
             _dbContext = dbContext;
             _leadAssignmentService = leadAssignmentService;
+            _partnerLookupService = partnerLookupService;
             _userManager = userManager;
         }
 
@@ -38,6 +41,9 @@ namespace Leads.Infrastructure.Repositories
                 .OrderByDescending(x => x.CreatedOn)
                 .ToListAsync(cancellationToken);
 
+            var partnerNames = (await _partnerLookupService.GetActivePartnersAsync(cancellationToken))
+                .ToDictionary(x => x.Id, x => x.Name);
+
             return leads.Select(x => new LeadListItemViewModel
             {
                 Id = x.Id,
@@ -45,7 +51,10 @@ namespace Leads.Infrastructure.Repositories
                 SourceId = x.SourceId,
                 CategoryId = x.CategoryId,
                 PartnerId = x.PartnerId,
+                PartnerName = x.PartnerId.HasValue ? partnerNames.GetValueOrDefault(x.PartnerId.Value) : null,
                 CampaignName = x.CampaignName,
+                SourceStartDate = x.SourceStartDate,
+                SourceEndDate = x.SourceEndDate,
                 CompanyName = x.CompanyName,
                 Website = x.Website,
                 ContactPersonName = x.ContactPersonName,
@@ -74,7 +83,6 @@ namespace Leads.Infrastructure.Repositories
                 .AsNoTracking()
                 .Include(x => x.Source)
                 .Include(x => x.Category)
-                .Include(x => x.Partner)
                 .Include(x => x.Country)
                 .Include(x => x.Industry)
                 .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
@@ -87,6 +95,11 @@ namespace Leads.Infrastructure.Repositories
             }
 
             var detail = MapDetail(lead, false);
+            if (lead.PartnerId.HasValue)
+            {
+                detail.PartnerName = await _partnerLookupService.GetPartnerNameAsync(lead.PartnerId.Value, cancellationToken);
+            }
+
             await PopulateAssignedUserNameAsync(detail);
             return detail;
         }
@@ -103,6 +116,8 @@ namespace Leads.Infrastructure.Repositories
                     CategoryId = x.CategoryId,
                     PartnerId = x.PartnerId,
                     CampaignName = x.CampaignName,
+                    SourceStartDate = x.SourceStartDate,
+                    SourceEndDate = x.SourceEndDate,
                     CompanyName = x.CompanyName,
                     Website = x.Website,
                     ContactPersonName = x.ContactPersonName,
@@ -140,7 +155,6 @@ namespace Leads.Infrastructure.Repositories
         public Task<List<LookupViewModel>> GetLeadSourceLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.LeadSources, cancellationToken);
         public Task<List<LookupViewModel>> GetLeadCategoryLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.LeadCategories, cancellationToken);
         public Task<List<LookupViewModel>> GetProductLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.Products, cancellationToken);
-        public Task<List<LookupViewModel>> GetPartnerLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.Partners, cancellationToken);
         public Task<List<LookupViewModel>> GetCountryLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.Countries, cancellationToken);
         public Task<List<LookupViewModel>> GetIndustryLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.Industries, cancellationToken);
 
@@ -149,11 +163,19 @@ namespace Leads.Infrastructure.Repositories
             return _dbContext.LeadSources.AnyAsync(x => x.Id == sourceId && x.IsActive && x.RequiresPartner, cancellationToken);
         }
 
+        public Task<string?> GetLeadSourceCodeAsync(Guid sourceId, CancellationToken cancellationToken)
+        {
+            return _dbContext.LeadSources
+                .AsNoTracking()
+                .Where(x => x.Id == sourceId && x.IsActive)
+                .Select(x => x.Code)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         public Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Leads.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
         public Task<bool> SourceExistsAsync(Guid sourceId, CancellationToken cancellationToken) => _dbContext.LeadSources.AnyAsync(x => x.Id == sourceId && x.IsActive, cancellationToken);
         public Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken) => _dbContext.LeadCategories.AnyAsync(x => x.Id == categoryId && x.IsActive, cancellationToken);
         public Task<bool> CountryExistsAsync(Guid countryId, CancellationToken cancellationToken) => _dbContext.Countries.AnyAsync(x => x.Id == countryId && x.IsActive, cancellationToken);
-        public Task<bool> PartnerExistsAsync(Guid partnerId, CancellationToken cancellationToken) => _dbContext.Partners.AnyAsync(x => x.Id == partnerId && x.IsActive, cancellationToken);
         public Task<bool> IndustryExistsAsync(Guid industryId, CancellationToken cancellationToken) => _dbContext.Industries.AnyAsync(x => x.Id == industryId && x.IsActive, cancellationToken);
 
         public Task<List<Guid>> GetActiveProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken)
@@ -192,6 +214,8 @@ namespace Leads.Infrastructure.Repositories
                 CategoryId = request.CategoryId,
                 PartnerId = request.PartnerId,
                 CampaignName = Clean(request.CampaignName),
+                SourceStartDate = request.SourceStartDate?.ToUniversalTime(),
+                SourceEndDate = request.SourceEndDate?.ToUniversalTime(),
                 CompanyName = request.CompanyName.Trim(),
                 Website = Clean(request.Website),
                 ContactPersonName = request.ContactPersonName.Trim(),
@@ -274,6 +298,8 @@ namespace Leads.Infrastructure.Repositories
             lead.CategoryId = request.CategoryId;
             lead.PartnerId = request.PartnerId;
             lead.CampaignName = Clean(request.CampaignName);
+            lead.SourceStartDate = request.SourceStartDate?.ToUniversalTime();
+            lead.SourceEndDate = request.SourceEndDate?.ToUniversalTime();
             lead.CompanyName = request.CompanyName.Trim();
             lead.Website = Clean(request.Website);
             lead.ContactPersonName = request.ContactPersonName.Trim();
@@ -431,7 +457,7 @@ namespace Leads.Infrastructure.Repositories
                 OwnerUsers = await GetActiveUserLookupsAsync(cancellationToken),
                 DefaultOwnerUserId = lead.AssignedToUserId,
                 DefaultOwnerUserName = await GetUserFullNameAsync(lead.AssignedToUserId),
-                CanConvert = lead.Status == LeadStatus.Qualified && !lead.ConvertedOpportunityId.HasValue
+                CanConvert = lead.Status == LeadStatus.Qualified && lead.AssignedToUserId.HasValue && !lead.ConvertedOpportunityId.HasValue
             };
         }
 
@@ -444,7 +470,7 @@ namespace Leads.Infrastructure.Repositories
                 .Include(x => x.TimelineEntries)
                 .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
 
-            if (lead == null || lead.Status != LeadStatus.Qualified || lead.ConvertedOpportunityId.HasValue)
+            if (lead == null || lead.Status != LeadStatus.Qualified || !lead.AssignedToUserId.HasValue || lead.ConvertedOpportunityId.HasValue)
             {
                 return null;
             }
@@ -484,6 +510,12 @@ namespace Leads.Infrastructure.Repositories
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
+            var defaultStage = await _dbContext.OpportunityStages
+                .Where(x => x.IsActive && !x.IsDeleted)
+                .OrderByDescending(x => x.IsDefault)
+                .ThenBy(x => x.Sequence)
+                .FirstAsync(cancellationToken);
+
             var opportunity = new Opportunity
             {
                 OpportunityNumber = opportunityNumber,
@@ -495,11 +527,21 @@ namespace Leads.Infrastructure.Repositories
                 EstimatedValue = request.EstimatedValue,
                 CurrencyId = request.CurrencyId,
                 ExpectedCloseDate = request.ExpectedCloseDate,
-                OwnerUserId = request.OwnerUserId
+                OwnerUserId = lead.AssignedToUserId.Value,
+                StageId = defaultStage.Id,
+                Stage = defaultStage.Name,
+                Status = "Open"
             };
 
             _dbContext.Opportunities.Add(opportunity);
             await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _dbContext.OpportunityStageHistories.Add(new OpportunityStageHistory
+            {
+                OpportunityId = opportunity.Id,
+                ToStageId = defaultStage.Id,
+                Remarks = "Lead converted to opportunity."
+            });
 
             lead.Status = LeadStatus.Converted;
             lead.ConvertedOpportunityId = opportunity.Id;
@@ -735,8 +777,9 @@ namespace Leads.Infrastructure.Repositories
                 CategoryId = lead.CategoryId,
                 CategoryName = lead.Category?.Name ?? string.Empty,
                 PartnerId = lead.PartnerId,
-                PartnerName = lead.Partner?.Name,
                 CampaignName = lead.CampaignName,
+                SourceStartDate = lead.SourceStartDate,
+                SourceEndDate = lead.SourceEndDate,
                 CompanyName = lead.CompanyName,
                 Website = lead.Website,
                 ContactPersonName = lead.ContactPersonName,

@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { apiUrl } from '@/core/http/api-url';
@@ -15,7 +15,10 @@ export interface OpportunityListItemViewModel {
     contactName: string;
     leadId?: string;
     leadNumber?: string;
+    stageId: string;
     stageName: string;
+    stageSequence: number;
+    isFinalStage: boolean;
     estimatedValue: number;
     currencyId: string;
     currencyCode: string;
@@ -23,6 +26,30 @@ export interface OpportunityListItemViewModel {
     ownerUserName?: string;
     expectedCloseDate?: string;
     status: string;
+    finalAmount?: number;
+    closedDate?: string;
+    closingNote?: string;
+    lostReason?: string;
+}
+
+export interface OpportunityListQuery {
+    pageNumber?: number;
+    pageSize?: number;
+    searchTerm?: string;
+    clientId?: string;
+    stageId?: string;
+    ownerUserId?: string;
+    status?: string;
+    sortField?: string;
+    sortDirection?: 'asc' | 'desc';
+}
+
+export interface PagedResult<T> {
+    items: T[];
+    pageNumber: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
 }
 
 export interface CreateOpportunityRequest {
@@ -35,6 +62,33 @@ export interface CreateOpportunityRequest {
     currencyId: string;
     ownerUserId: string;
     expectedCloseDate?: string;
+}
+
+export interface UpdateOpportunityRequest {
+    id: string;
+    title: string;
+    estimatedValue: number;
+    ownerUserId: string;
+}
+
+export interface ChangeOpportunityStageRequest {
+    stageId: string;
+    remarks?: string;
+}
+
+export interface CloseOpportunityRequest {
+    finalAmount?: number;
+    lostReason?: string;
+    closedDate: string;
+    note?: string;
+}
+
+export interface CreateOpportunityActivityRequest {
+    activityType: string;
+    subject?: string;
+    notes: string;
+    activityDate?: string;
+    followUpDate?: string;
 }
 
 export interface ClientLookupViewModel {
@@ -54,6 +108,10 @@ export interface LookupViewModel {
     id: string;
     name: string;
     code: string;
+    sequence?: number;
+    isFinal?: boolean;
+    isWonStage?: boolean;
+    isLostStage?: boolean;
 }
 
 export interface LeadLookupViewModel {
@@ -67,7 +125,7 @@ export interface LeadLookupViewModel {
 export interface OpportunityUserLookupViewModel {
     id: string;
     fullName: string;
-    isActive: boolean;
+    isActive?: boolean;
 }
 
 export interface CurrencyLookupViewModel {
@@ -83,6 +141,39 @@ export interface OpportunityLookupBundle {
     leads: LeadLookupViewModel[];
     ownerUsers: OpportunityUserLookupViewModel[];
     currencies: CurrencyLookupViewModel[];
+    stages: LookupViewModel[];
+    statuses: LookupViewModel[];
+}
+
+export interface OpportunityPipelineStageViewModel {
+    stageId: string;
+    stageName: string;
+    sequence: number;
+    isFinal: boolean;
+    isWonStage: boolean;
+    isLostStage: boolean;
+    opportunities: OpportunityListItemViewModel[];
+}
+
+export interface OpportunityStageHistoryViewModel {
+    id: string;
+    opportunityId: string;
+    fromStageName?: string;
+    toStageName: string;
+    remarks?: string;
+    changedByUserName?: string;
+    changedAt: string;
+}
+
+export interface OpportunityActivityViewModel {
+    id: string;
+    opportunityId: string;
+    activityType: string;
+    subject?: string;
+    notes: string;
+    activityDate: string;
+    followUpDate?: string;
+    createdByUserName?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -91,12 +182,60 @@ export class OpportunityApiService {
 
     constructor(private readonly http: HttpClient) {}
 
-    getOpportunities(): Observable<OpportunityListItemViewModel[]> {
-        return this.http.get<OpportunityListItemViewModel[]>(this.opportunitiesUrl);
+    getOpportunities(query: OpportunityListQuery): Observable<PagedResult<OpportunityListItemViewModel>> {
+        let params = new HttpParams();
+
+        Object.entries(query).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params = params.set(key, String(value));
+            }
+        });
+
+        return this.http.get<PagedResult<OpportunityListItemViewModel>>(this.opportunitiesUrl, { params });
+    }
+
+    getPipeline(query: OpportunityListQuery): Observable<OpportunityPipelineStageViewModel[]> {
+        let params = new HttpParams();
+
+        Object.entries(query).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params = params.set(key, String(value));
+            }
+        });
+
+        return this.http.get<OpportunityPipelineStageViewModel[]>(`${this.opportunitiesUrl}/pipeline`, { params });
     }
 
     createOpportunity(request: CreateOpportunityRequest): Observable<OpportunityListItemViewModel> {
         return this.http.post<OpportunityListItemViewModel>(this.opportunitiesUrl, request);
+    }
+
+    updateOpportunity(id: string, request: UpdateOpportunityRequest): Observable<OpportunityListItemViewModel> {
+        return this.http.put<OpportunityListItemViewModel>(`${this.opportunitiesUrl}/${id}`, request);
+    }
+
+    changeStage(id: string, request: ChangeOpportunityStageRequest): Observable<OpportunityListItemViewModel> {
+        return this.http.patch<OpportunityListItemViewModel>(`${this.opportunitiesUrl}/${id}/stage`, request);
+    }
+
+    closeAsWon(id: string, request: CloseOpportunityRequest): Observable<OpportunityListItemViewModel> {
+        return this.http.patch<OpportunityListItemViewModel>(`${this.opportunitiesUrl}/${id}/won`, request);
+    }
+
+    closeAsLost(id: string, request: CloseOpportunityRequest): Observable<OpportunityListItemViewModel> {
+        return this.http.patch<OpportunityListItemViewModel>(`${this.opportunitiesUrl}/${id}/lost`, request);
+    }
+
+    getStageHistory(id: string): Observable<OpportunityStageHistoryViewModel[]> {
+        return this.http.get<OpportunityStageHistoryViewModel[]>(`${this.opportunitiesUrl}/${id}/stage-history`);
+    }
+
+    getActivities(id: string): Observable<OpportunityActivityViewModel[]> {
+        return this.http.get<OpportunityActivityViewModel[]>(`${this.opportunitiesUrl}/${id}/activities`);
+    }
+
+    createActivity(id: string, request: CreateOpportunityActivityRequest): Observable<OpportunityActivityViewModel> {
+        return this.http.post<OpportunityActivityViewModel>(`${this.opportunitiesUrl}/${id}/activities`, request);
     }
 
     getLookupBundle(): Observable<OpportunityLookupBundle> {
