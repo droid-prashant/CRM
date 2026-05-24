@@ -272,6 +272,7 @@ namespace Leads.Infrastructure.Repositories
                 return null;
             }
 
+            var previousStatus = lead.Status;
             lead.SourceId = request.SourceId;
             lead.CategoryId = request.CategoryId;
             lead.PartnerId = request.PartnerId;
@@ -297,6 +298,11 @@ namespace Leads.Infrastructure.Repositories
                 EventType = "LeadUpdated",
                 Description = "Lead details were updated."
             });
+
+            if (previousStatus == LeadStatus.Disqualified)
+            {
+                ResetDisqualifiedLeadForResubmission(lead);
+            }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -835,6 +841,20 @@ namespace Leads.Infrastructure.Repositories
         private static string BuildStatusChangeDescription(string previousStatus, string newStatus, string? remarks)
         {
             return $"PreviousStatus={previousStatus};NewStatus={newStatus};Remarks={Clean(remarks) ?? string.Empty}";
+        }
+
+        private static void ResetDisqualifiedLeadForResubmission(Lead lead)
+        {
+            lead.Status = LeadStatus.New;
+            lead.QualificationDate = null;
+            lead.DisqualificationReason = null;
+            lead.AssignedToUserId = null;
+            lead.AssignedAt = null;
+            lead.TimelineEntries.Add(new LeadTimelineEntry
+            {
+                EventType = "LeadResubmitted",
+                Description = "Lead was resubmitted after editing. Status reset from Disqualified to New."
+            });
         }
 
         private static string BuildAssignmentDescription(string? assigneeName, string? remarks)

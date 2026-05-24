@@ -533,10 +533,15 @@ export class LeadDetail implements OnInit, OnDestroy {
         }
 
         this.isSavingLead = true;
+        const wasDisqualified = this.lead.status?.toLowerCase() === 'disqualified';
         this.leadApiService.updateLead(this.lead.id, this.buildUpdateLeadRequest()).subscribe({
             next: (lead) => {
                 this.editDialog = false;
-                this.messageService.add({ severity: 'success', summary: 'Lead updated', detail: `${lead.leadNumber} was updated successfully.`, life: 4000 });
+                const summary = wasDisqualified ? 'Lead resubmitted' : 'Lead updated';
+                const detail = wasDisqualified
+                    ? `${lead.leadNumber} was moved back to the active qualification pipeline.`
+                    : `${lead.leadNumber} was updated successfully.`;
+                this.messageService.add({ severity: 'success', summary, detail, life: 4000 });
                 this.loadLead();
                 this.isSavingLead = false;
             },
