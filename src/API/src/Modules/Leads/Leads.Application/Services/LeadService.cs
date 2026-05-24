@@ -152,7 +152,7 @@ namespace Leads.Application.Services
 
         public async Task<LeadAssignmentResult> AssignLeadAsync(Guid id, AssignLeadRequest request, CancellationToken cancellationToken)
         {
-            var errors = await ValidateAssignmentRequestAsync(request);
+            var errors = await ValidateAssignmentRequestAsync(id, request, cancellationToken);
             if (errors.Count > 0)
             {
                 return new LeadAssignmentResult { Errors = errors };
@@ -496,9 +496,19 @@ namespace Leads.Application.Services
             return errors;
         }
 
-        private async Task<List<string>> ValidateAssignmentRequestAsync(AssignLeadRequest request)
+        private async Task<List<string>> ValidateAssignmentRequestAsync(Guid id, AssignLeadRequest request, CancellationToken cancellationToken)
         {
             var errors = new List<string>();
+
+            var status = await _leadRepository.GetLeadStatusAsync(id, cancellationToken);
+            if (!status.HasValue)
+            {
+                errors.Add("Lead was not found.");
+            }
+            else if (status.Value != LeadStatus.Qualified)
+            {
+                errors.Add("Only qualified leads can be assigned.");
+            }
 
             if (request.AssignedToUserId == Guid.Empty)
             {

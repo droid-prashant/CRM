@@ -43,8 +43,10 @@
                     <p-button label="Qualify" icon="pi pi-check-circle" severity="success" outlined (onClick)="openQualificationDialog()" />
                     <p-button label="Disqualify" icon="pi pi-times-circle" severity="danger" outlined (onClick)="openDisqualificationDialog()" />
                 }
-                @if (canShowEditActions) {
+                @if (canShowAssignAction) {
                     <p-button label="Assign" icon="pi pi-user-plus" severity="secondary" outlined [loading]="isAssigning" (onClick)="openAssignmentDialog()" />
+                }
+                @if (canShowEditActions) {
                     <p-button label="Edit" icon="pi pi-pencil" severity="secondary" outlined [loading]="isSavingLead" (onClick)="openEditDialog()" />
                 }
             </div>

@@ -1,6 +1,7 @@
 using Leads.Application.DTOs;
 using Leads.Application.ViewModels;
 using Leads.Domain.Entities;
+using Leads.Domain.Enums;
 
 namespace Leads.Application.Repositories
 {
@@ -18,6 +19,7 @@ namespace Leads.Application.Repositories
         Task<bool> SourceRequiresPartnerAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<string?> GetLeadSourceCodeAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken);
+        Task<LeadStatus?> GetLeadStatusAsync(Guid id, CancellationToken cancellationToken);
         Task<bool> SourceExistsAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken);
         Task<bool> CountryExistsAsync(Guid countryId, CancellationToken cancellationToken);

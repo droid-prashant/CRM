@@ -199,6 +199,10 @@ export class LeadDetail implements OnInit, OnDestroy {
         return this.canEditLead && this.lead?.status?.toLowerCase() !== 'converted';
     }
 
+    get canShowAssignAction(): boolean {
+        return this.canEditLead && this.lead?.status?.toLowerCase() === 'qualified';
+    }
+
     get canShowInteractionAction(): boolean {
         return this.canShowEditActions;
     }

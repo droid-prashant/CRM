@@ -2,7 +2,6 @@ using ERP.Identity.Entities;
 using Leads.Application.DTOs;
 using Leads.Application.Interfaces;
 using Leads.Application.Repositories;
-using Leads.Application.Services;
 using Leads.Application.ViewModels;
 using Leads.Domain.Entities;
 using Leads.Domain.Enums;
@@ -17,14 +16,12 @@ namespace Leads.Infrastructure.Repositories
     public class LeadRepository : ILeadRepository
     {
         private readonly LeadsDbContext _dbContext;
-        private readonly ILeadAssignmentService _leadAssignmentService;
         private readonly IPartnerLookupService _partnerLookupService;
         private readonly UserManager<ApplicationUser> _userManager;
 
-        public LeadRepository(LeadsDbContext dbContext, ILeadAssignmentService leadAssignmentService, IPartnerLookupService partnerLookupService, UserManager<ApplicationUser> userManager)
+        public LeadRepository(LeadsDbContext dbContext, IPartnerLookupService partnerLookupService, UserManager<ApplicationUser> userManager)
         {
             _dbContext = dbContext;
-            _leadAssignmentService = leadAssignmentService;
             _partnerLookupService = partnerLookupService;
             _userManager = userManager;
         }
@@ -173,6 +170,15 @@ namespace Leads.Infrastructure.Repositories
         }
 
         public Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Leads.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
+        public Task<LeadStatus?> GetLeadStatusAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return _dbContext.Leads
+                .AsNoTracking()
+                .Where(x => x.Id == id && x.IsActive)
+                .Select(x => (LeadStatus?)x.Status)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         public Task<bool> SourceExistsAsync(Guid sourceId, CancellationToken cancellationToken) => _dbContext.LeadSources.AnyAsync(x => x.Id == sourceId && x.IsActive, cancellationToken);
         public Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken) => _dbContext.LeadCategories.AnyAsync(x => x.Id == categoryId && x.IsActive, cancellationToken);
         public Task<bool> CountryExistsAsync(Guid countryId, CancellationToken cancellationToken) => _dbContext.Countries.AnyAsync(x => x.Id == countryId && x.IsActive, cancellationToken);
@@ -245,34 +251,6 @@ namespace Leads.Infrastructure.Repositories
 
             _dbContext.Leads.Add(lead);
             await _dbContext.SaveChangesAsync(cancellationToken);
-
-            try
-            {
-                var assigneeId = await _leadAssignmentService.ResolveAssigneeAsync(lead.Id, cancellationToken);
-                if (assigneeId.HasValue)
-                {
-                    lead.AssignedToUserId = assigneeId.Value;
-                    lead.AssignedAt = DateTime.UtcNow;
-                    lead.Status = LeadStatus.Assigned;
-                    lead.TimelineEntries.Add(new LeadTimelineEntry
-                    {
-                        EventType = "LeadAssigned",
-                        Description = "Lead was assigned automatically."
-                    });
-
-                    await _dbContext.SaveChangesAsync(cancellationToken);
-                }
-            }
-            catch
-            {
-                lead.TimelineEntries.Add(new LeadTimelineEntry
-                {
-                    EventType = "LeadAssignmentWarning",
-                    Description = "Lead assignment rule failed. Lead remains unassigned."
-                });
-
-                await _dbContext.SaveChangesAsync(cancellationToken);
-            }
 
             var detail = await GetLeadDetailAsync(lead.Id, cancellationToken);
             detail!.HasDuplicateWarning = hasDuplicateWarning;
@@ -579,18 +557,13 @@ namespace Leads.Infrastructure.Repositories
                 .Include(x => x.TimelineEntries)
                 .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
 
-            if (lead == null || lead.Status == LeadStatus.Converted)
+            if (lead == null || lead.Status != LeadStatus.Qualified)
             {
                 return null;
             }
 
             lead.AssignedToUserId = request.AssignedToUserId;
             lead.AssignedAt = DateTime.UtcNow;
-
-            if (lead.Status == LeadStatus.New)
-            {
-                lead.Status = LeadStatus.Assigned;
-            }
 
             var assigneeName = await GetUserFullNameAsync(request.AssignedToUserId);
             lead.TimelineEntries.Add(new LeadTimelineEntry
