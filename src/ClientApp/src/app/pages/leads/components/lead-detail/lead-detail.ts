@@ -30,6 +30,9 @@ import { LeadDetailViewModel } from '../../view-models/lead-detail.view-model';
     providers: [MessageService]
 })
 export class LeadDetail implements OnInit, OnDestroy {
+    private readonly nonEditableStatuses = new Set(['assigned', 'converted']);
+    private readonly qualificationStatuses = new Set(['new']);
+
     lead?: LeadDetailViewModel;
     isLoading = true;
     isSavingStatus = false;
@@ -192,11 +195,11 @@ export class LeadDetail implements OnInit, OnDestroy {
     }
 
     get canShowQualificationActions(): boolean {
-        return this.canEditLead && ['new', 'assigned'].includes(this.lead?.status?.toLowerCase() ?? '');
+        return this.canEditLead && this.qualificationStatuses.has(this.leadStatus);
     }
 
     get canShowEditActions(): boolean {
-        return this.canEditLead && this.lead?.status?.toLowerCase() !== 'converted';
+        return this.canEditLead && !this.nonEditableStatuses.has(this.leadStatus);
     }
 
     get canShowAssignAction(): boolean {
@@ -204,7 +207,11 @@ export class LeadDetail implements OnInit, OnDestroy {
     }
 
     get canShowInteractionAction(): boolean {
-        return this.canShowEditActions;
+        return this.canEditLead && this.leadStatus !== 'converted';
+    }
+
+    private get leadStatus(): string {
+        return this.lead?.status?.toLowerCase() ?? '';
     }
 
     get leadInitials(): string {
@@ -263,11 +270,19 @@ export class LeadDetail implements OnInit, OnDestroy {
     }
 
     openQualificationDialog(): void {
+        if (!this.canShowQualificationActions) {
+            return;
+        }
+
         this.qualificationForm.reset({ qualificationRemarks: '' });
         this.qualificationDialog = true;
     }
 
     openDisqualificationDialog(): void {
+        if (!this.canShowQualificationActions) {
+            return;
+        }
+
         this.disqualificationForm.reset({ disqualificationReason: '', disqualificationRemarks: '' });
         this.disqualificationDialog = true;
     }
@@ -294,7 +309,7 @@ export class LeadDetail implements OnInit, OnDestroy {
     }
 
     openEditDialog(): void {
-        if (!this.lead) {
+        if (!this.lead || !this.canShowEditActions) {
             return;
         }
 

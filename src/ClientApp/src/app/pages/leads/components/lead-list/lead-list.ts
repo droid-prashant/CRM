@@ -33,7 +33,7 @@ export class LeadList implements OnInit {
     canEdit = false;
     canDelete = false;
     canExport = false;
-    canEditLeadRow = (row: Record<string, unknown>): boolean => String(row['status'] ?? '').toLowerCase() !== 'converted';
+    canEditLeadRow = (row: Record<string, unknown>): boolean => !['assigned', 'converted'].includes(String(row['status'] ?? '').toLowerCase());
 
     constructor(
         private readonly leadApiService: LeadApiService,
