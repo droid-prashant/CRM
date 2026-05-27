@@ -1,0 +1,75 @@
+using ERP.Core.Entities;
+using ERP.Identity.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using Products.Domain.Entities;
+
+namespace Products.Infrastructure.Persistence.Data
+{
+    public class ProductsDbContext : DbContext
+    {
+        private readonly IUserContextService _userContextService;
+
+        public ProductsDbContext(DbContextOptions<ProductsDbContext> options, IUserContextService userContextService) : base(options)
+        {
+            _userContextService = userContextService;
+        }
+
+        public DbSet<Product> Products { get; set; }
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            ApplyAuditInformation();
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.HasDefaultSchema("products");
+
+            modelBuilder.Entity<Product>(entity =>
+            {
+                entity.ToTable("Products", "products");
+                entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+                entity.Property(x => x.Description).HasColumnType("text");
+                entity.Property(x => x.ProductType).HasConversion<int>().IsRequired();
+                entity.Property(x => x.DeploymentType).HasConversion<int>().IsRequired();
+                entity.Property(x => x.OwnershipType).HasConversion<int>().HasDefaultValue(global::Products.Domain.Enums.ProductOwnershipType.InHouse).IsRequired();
+                entity.Property(x => x.IsActive).HasDefaultValue(true);
+                entity.Property(x => x.IsDeleted).HasDefaultValue(false);
+                entity.Property(x => x.IsSubscriptionBased).HasDefaultValue(false);
+                entity.Property(x => x.IsLicenseBased).HasDefaultValue(false);
+                entity.HasIndex(x => x.Code).IsUnique();
+                entity.HasIndex(x => new { x.Name, x.ProductType, x.DeploymentType });
+                entity.HasIndex(x => x.OwnerPartnerId);
+            });
+        }
+
+        private void ApplyAuditInformation()
+        {
+            var entries = ChangeTracker.Entries<BaseEntity>();
+            var userId = _userContextService.GetUserId() ?? Guid.Empty;
+
+            foreach (var entry in entries)
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    if (entry.Entity.Id == Guid.Empty)
+                    {
+                        entry.Entity.Id = Guid.NewGuid();
+                    }
+
+                    entry.Entity.CreatedOn = DateTime.UtcNow;
+                    entry.Entity.CreatedBy = userId;
+                    entry.Entity.IsActive = true;
+                }
+                else if (entry.State == EntityState.Modified)
+                {
+                    entry.Entity.UpdatedOn = DateTime.UtcNow;
+                    entry.Entity.UpdatedBy = userId;
+                }
+            }
+        }
+    }
+}

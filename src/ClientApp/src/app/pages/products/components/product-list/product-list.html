@@ -1,0 +1,26 @@
+<p-toast position="bottom-right"></p-toast>
+
+@if (!isLoading) {
+    <app-crud
+        [columns]="columns"
+        [data]="data"
+        [fields]="fields"
+        [title]="title"
+        [dataNotFound]="dataNotFound"
+        [errorMessage]="errorMessage"
+        [bulkActionLabel]="bulkActionLabel"
+        [rowActionLabel]="rowActionLabel"
+        [rowActionIcon]="rowActionIcon"
+        [rowActionLabelResolver]="rowActionLabelResolver"
+        [rowActionIconResolver]="rowActionIconResolver"
+        [canCreate]="canCreate"
+        [canEdit]="canEdit"
+        [canRowAction]="canDelete || canEdit"
+        [canBulkAction]="canDelete"
+        [canExport]="canExport"
+        [enableViewAction]="false"
+        (save)="saveProduct($event)"
+        (delete)="toggleProductStatus($event)"
+        (bulkDelete)="deactivateProducts($event)"
+    />
+}

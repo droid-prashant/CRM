@@ -1,6 +1,8 @@
 using Partners.Application.DTOs;
 using Partners.Application.Repositories;
 using Partners.Application.ViewModels;
+using Partners.Domain.Constants;
+using Products.Application.Services;
 using System.Net.Mail;
 using System.Text;
 
@@ -9,22 +11,41 @@ namespace Partners.Application.Services
     public class PartnerService : IPartnerService, IPartnerLookupService
     {
         private readonly IPartnerRepository _partnerRepository;
+        private readonly IProductLookupService _productLookupService;
 
-        public PartnerService(IPartnerRepository partnerRepository)
+        public PartnerService(IPartnerRepository partnerRepository, IProductLookupService productLookupService)
         {
             _partnerRepository = partnerRepository;
+            _productLookupService = productLookupService;
         }
 
         public Task<List<PartnerListItemViewModel>> GetPartnersAsync(CancellationToken cancellationToken) => _partnerRepository.GetPartnersAsync(cancellationToken);
         public Task<PartnerDetailViewModel?> GetPartnerAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.GetPartnerAsync(id, cancellationToken);
-        public Task<PartnerLookupBundleViewModel> GetLookupsAsync(CancellationToken cancellationToken) => _partnerRepository.GetLookupsAsync(cancellationToken);
+        public async Task<PartnerLookupBundleViewModel> GetLookupsAsync(CancellationToken cancellationToken)
+        {
+            var lookups = await _partnerRepository.GetLookupsAsync(cancellationToken);
+            var products = await _productLookupService.GetActiveProductsAsync(cancellationToken);
+            lookups.Products = products
+                .Select(product => new LookupViewModel
+                {
+                    Id = product.Id,
+                    Name = product.Name,
+                    Code = product.Code
+                })
+                .ToList();
+
+            return lookups;
+        }
         public Task<List<LookupViewModel>> GetActivePartnersAsync(CancellationToken cancellationToken) => _partnerRepository.GetActivePartnerLookupsAsync(cancellationToken);
         public Task<string?> GetPartnerNameAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.GetPartnerNameAsync(id, cancellationToken);
+        public Task<string?> GetPartnerTypeCodeAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.GetPartnerTypeCodeForPartnerAsync(id, cancellationToken);
+        public Task<List<Guid>> GetPartnerProductIdsAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.GetPartnerProductIdsAsync(id, cancellationToken);
         public Task<bool> PartnerExistsAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.PartnerExistsAsync(id, cancellationToken);
 
         public async Task<PartnerResult> CreatePartnerAsync(CreatePartnerRequest request, CancellationToken cancellationToken)
         {
-            var errors = await ValidatePartnerAsync(request.Name, request.PartnerTypeId, request.CountryId, request.Email, request.ContactPerson, request.PhoneNumber, request.Address, request.Remarks, null, cancellationToken);
+            request.ProductIds = NormalizeProductIds(request.ProductIds);
+            var errors = await ValidatePartnerAsync(request.Name, request.PartnerTypeId, request.CountryId, request.Email, request.ContactPerson, request.PhoneNumber, request.Address, request.Remarks, request.ProductIds, null, cancellationToken);
             if (errors.Count > 0)
             {
                 return new PartnerResult { Errors = errors };
@@ -41,7 +62,8 @@ namespace Partners.Application.Services
                 return new PartnerResult { Errors = new List<string> { "Partner id is required." } };
             }
 
-            var errors = await ValidatePartnerAsync(request.Name, request.PartnerTypeId, request.CountryId, request.Email, request.ContactPerson, request.PhoneNumber, request.Address, request.Remarks, id, cancellationToken);
+            request.ProductIds = NormalizeProductIds(request.ProductIds);
+            var errors = await ValidatePartnerAsync(request.Name, request.PartnerTypeId, request.CountryId, request.Email, request.ContactPerson, request.PhoneNumber, request.Address, request.Remarks, request.ProductIds, id, cancellationToken);
             if (errors.Count > 0)
             {
                 return new PartnerResult { Errors = errors };
@@ -54,7 +76,7 @@ namespace Partners.Application.Services
         public Task<bool> ActivatePartnerAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.ActivatePartnerAsync(id, cancellationToken);
         public Task<bool> DeactivatePartnerAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.DeactivatePartnerAsync(id, cancellationToken);
 
-        private async Task<List<string>> ValidatePartnerAsync(string name, Guid partnerTypeId, Guid countryId, string? email, string? contactPerson, string? phoneNumber, string? address, string? remarks, Guid? excludingId, CancellationToken cancellationToken)
+        private async Task<List<string>> ValidatePartnerAsync(string name, Guid partnerTypeId, Guid countryId, string? email, string? contactPerson, string? phoneNumber, string? address, string? remarks, IReadOnlyCollection<Guid> productIds, Guid? excludingId, CancellationToken cancellationToken)
         {
             var errors = new List<string>();
 
@@ -79,14 +101,42 @@ namespace Partners.Application.Services
             }
 
             var cleanName = (name ?? string.Empty).Trim();
-            if (!await _partnerRepository.PartnerTypeExistsAsync(partnerTypeId, cancellationToken)) errors.Add("Partner type is invalid.");
+            var partnerTypeCode = await _partnerRepository.GetPartnerTypeCodeAsync(partnerTypeId, cancellationToken);
+            if (string.IsNullOrWhiteSpace(partnerTypeCode)) errors.Add("Partner type is invalid.");
             if (!await _partnerRepository.CountryExistsAsync(countryId, cancellationToken)) errors.Add("Country is invalid.");
             if (await _partnerRepository.DuplicatePartnerExistsAsync(cleanName, partnerTypeId, countryId, excludingId, cancellationToken))
             {
                 errors.Add("A partner with the same name, partner type, and country already exists.");
             }
 
+            if (productIds.Count > 0)
+            {
+                if (!PartnerTypeCodes.CanOwnProducts(partnerTypeCode))
+                {
+                    errors.Add("Partner-owned products can only be assigned to Vendor, Supplier, or Technology Partner partner types.");
+                }
+                else
+                {
+                    var activeProductIds = (await _productLookupService.GetActiveProductsAsync(cancellationToken))
+                        .Select(product => product.Id)
+                        .ToHashSet();
+
+                    if (productIds.Any(productId => !activeProductIds.Contains(productId)))
+                    {
+                        errors.Add("One or more products are invalid or inactive.");
+                    }
+                }
+            }
+
             return errors;
+        }
+
+        private static List<Guid> NormalizeProductIds(IEnumerable<Guid>? productIds)
+        {
+            return (productIds ?? Enumerable.Empty<Guid>())
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
         }
 
         private async Task<string> GeneratePartnerCodeAsync(string name, CancellationToken cancellationToken)

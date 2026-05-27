@@ -11,6 +11,7 @@ export interface PartnerListItemViewModel {
     email?: string;
     address?: string;
     remarks?: string;
+    productIds: string[];
     isActive: boolean;
     createdAt: string;
 }

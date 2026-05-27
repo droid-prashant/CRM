@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Partners.Application.DTOs;
 using Partners.Application.Repositories;
 using Partners.Application.ViewModels;
+using Partners.Domain.Constants;
 using Partners.Domain.Entities;
 using Partners.Infrastructure.Persistence.Data;
 
@@ -35,7 +36,7 @@ namespace Partners.Infrastructure.Repositories
         {
             return new PartnerLookupBundleViewModel
             {
-                PartnerTypes = await ToLookupsAsync(_dbContext.PartnerTypes, cancellationToken),
+                PartnerTypes = await GetPartnerTypeLookupsAsync(cancellationToken),
                 Countries = await ToLookupsAsync(_dbContext.Countries, cancellationToken)
             };
         }
@@ -50,7 +51,12 @@ namespace Partners.Infrastructure.Repositories
                 {
                     Id = x.Id,
                     Name = x.Name,
-                    Code = x.Code
+                    Code = x.Code,
+                    PartnerTypeCode = x.PartnerType != null ? x.PartnerType.Code : null,
+                    ProductIds = x.PartnerProducts
+                        .Where(product => product.IsActive)
+                        .Select(product => product.ProductId)
+                        .ToList()
                 })
                 .ToListAsync(cancellationToken);
         }
@@ -74,6 +80,8 @@ namespace Partners.Infrastructure.Repositories
             _dbContext.Partners.Add(partner);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
+            await ReplacePartnerProductsAsync(partner.Id, request.ProductIds, cancellationToken);
+
             return (await GetPartnerAsync(partner.Id, cancellationToken))!;
         }
 
@@ -96,15 +104,34 @@ namespace Partners.Infrastructure.Repositories
             partner.IsActive = request.IsActive;
 
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await ReplacePartnerProductsAsync(partner.Id, request.ProductIds, cancellationToken);
             return await GetPartnerAsync(partner.Id, cancellationToken);
         }
 
         public Task<bool> ActivatePartnerAsync(Guid id, CancellationToken cancellationToken) => SetActiveAsync(id, true, cancellationToken);
         public Task<bool> DeactivatePartnerAsync(Guid id, CancellationToken cancellationToken) => SetActiveAsync(id, false, cancellationToken);
         public Task<bool> PartnerTypeExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.PartnerTypes.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
+        public Task<string?> GetPartnerTypeCodeAsync(Guid id, CancellationToken cancellationToken) => _dbContext.PartnerTypes.AsNoTracking().Where(x => x.Id == id && x.IsActive).Select(x => x.Code).FirstOrDefaultAsync(cancellationToken);
         public Task<bool> CountryExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Countries.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
         public Task<bool> PartnerExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Partners.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
         public Task<string?> GetPartnerNameAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Partners.AsNoTracking().Where(x => x.Id == id && x.IsActive).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken);
+        public Task<string?> GetPartnerTypeCodeForPartnerAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return _dbContext.Partners
+                .AsNoTracking()
+                .Where(x => x.Id == id && x.IsActive)
+                .Select(x => x.PartnerType != null ? x.PartnerType.Code : null)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public Task<List<Guid>> GetPartnerProductIdsAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return _dbContext.PartnerProducts
+                .AsNoTracking()
+                .Where(x => x.PartnerId == id && x.IsActive)
+                .Select(x => x.ProductId)
+                .ToListAsync(cancellationToken);
+        }
 
         public Task<bool> DuplicatePartnerExistsAsync(string name, Guid partnerTypeId, Guid countryId, Guid? excludingId, CancellationToken cancellationToken)
         {
@@ -136,7 +163,40 @@ namespace Partners.Infrastructure.Repositories
         {
             return _dbContext.Partners
                 .AsNoTracking()
-                .Include(x => x.PartnerType);
+                .Include(x => x.PartnerType)
+                .Include(x => x.PartnerProducts);
+        }
+
+        private async Task ReplacePartnerProductsAsync(Guid partnerId, IEnumerable<Guid>? productIds, CancellationToken cancellationToken)
+        {
+            var existing = await _dbContext.PartnerProducts
+                .Where(x => x.PartnerId == partnerId)
+                .ToListAsync(cancellationToken);
+
+            if (existing.Count > 0)
+            {
+                _dbContext.PartnerProducts.RemoveRange(existing);
+            }
+
+            var distinctProductIds = (productIds ?? Enumerable.Empty<Guid>())
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            foreach (var productId in distinctProductIds)
+            {
+                _dbContext.PartnerProducts.Add(new PartnerProduct
+                {
+                    PartnerId = partnerId,
+                    ProductId = productId,
+                    IsActive = true
+                });
+            }
+
+            if (existing.Count > 0 || distinctProductIds.Count > 0)
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
         }
 
         private async Task<List<PartnerListItemViewModel>> MapListAsync(List<Partner> partners, CancellationToken cancellationToken)
@@ -173,6 +233,7 @@ namespace Partners.Infrastructure.Repositories
                 Email = item.Email,
                 Address = item.Address,
                 Remarks = item.Remarks,
+                ProductIds = item.ProductIds,
                 IsActive = item.IsActive,
                 CreatedAt = item.CreatedAt,
                 CreatedBy = partner.CreatedBy,
@@ -197,6 +258,7 @@ namespace Partners.Infrastructure.Repositories
                 Email = partner.Email,
                 Address = partner.Address,
                 Remarks = partner.Remarks,
+                ProductIds = partner.PartnerProducts.Select(x => x.ProductId).ToList(),
                 IsActive = partner.IsActive,
                 CreatedAt = partner.CreatedOn
             };
@@ -215,6 +277,33 @@ namespace Partners.Infrastructure.Repositories
                     Code = EF.Property<string>(x, "Code")
                 })
                 .ToListAsync(cancellationToken);
+        }
+
+        private async Task<List<LookupViewModel>> GetPartnerTypeLookupsAsync(CancellationToken cancellationToken)
+        {
+            var partnerTypes = await _dbContext.PartnerTypes
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .Select(x => new
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    Code = x.Code
+                })
+                .ToListAsync(cancellationToken);
+
+            return partnerTypes
+                .OrderBy(x => PartnerTypeCodes.GetSortOrder(x.Code))
+                .ThenBy(x => x.Name)
+                .Select(x => new LookupViewModel
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    Code = x.Code,
+                    CanOwnProducts = PartnerTypeCodes.CanOwnProducts(x.Code),
+                    CanSellInHouseProducts = PartnerTypeCodes.CanSellInHouseProducts(x.Code)
+                })
+                .ToList();
         }
 
         private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -28,7 +28,9 @@ namespace Leads.Application.Services
             {
                 Id = x.Id,
                 Code = x.Code,
-                Name = x.Name
+                Name = x.Name,
+                PartnerTypeCode = x.PartnerTypeCode,
+                ProductIds = x.ProductIds
             }).ToList();
         }
     }

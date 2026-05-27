@@ -134,10 +134,10 @@
                                         <p-inputnumber [formControlName]="field.key" mode="currency" currency="USD" locale="en-US" class="w-full" />
                                     }
                                     @case ('select') {
-                                        <p-select [options]="field.options ?? []" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" class="w-full" />
+                                        <p-select [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" class="w-full" />
                                     }
                                     @case ('multiSelect') {
-                                        <p-multiselect [options]="field.options ?? []" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" display="chip" class="w-full" />
+                                        <p-multiselect [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" display="chip" class="w-full" />
                                     }
                                     @case ('radio') {
                                         <div class="grid grid-cols-12 gap-3">

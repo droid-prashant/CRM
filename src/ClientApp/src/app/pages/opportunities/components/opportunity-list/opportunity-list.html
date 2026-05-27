@@ -59,9 +59,17 @@
 
     @if (viewMode === 'pipeline') {
         <div class="overflow-x-auto px-5 py-4">
-            <div class="grid min-w-[84rem] grid-cols-6 gap-3">
+            <div class="grid gap-3" [style.grid-template-columns]="pipelineGridTemplate" [style.min-width]="pipelineMinWidth">
                 @for (stage of pipelineStages; track stage.stageId) {
-                    <div class="rounded-md border border-surface-200 bg-surface-50 dark:border-surface-700 dark:bg-surface-950/40">
+                    <div
+                        class="rounded-md border border-surface-200 bg-surface-50 transition-colors dark:border-surface-700 dark:bg-surface-950/40"
+                        [class.border-primary]="isStageDragTarget(stage)"
+                        [class.bg-primary-50]="isStageDragTarget(stage)"
+                        [class.dark:bg-primary-950]="isStageDragTarget(stage)"
+                        (dragover)="onStageDragOver(stage, $event)"
+                        (dragleave)="onStageDragLeave(stage)"
+                        (drop)="onStageDrop(stage, $event)"
+                    >
                         <div class="flex items-center justify-between gap-2 border-b border-surface-200 px-3 py-3 dark:border-surface-700">
                             <div class="min-w-0">
                                 <div class="truncate text-sm font-semibold text-surface-950 dark:text-surface-0">{{ stage.stageName }}</div>
@@ -74,7 +82,14 @@
 
                         <div class="space-y-3 p-3">
                             @for (opportunity of stage.opportunities; track opportunity.id) {
-                                <article class="rounded-md border border-surface-200 bg-surface-0 p-3 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                                <article
+                                    class="rounded-md border border-surface-200 bg-surface-0 p-3 shadow-sm transition-opacity dark:border-surface-700 dark:bg-surface-900"
+                                    [class.cursor-move]="canMoveOpportunity(opportunity)"
+                                    [class.opacity-60]="draggedOpportunity?.id === opportunity.id"
+                                    [attr.draggable]="canMoveOpportunity(opportunity)"
+                                    (dragstart)="onOpportunityDragStart(opportunity, $event)"
+                                    (dragend)="onOpportunityDragEnd()"
+                                >
                                     <div class="flex items-start justify-between gap-2">
                                         <div class="min-w-0">
                                             <div class="text-xs font-semibold text-primary">{{ opportunity.opportunityNumber }}</div>
@@ -110,7 +125,13 @@
                                     </div>
                                 </article>
                             } @empty {
-                                <div class="rounded-md border border-dashed border-surface-300 px-3 py-6 text-center text-sm text-surface-500 dark:border-surface-700">No deals</div>
+                                <div class="rounded-md border border-dashed border-surface-300 px-3 py-6 text-center text-sm text-surface-500 dark:border-surface-700">
+                                    @if (isStageDragTarget(stage)) {
+                                        Drop to move here
+                                    } @else {
+                                        No deals
+                                    }
+                                </div>
                             }
                         </div>
                     </div>
@@ -278,6 +299,27 @@
     <ng-template #footer>
         <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSaving" (onClick)="closeDialog = false" />
         <p-button [label]="closingMode === 'won' ? 'Mark Won' : 'Mark Lost'" icon="pi pi-check" [severity]="closingMode === 'won' ? 'success' : 'danger'" [loading]="isSaving" (onClick)="closeOpportunity()" />
+    </ng-template>
+</p-dialog>
+
+<p-dialog [(visible)]="stageChangeDialog" [modal]="true" [style]="{ width: 'min(520px, 96vw)' }" header="Move Opportunity">
+    <form [formGroup]="stageChangeForm" class="grid grid-cols-12 gap-4">
+        <div class="col-span-12 rounded-md border border-surface-200 bg-surface-50 p-3 text-sm dark:border-surface-700 dark:bg-surface-950/40">
+            <div class="font-semibold text-surface-950 dark:text-surface-0">{{ pendingStageOpportunity?.opportunityNumber }}</div>
+            <div class="mt-1 text-surface-600 dark:text-surface-300">{{ pendingStageOpportunity?.stageName }} to {{ pendingStageName }}</div>
+        </div>
+        <div class="col-span-12">
+            <label class="mb-2 block text-sm font-semibold">Remarks</label>
+            <textarea formControlName="remarks" rows="4" class="w-full rounded-md border border-surface-300 bg-surface-0 p-3 text-sm dark:border-surface-600 dark:bg-surface-900"></textarea>
+            @if (stageChangeForm.get('remarks')?.errors && stageChangeForm.get('remarks')?.touched) {
+                <span class="mt-1 block text-sm text-red-600">Remarks must be 1000 characters or fewer.</span>
+            }
+        </div>
+    </form>
+
+    <ng-template #footer>
+        <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSaving" (onClick)="cancelStageChange()" />
+        <p-button label="Move" icon="pi pi-arrow-right" [loading]="isSaving" (onClick)="confirmStageChange()" />
     </ng-template>
 </p-dialog>
 

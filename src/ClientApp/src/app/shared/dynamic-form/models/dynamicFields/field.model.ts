@@ -4,9 +4,16 @@ export interface SelectOption {
     label: string;
     value: any;
     code?: string;
+    partnerTypeCode?: string;
+    productIds?: string[];
+    ownershipType?: number;
+    ownerPartnerId?: string | null;
+    canOwnProducts?: boolean;
+    canSellInHouseProducts?: boolean;
 }
 
 export type DynamicFieldRule = (formValue: Record<string, unknown>, mode: 'create' | 'update') => boolean;
+export type DynamicFieldOptionFilter = (option: SelectOption, formValue: Record<string, unknown>, mode: 'create' | 'update') => boolean;
 
 export interface DynamicField {
     key: string;
@@ -21,5 +28,6 @@ export interface DynamicField {
     visibleOn?: 'create' | 'update' | 'both';
     visibleWhen?: DynamicFieldRule;
     requiredWhen?: DynamicFieldRule;
+    optionFilter?: DynamicFieldOptionFilter;
     clearWhenHidden?: boolean;
 }

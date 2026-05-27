@@ -3,6 +3,7 @@ using ERP.Identity.Services.Interfaces;
 using Leads.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Opportunities.Domain.Entities;
+using Products.Domain.Entities;
 
 namespace Opportunities.Infrastructure.Persistence.Data
 {
@@ -95,7 +96,16 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Ignore(x => x.Interactions);
             });
 
-            modelBuilder.Entity<Product>(entity => ConfigureLookup(entity, "Products"));
+            modelBuilder.Entity<Product>(entity =>
+            {
+                ConfigureProduct(entity, "Products");
+                entity.Property(x => x.Description).HasColumnType("text");
+                entity.Property(x => x.ProductType).HasConversion<int>().IsRequired();
+                entity.Property(x => x.DeploymentType).HasConversion<int>().IsRequired();
+                entity.Property(x => x.IsDeleted).HasDefaultValue(false);
+                entity.Property(x => x.IsSubscriptionBased).HasDefaultValue(false);
+                entity.Property(x => x.IsLicenseBased).HasDefaultValue(false);
+            });
             modelBuilder.Entity<Country>(entity => ConfigureLookup(entity, "Countries"));
 
             modelBuilder.Entity<Client>(entity =>
@@ -125,6 +135,15 @@ namespace Opportunities.Infrastructure.Persistence.Data
             entity.HasIndex("Code").IsUnique();
             entity.Property("Code").HasMaxLength(50).IsRequired();
             entity.Property("Name").HasMaxLength(150).IsRequired();
+        }
+
+        private static void ConfigureProduct(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<Product> entity, string tableName)
+        {
+            entity.ToTable(tableName, "products");
+            entity.Property(nameof(BaseEntity.IsActive)).HasDefaultValue(true);
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
         }
 
         private void ApplyAuditInformation()

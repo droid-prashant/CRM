@@ -15,6 +15,7 @@ namespace Partners.Infrastructure.Persistence.Data
         }
 
         public DbSet<Partner> Partners { get; set; }
+        public DbSet<PartnerProduct> PartnerProducts { get; set; }
         public DbSet<PartnerType> PartnerTypes { get; set; }
         public DbSet<CountryLookup> Countries { get; set; }
 
@@ -42,6 +43,14 @@ namespace Partners.Infrastructure.Persistence.Data
                 entity.HasIndex(x => x.Code).IsUnique();
                 entity.HasIndex(x => new { x.Name, x.PartnerTypeId, x.CountryId });
                 entity.HasOne(x => x.PartnerType).WithMany().HasForeignKey(x => x.PartnerTypeId);
+                entity.HasMany(x => x.PartnerProducts).WithOne(x => x.Partner).HasForeignKey(x => x.PartnerId);
+            });
+
+            modelBuilder.Entity<PartnerProduct>(entity =>
+            {
+                entity.ToTable("PartnerProducts", "partners");
+                entity.Property(x => x.IsActive).HasDefaultValue(true);
+                entity.HasIndex(x => new { x.PartnerId, x.ProductId }).IsUnique();
             });
 
             modelBuilder.Entity<PartnerType>(entity =>

@@ -65,12 +65,18 @@ export class OpportunityList implements OnInit {
     editDialog = false;
     closeDialog = false;
     activityDialog = false;
+    stageChangeDialog = false;
     closingMode: 'won' | 'lost' = 'won';
     canCreate = false;
     canEdit = false;
     canApprove = false;
     errorMessage = '';
     selectedOpportunity?: OpportunityListItemViewModel;
+    pendingStageOpportunity?: OpportunityListItemViewModel;
+    pendingStageId = '';
+    pendingStageName = '';
+    draggedOpportunity?: OpportunityListItemViewModel;
+    dragOverStageId = '';
     stageHistory: OpportunityStageHistoryViewModel[] = [];
     activities: OpportunityActivityViewModel[] = [];
     totalRecords = 0;
@@ -114,6 +120,10 @@ export class OpportunityList implements OnInit {
         notes: ['', [Validators.required, Validators.maxLength(2000)]],
         activityDate: [''],
         followUpDate: ['']
+    });
+
+    stageChangeForm = this.fb.group({
+        remarks: ['', Validators.maxLength(1000)]
     });
 
     closeForm = this.fb.group({
@@ -212,14 +222,101 @@ export class OpportunityList implements OnInit {
     }
 
     onStageChange(opportunity: OpportunityListItemViewModel, event: Event): void {
-        const stageId = (event.target as HTMLSelectElement).value;
+        const select = event.target as HTMLSelectElement;
+        const stageId = select.value;
+        select.value = opportunity.stageId;
+
         if (!stageId || stageId === opportunity.stageId) {
             return;
         }
 
+        this.prepareStageChange(opportunity, stageId);
+    }
+
+    onOpportunityDragStart(opportunity: OpportunityListItemViewModel, event: DragEvent): void {
+        if (!this.canMoveOpportunity(opportunity)) {
+            event.preventDefault();
+            return;
+        }
+
+        this.draggedOpportunity = opportunity;
+        event.dataTransfer?.setData('text/plain', opportunity.id);
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+        }
+    }
+
+    onOpportunityDragEnd(): void {
+        this.draggedOpportunity = undefined;
+        this.dragOverStageId = '';
+    }
+
+    onStageDragOver(stage: OpportunityPipelineStageViewModel, event: DragEvent): void {
+        if (!this.canDropOnStage(stage)) {
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = 'none';
+            }
+            return;
+        }
+
+        event.preventDefault();
+        this.dragOverStageId = stage.stageId;
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = 'move';
+        }
+    }
+
+    onStageDragLeave(stage: OpportunityPipelineStageViewModel): void {
+        if (this.dragOverStageId === stage.stageId) {
+            this.dragOverStageId = '';
+        }
+    }
+
+    onStageDrop(stage: OpportunityPipelineStageViewModel, event: DragEvent): void {
+        event.preventDefault();
+        this.dragOverStageId = '';
+
+        if (!this.draggedOpportunity || !this.canDropOnStage(stage)) {
+            return;
+        }
+
+        this.prepareStageChange(this.draggedOpportunity, stage.stageId);
+    }
+
+    canMoveOpportunity(opportunity: OpportunityListItemViewModel): boolean {
+        return this.canEdit && !opportunity.isFinalStage && opportunity.status === 'Open';
+    }
+
+    canDropOnStage(stage: OpportunityPipelineStageViewModel): boolean {
+        return !!this.draggedOpportunity && !stage.isFinal && stage.sequence > this.draggedOpportunity.stageSequence && stage.stageId !== this.draggedOpportunity.stageId;
+    }
+
+    isStageDragTarget(stage: OpportunityPipelineStageViewModel): boolean {
+        return this.dragOverStageId === stage.stageId && this.canDropOnStage(stage);
+    }
+
+    private prepareStageChange(opportunity: OpportunityListItemViewModel, stageId: string): void {
+        const targetStage = this.stages.find((stage) => stage.id === stageId);
+        this.pendingStageOpportunity = opportunity;
+        this.pendingStageId = stageId;
+        this.pendingStageName = targetStage?.name ?? 'selected stage';
+        this.stageChangeForm.reset({ remarks: '' });
+        this.stageChangeDialog = true;
+    }
+
+    confirmStageChange(): void {
+        this.stageChangeForm.markAllAsTouched();
+        if (this.stageChangeForm.invalid || !this.pendingStageOpportunity || !this.pendingStageId) {
+            return;
+        }
+
+        const opportunity = this.pendingStageOpportunity;
+        const value = this.stageChangeForm.getRawValue();
         this.isSaving = true;
-        this.opportunityApiService.changeStage(opportunity.id, { stageId }).subscribe({
+        this.opportunityApiService.changeStage(opportunity.id, { stageId: this.pendingStageId, remarks: value.remarks?.trim() || undefined }).subscribe({
             next: () => {
+                this.stageChangeDialog = false;
+                this.clearPendingStageChange();
                 this.messageService.add({ severity: 'success', summary: 'Stage updated', detail: `${opportunity.opportunityNumber} moved successfully.`, life: 3000 });
                 this.refreshData();
             },
@@ -229,6 +326,11 @@ export class OpportunityList implements OnInit {
                 this.isSaving = false;
             }
         });
+    }
+
+    cancelStageChange(): void {
+        this.stageChangeDialog = false;
+        this.clearPendingStageChange();
     }
 
     createOpportunity(): void {
@@ -356,6 +458,14 @@ export class OpportunityList implements OnInit {
 
     stageOptionsFor(opportunity: OpportunityListItemViewModel): LookupViewModel[] {
         return this.stages.filter((stage) => !stage.isFinal && (stage.sequence ?? 0) > opportunity.stageSequence);
+    }
+
+    get pipelineGridTemplate(): string {
+        return `repeat(${Math.max(this.pipelineStages.length, 1)}, minmax(14rem, 1fr))`;
+    }
+
+    get pipelineMinWidth(): string {
+        return `${Math.max(this.pipelineStages.length, 1) * 16}rem`;
     }
 
     applyFilters(): void {
@@ -506,5 +616,11 @@ export class OpportunityList implements OnInit {
             activityDate: value.activityDate ? new Date(value.activityDate).toISOString() : undefined,
             followUpDate: value.followUpDate ? new Date(value.followUpDate).toISOString() : undefined
         };
+    }
+
+    private clearPendingStageChange(): void {
+        this.pendingStageOpportunity = undefined;
+        this.pendingStageId = '';
+        this.pendingStageName = '';
     }
 }

@@ -67,6 +67,15 @@ namespace ERP.Identity.Seed
                         await roleManager.AddClaimAsync(manager, new Claim(IdentityClaimTypes.Permission, permission));
                     }
                 }
+
+                foreach (var action in new[] { PermissionActions.View, PermissionActions.Create, PermissionActions.Edit, PermissionActions.Delete, PermissionActions.Export })
+                {
+                    var permission = PermissionCatalog.ToClaimValue(PermissionModules.Products, action);
+                    if (!existingPermissions.Contains(permission))
+                    {
+                        await roleManager.AddClaimAsync(manager, new Claim(IdentityClaimTypes.Permission, permission));
+                    }
+                }
             }
         }
     }

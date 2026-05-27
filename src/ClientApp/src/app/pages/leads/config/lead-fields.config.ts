@@ -12,6 +12,21 @@ export interface LeadFieldOptions {
 export function buildLeadFields(options: LeadFieldOptions): DynamicField[] {
     const isCampaignSource = (formValue: Record<string, unknown>) => selectedSourceCode(formValue, options.sources) === 'campaign';
     const isPartnerSource = (formValue: Record<string, unknown>) => selectedSourceCode(formValue, options.sources) === 'partner';
+    const isPartnerOwnedProductContext = (formValue: Record<string, unknown>): boolean => {
+        if (!isPartnerSource(formValue)) {
+            return false;
+        }
+
+        const partnerTypeCode = selectedPartnerTypeCode(formValue, options.partners);
+        return partnerTypeCode === 'vendor' || partnerTypeCode === 'supplier';
+    };
+    const availableProductInterest = (option: SelectOption, formValue: Record<string, unknown>): boolean => {
+        if (!isPartnerOwnedProductContext(formValue)) {
+            return isInHouseProduct(option);
+        }
+
+        return selectedPartnerProductIds(formValue, options.partners).has(String(option.value));
+    };
 
     return [
         { key: 'sourceId', label: 'Source', type: 'select', required: true, options: options.sources, colSpan: 3, section: 'Lead Classification', placeholder: 'Select lead source' },
@@ -27,7 +42,7 @@ export function buildLeadFields(options: LeadFieldOptions): DynamicField[] {
         { key: 'email', label: 'Email', type: 'email', colSpan: 4, section: 'Company & Contact', placeholder: 'name@company.com' },
         { key: 'phone', label: 'Phone', type: 'text', colSpan: 4, section: 'Company & Contact', placeholder: 'Phone number' },
         { key: 'alternatePhone', label: 'Alternate Phone', type: 'text', colSpan: 4, section: 'Company & Contact', placeholder: 'Alternate phone number' },
-        { key: 'productIds', label: 'Product Interests', type: 'multiSelect', required: true, options: options.products, colSpan: 12, section: 'Product Interest', placeholder: 'Select products' },
+        { key: 'productIds', label: 'Product Interests', type: 'multiSelect', required: true, options: options.products, colSpan: 12, section: 'Product Interest', placeholder: 'Select products', optionFilter: availableProductInterest },
         { key: 'campaignName', label: 'Campaign Name', type: 'text', colSpan: 3, section: 'Source Details', visibleWhen: isCampaignSource, requiredWhen: isCampaignSource },
         { key: 'sourceStartDate', label: 'Start Date', type: 'date', colSpan: 3, section: 'Source Details', visibleWhen: isCampaignSource, requiredWhen: isCampaignSource },
         { key: 'sourceEndDate', label: 'End Date', type: 'date', colSpan: 3, section: 'Source Details', visibleWhen: isCampaignSource, requiredWhen: isCampaignSource },
@@ -39,4 +54,25 @@ function selectedSourceCode(formValue: Record<string, unknown>, sources: SelectO
     const selectedSourceId = formValue['sourceId'];
     const source = sources.find((option) => option.value === selectedSourceId);
     return String(source?.code ?? source?.label ?? '').trim().toLowerCase();
+}
+
+function selectedPartnerTypeCode(formValue: Record<string, unknown>, partners: SelectOption[]): string {
+    const selectedPartnerId = formValue['partnerId'];
+    const partner = partners.find((option) => option.value === selectedPartnerId);
+    return String(partner?.partnerTypeCode ?? '').trim().replace(/-/g, '_').toLowerCase();
+}
+
+function selectedPartnerId(formValue: Record<string, unknown>): string | null {
+    const selectedPartnerId = formValue['partnerId'];
+    return typeof selectedPartnerId === 'string' && selectedPartnerId.trim() ? selectedPartnerId : null;
+}
+
+function selectedPartnerProductIds(formValue: Record<string, unknown>, partners: SelectOption[]): Set<string> {
+    const partnerId = selectedPartnerId(formValue);
+    const partner = partners.find((option) => option.value === partnerId);
+    return new Set((partner?.productIds ?? []).map(String));
+}
+
+function isInHouseProduct(option: SelectOption): boolean {
+    return !option.ownershipType || option.ownershipType === 1;
 }

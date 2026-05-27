@@ -2,6 +2,7 @@ using Leads.Infrastructure.Persistence.Data;
 using Microsoft.EntityFrameworkCore;
 using Opportunities.Infrastructure.Persistence.Data;
 using Partners.Infrastructure.Persistence.Data;
+using Products.Infrastructure.Persistence.Data;
 
 namespace ERP.API.Extensions
 {
@@ -17,6 +18,9 @@ namespace ERP.API.Extensions
             using var scope = app.Services.CreateScope();
             var leadsDbContext = scope.ServiceProvider.GetRequiredService<LeadsDbContext>();
             await leadsDbContext.Database.MigrateAsync();
+
+            var productsDbContext = scope.ServiceProvider.GetRequiredService<ProductsDbContext>();
+            await productsDbContext.Database.MigrateAsync();
 
             var partnersDbContext = scope.ServiceProvider.GetRequiredService<PartnersDbContext>();
             await partnersDbContext.Database.MigrateAsync();

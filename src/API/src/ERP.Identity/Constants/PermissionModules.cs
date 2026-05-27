@@ -8,5 +8,6 @@ namespace ERP.Identity.Constants
         public const string Leads = "leads";
         public const string Opportunities = "opportunities";
         public const string Partners = "partners";
+        public const string Products = "products";
     }
 }

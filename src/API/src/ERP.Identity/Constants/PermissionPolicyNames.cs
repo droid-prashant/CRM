@@ -30,6 +30,12 @@ namespace ERP.Identity.Constants
         public const string PartnersDelete = "Permission:partners:delete";
         public const string PartnersApprove = "Permission:partners:approve";
         public const string PartnersExport = "Permission:partners:export";
+        public const string ProductsView = "Permission:products:view";
+        public const string ProductsCreate = "Permission:products:create";
+        public const string ProductsEdit = "Permission:products:edit";
+        public const string ProductsDelete = "Permission:products:delete";
+        public const string ProductsApprove = "Permission:products:approve";
+        public const string ProductsExport = "Permission:products:export";
 
         public static string For(string moduleCode, string actionCode) => $"Permission:{moduleCode}:{actionCode}";
     }

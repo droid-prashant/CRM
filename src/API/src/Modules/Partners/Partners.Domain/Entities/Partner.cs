@@ -15,5 +15,6 @@ namespace Partners.Domain.Entities
         public string? Remarks { get; set; }
 
         public PartnerType? PartnerType { get; set; }
+        public ICollection<PartnerProduct> PartnerProducts { get; set; } = new List<PartnerProduct>();
     }
 }

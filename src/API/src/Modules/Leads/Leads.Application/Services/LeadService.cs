@@ -3,6 +3,7 @@ using Leads.Application.Repositories;
 using Leads.Application.ViewModels;
 using Leads.Domain.Enums;
 using Partners.Application.Services;
+using Partners.Domain.Constants;
 using System.Net.Mail;
 
 namespace Leads.Application.Services
@@ -232,12 +233,7 @@ namespace Leads.Application.Services
                 request.Address,
                 cancellationToken));
 
-            var activeProductIds = await _leadRepository.GetActiveProductIdsAsync(request.ProductIds, cancellationToken);
-            var inactiveOrMissingProducts = request.ProductIds.Except(activeProductIds).ToList();
-            if (inactiveOrMissingProducts.Count > 0)
-            {
-                errors.Add("All ProductIds must exist in active product master data.");
-            }
+            errors.AddRange(await ValidateProductInterestAvailabilityAsync(request.SourceId, request.PartnerId, request.ProductIds, cancellationToken));
 
             return errors;
         }
@@ -308,12 +304,7 @@ namespace Leads.Application.Services
 
             errors.AddRange(await ValidateSourceDetailsAsync(sourceId, partnerId, campaignName, sourceStartDate, sourceEndDate, address, cancellationToken));
 
-            var activeProductIds = await _leadRepository.GetActiveProductIdsAsync(productIds, cancellationToken);
-            var inactiveOrMissingProducts = productIds.Except(activeProductIds).ToList();
-            if (inactiveOrMissingProducts.Count > 0)
-            {
-                errors.Add("All ProductIds must exist in active product master data.");
-            }
+            errors.AddRange(await ValidateProductInterestAvailabilityAsync(sourceId, partnerId, productIds, cancellationToken));
 
             return errors;
         }
@@ -354,6 +345,50 @@ namespace Leads.Application.Services
             }
 
             return errors;
+        }
+
+        private async Task<List<string>> ValidateProductInterestAvailabilityAsync(Guid sourceId, Guid? partnerId, List<Guid> productIds, CancellationToken cancellationToken)
+        {
+            var errors = new List<string>();
+            var activeProductIds = await _leadRepository.GetActiveProductIdsAsync(productIds, cancellationToken);
+            var inactiveOrMissingProducts = productIds.Except(activeProductIds).ToList();
+            if (inactiveOrMissingProducts.Count > 0)
+            {
+                errors.Add("All ProductIds must exist in active product master data.");
+                return errors;
+            }
+
+            if (await RequiresAssignedPartnerProductsAsync(sourceId, partnerId, cancellationToken))
+            {
+                var assignedProductIds = (await _partnerLookupService.GetPartnerProductIdsAsync(partnerId!.Value, cancellationToken)).ToHashSet();
+                if (productIds.Any(productId => !assignedProductIds.Contains(productId)))
+                {
+                    errors.Add("Supplier and Vendor partner leads can only use products assigned to the selected partner.");
+                }
+
+                return errors;
+            }
+
+            var inHouseProductIds = (await _leadRepository.GetActiveInHouseProductIdsAsync(productIds, cancellationToken)).ToHashSet();
+            if (productIds.Any(productId => !inHouseProductIds.Contains(productId)))
+            {
+                errors.Add("Product Interest can only include in-house products unless the selected Partner is Supplier or Vendor.");
+            }
+
+            return errors;
+        }
+
+        private async Task<bool> RequiresAssignedPartnerProductsAsync(Guid sourceId, Guid? partnerId, CancellationToken cancellationToken)
+        {
+            var sourceCode = (await _leadRepository.GetLeadSourceCodeAsync(sourceId, cancellationToken))?.Trim().ToUpperInvariant();
+            if (sourceCode != "PARTNER" || !partnerId.HasValue)
+            {
+                return false;
+            }
+
+            var partnerTypeCode = await _partnerLookupService.GetPartnerTypeCodeAsync(partnerId.Value, cancellationToken);
+            var normalizedPartnerTypeCode = PartnerTypeCodes.Normalize(partnerTypeCode);
+            return normalizedPartnerTypeCode == PartnerTypeCodes.Vendor || normalizedPartnerTypeCode == PartnerTypeCodes.Supplier;
         }
 
         private static List<string> ValidateStatusRequest(UpdateLeadStatusRequest request)

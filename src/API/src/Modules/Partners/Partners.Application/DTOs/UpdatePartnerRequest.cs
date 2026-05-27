@@ -10,6 +10,7 @@ namespace Partners.Application.DTOs
         public string? Email { get; set; }
         public string? Address { get; set; }
         public string? Remarks { get; set; }
+        public List<Guid> ProductIds { get; set; } = new();
         public bool IsActive { get; set; } = true;
     }
 }

@@ -25,6 +25,8 @@ namespace Leads.Application.Repositories
         Task<bool> CountryExistsAsync(Guid countryId, CancellationToken cancellationToken);
         Task<bool> IndustryExistsAsync(Guid industryId, CancellationToken cancellationToken);
         Task<List<Guid>> GetActiveProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken);
+        Task<List<Guid>> GetActiveInHouseProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken);
+        Task<List<Guid>> GetActivePartnerOwnedProductIdsAsync(Guid ownerPartnerId, IEnumerable<Guid> productIds, CancellationToken cancellationToken);
         Task<bool> DuplicateCompanyEmailExistsAsync(string companyName, string email, CancellationToken cancellationToken);
         Task<string> GenerateNextLeadNumberAsync(CancellationToken cancellationToken);
         Task<LeadDetailViewModel> CreateLeadAsync(CreateLeadRequest request, string leadNumber, bool hasDuplicateWarning, CancellationToken cancellationToken);

@@ -19,7 +19,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { ToolbarModule } from 'primeng/toolbar';
 import { Subscription } from 'rxjs';
 import { DynamicColumn } from '@/shared/dynamic-form/models/dynamicFields/column.model';
-import { DynamicField } from '@/shared/dynamic-form/models/dynamicFields/field.model';
+import { DynamicField, SelectOption } from '@/shared/dynamic-form/models/dynamicFields/field.model';
 
 export type CrudMode = 'create' | 'update';
 
@@ -292,6 +292,11 @@ export class Crud implements OnChanges, OnDestroy {
         return field.required === true || (field.requiredWhen ? field.requiredWhen(this.currentFormValue(), this.mode) : false);
     }
 
+    fieldOptions(field: DynamicField): SelectOption[] {
+        const options = field.options ?? [];
+        return field.optionFilter ? options.filter((option) => field.optionFilter?.(option, this.currentFormValue(), this.mode) === true) : options;
+    }
+
     private buildForm(): FormGroup {
         const group: Record<string, unknown[]> = {};
 
@@ -322,8 +327,30 @@ export class Crud implements OnChanges, OnDestroy {
                 control.reset(this.getDefaultValue(field), { emitEvent: false });
             }
 
+            this.clearUnavailableOptions(field, control);
+
             control.updateValueAndValidity({ emitEvent: false });
         });
+    }
+
+    private clearUnavailableOptions(field: DynamicField, control: { value: unknown; reset: (value?: unknown, options?: { emitEvent?: boolean }) => void }): void {
+        if (!field.optionFilter || (field.type !== 'select' && field.type !== 'multiSelect')) {
+            return;
+        }
+
+        const allowedValues = new Set(this.fieldOptions(field).map((option) => option.value));
+        if (field.type === 'multiSelect') {
+            const selectedValues = Array.isArray(control.value) ? control.value : [];
+            const validValues = selectedValues.filter((value) => allowedValues.has(value));
+            if (validValues.length !== selectedValues.length) {
+                control.reset(validValues, { emitEvent: false });
+            }
+            return;
+        }
+
+        if (control.value && !allowedValues.has(control.value)) {
+            control.reset(this.getDefaultValue(field), { emitEvent: false });
+        }
     }
 
     private buildPayload(): Record<string, unknown> | FormData {

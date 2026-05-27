@@ -11,7 +11,6 @@ namespace Leads.Application.Interfaces
         DbSet<LeadInteraction> LeadInteractions { get; set; }
         DbSet<LeadSource> LeadSources { get; set; }
         DbSet<LeadCategory> LeadCategories { get; set; }
-        DbSet<Product> Products { get; set; }
         DbSet<Country> Countries { get; set; }
         DbSet<Industry> Industries { get; set; }
         DbSet<Client> Clients { get; set; }

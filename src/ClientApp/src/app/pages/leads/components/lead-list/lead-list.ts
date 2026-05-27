@@ -212,7 +212,15 @@ export class LeadList implements OnInit {
     }
 
     private toOptions(values: LookupViewModel[]): SelectOption[] {
-        return values.map((value) => ({ label: value.name, value: value.id, code: value.code }));
+        return values.map((value) => ({
+            label: value.name,
+            value: value.id,
+            code: value.code,
+            partnerTypeCode: value.partnerTypeCode,
+            productIds: value.productIds,
+            ownershipType: value.ownershipType,
+            ownerPartnerId: value.ownerPartnerId
+        }));
     }
 
     private optionalString(value: unknown): string | null {

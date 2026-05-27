@@ -4,5 +4,6 @@ namespace Partners.Application.ViewModels
     {
         public List<LookupViewModel> PartnerTypes { get; set; } = new();
         public List<LookupViewModel> Countries { get; set; } = new();
+        public List<LookupViewModel> Products { get; set; } = new();
     }
 }

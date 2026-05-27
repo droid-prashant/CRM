@@ -66,6 +66,7 @@ export class LeadDetail implements OnInit, OnDestroy {
     private readonly fb = inject(FormBuilder);
     private readonly messageService = inject(MessageService);
     private sourceSubscription?: Subscription;
+    private partnerSubscription?: Subscription;
 
     qualificationForm = this.fb.group({
         qualificationRemarks: ['', [Validators.maxLength(1000)]]
@@ -143,11 +144,13 @@ export class LeadDetail implements OnInit, OnDestroy {
         this.canEditLead = this.authService.hasPermission(Permissions.leads.edit);
         this.canApproveLead = this.authService.hasPermission(Permissions.leads.approve);
         this.sourceSubscription = this.editForm.controls.sourceId.valueChanges.subscribe(() => this.applyEditSourceRules());
+        this.partnerSubscription = this.editForm.controls.partnerId.valueChanges.subscribe(() => this.clearUnavailableEditProducts());
         this.loadLead();
     }
 
     ngOnDestroy(): void {
         this.sourceSubscription?.unsubscribe();
+        this.partnerSubscription?.unsubscribe();
     }
 
     loadLead(): void {
@@ -606,6 +609,34 @@ export class LeadDetail implements OnInit, OnDestroy {
         return this.selectedEditSourceCode() === 'partner';
     }
 
+    get editProductOptions() {
+        if (!this.leadLookups) {
+            return [];
+        }
+
+        if (!this.isPartnerOwnedEditProductContext) {
+            return this.leadLookups.products.filter((product) => !product.ownershipType || product.ownershipType === 1);
+        }
+
+        const assignedProductIds = this.selectedEditPartnerProductIds;
+        return this.leadLookups.products.filter((product) => assignedProductIds.has(product.id));
+    }
+
+    private get isPartnerOwnedEditProductContext(): boolean {
+        if (!this.isEditPartnerSource) {
+            return false;
+        }
+
+        const partnerTypeCode = this.selectedEditPartnerTypeCode();
+        return partnerTypeCode === 'vendor' || partnerTypeCode === 'supplier';
+    }
+
+    private get selectedEditPartnerProductIds(): Set<string> {
+        const partnerId = this.editForm.controls.partnerId.value;
+        const partner = this.leadLookups?.partners.find((item) => item.id === partnerId);
+        return new Set((partner?.productIds ?? []).map(String));
+    }
+
     private buildInteractionRequest(): CreateLeadInteractionRequest {
         const value = this.interactionForm.getRawValue();
         return {
@@ -660,6 +691,8 @@ export class LeadDetail implements OnInit, OnDestroy {
         if (!this.isEditPartnerSource) {
             this.editForm.controls.partnerId.reset('', { emitEvent: false });
         }
+
+        this.clearUnavailableEditProducts();
     }
 
     private setRequired(controlName: 'campaignName' | 'partnerId' | 'sourceStartDate' | 'sourceEndDate' | 'address', required: boolean): void {
@@ -672,6 +705,22 @@ export class LeadDetail implements OnInit, OnDestroy {
         const sourceId = this.editForm.controls.sourceId.value;
         const source = this.leadLookups?.sources.find((item) => item.id === sourceId);
         return String(source?.code ?? source?.name ?? '').trim().toLowerCase();
+    }
+
+    private selectedEditPartnerTypeCode(): string {
+        const partnerId = this.editForm.controls.partnerId.value;
+        const partner = this.leadLookups?.partners.find((item) => item.id === partnerId);
+        return String(partner?.partnerTypeCode ?? '').trim().replace(/-/g, '_').toLowerCase();
+    }
+
+    private clearUnavailableEditProducts(): void {
+        const allowedProductIds = new Set(this.editProductOptions.map((product) => product.id));
+        const selectedProductIds = this.editForm.controls.productIds.value ?? [];
+        const availableProductIds = selectedProductIds.filter((productId) => allowedProductIds.has(productId));
+
+        if (availableProductIds.length !== selectedProductIds.length) {
+            this.editForm.controls.productIds.reset(availableProductIds, { emitEvent: false });
+        }
     }
 
     private buildConversionRequest(): ConvertLeadRequest {

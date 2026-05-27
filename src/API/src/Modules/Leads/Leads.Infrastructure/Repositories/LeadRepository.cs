@@ -152,7 +152,22 @@ namespace Leads.Infrastructure.Repositories
 
         public Task<List<LookupViewModel>> GetLeadSourceLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.LeadSources, cancellationToken);
         public Task<List<LookupViewModel>> GetLeadCategoryLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.LeadCategories, cancellationToken);
-        public Task<List<LookupViewModel>> GetProductLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.Products, cancellationToken);
+        public Task<List<LookupViewModel>> GetProductLookupsAsync(CancellationToken cancellationToken)
+        {
+            return _dbContext.Products
+                .AsNoTracking()
+                .Where(x => x.IsActive && !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Select(x => new LookupViewModel
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    Code = x.Code,
+                    OwnershipType = (int)x.OwnershipType,
+                    OwnerPartnerId = x.OwnerPartnerId
+                })
+                .ToListAsync(cancellationToken);
+        }
         public Task<List<LookupViewModel>> GetCountryLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.Countries, cancellationToken);
         public Task<List<LookupViewModel>> GetIndustryLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.Industries, cancellationToken);
 
@@ -188,7 +203,32 @@ namespace Leads.Infrastructure.Repositories
         public Task<List<Guid>> GetActiveProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken)
         {
             var ids = productIds.ToList();
-            return _dbContext.Products.Where(x => ids.Contains(x.Id) && x.IsActive).Select(x => x.Id).ToListAsync(cancellationToken);
+            return _dbContext.Products.Where(x => ids.Contains(x.Id) && x.IsActive && !x.IsDeleted).Select(x => x.Id).ToListAsync(cancellationToken);
+        }
+
+        public Task<List<Guid>> GetActiveInHouseProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken)
+        {
+            var ids = productIds.ToList();
+            return _dbContext.Products
+                .Where(x => ids.Contains(x.Id)
+                    && x.IsActive
+                    && !x.IsDeleted
+                    && x.OwnershipType == Products.Domain.Enums.ProductOwnershipType.InHouse)
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<List<Guid>> GetActivePartnerOwnedProductIdsAsync(Guid ownerPartnerId, IEnumerable<Guid> productIds, CancellationToken cancellationToken)
+        {
+            var ids = productIds.ToList();
+            return _dbContext.Products
+                .Where(x => ids.Contains(x.Id)
+                    && x.IsActive
+                    && !x.IsDeleted
+                    && x.OwnershipType == Products.Domain.Enums.ProductOwnershipType.PartnerOwned
+                    && x.OwnerPartnerId == ownerPartnerId)
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
         }
 
         public Task<bool> DuplicateCompanyEmailExistsAsync(string companyName, string email, CancellationToken cancellationToken)
@@ -439,7 +479,7 @@ namespace Leads.Infrastructure.Repositories
                         ProductId = x.ProductId,
                         ProductCode = x.Product?.Code ?? string.Empty,
                         ProductName = x.Product?.Name ?? string.Empty,
-                        ProductCategoryName = x.Product?.CategoryName
+                        ProductCategoryName = x.Product?.ProductType.ToString()
                     }).ToList(),
                 ExistingClients = existingClients,
                 ExistingContacts = existingContacts,
@@ -799,7 +839,7 @@ namespace Leads.Infrastructure.Repositories
                         ProductId = x.ProductId,
                         ProductCode = x.Product?.Code ?? string.Empty,
                         ProductName = x.Product?.Name ?? string.Empty,
-                        ProductCategoryName = x.Product?.CategoryName
+                        ProductCategoryName = x.Product?.ProductType.ToString()
                     }).ToList(),
                 TimelineEntries = lead.TimelineEntries
                     .Where(x => x.IsActive)
@@ -835,7 +875,7 @@ namespace Leads.Infrastructure.Repositories
                         ProductId = x.ProductId,
                         ProductCode = x.Product?.Code ?? string.Empty,
                         ProductName = x.Product?.Name ?? string.Empty,
-                        ProductCategoryName = x.Product?.CategoryName
+                        ProductCategoryName = x.Product?.ProductType.ToString()
                     }).ToList(),
                 AssignedToUserId = lead.AssignedToUserId,
                 AssignedToUserName = assignedToUserName,

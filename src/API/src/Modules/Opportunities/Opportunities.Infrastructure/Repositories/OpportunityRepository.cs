@@ -12,9 +12,6 @@ namespace Opportunities.Infrastructure.Repositories
 {
     public class OpportunityRepository : IOpportunityRepository
     {
-        private static readonly Guid WonStageId = Guid.Parse("80000000-0000-0000-0000-000000000005");
-        private static readonly Guid LostStageId = Guid.Parse("80000000-0000-0000-0000-000000000006");
-
         private readonly OpportunitiesDbContext _dbContext;
         private readonly UserManager<ApplicationUser> _userManager;
 
@@ -100,7 +97,7 @@ namespace Opportunities.Infrastructure.Repositories
                     .ToListAsync(cancellationToken),
                 Products = await _dbContext.Products
                     .AsNoTracking()
-                    .Where(x => x.IsActive)
+                    .Where(x => x.IsActive && !x.IsDeleted)
                     .OrderBy(x => x.Name)
                     .Select(x => new OpportunityLookupItemViewModel
                     {
@@ -243,12 +240,12 @@ namespace Opportunities.Infrastructure.Repositories
 
         public Task<OpportunityListItemViewModel?> CloseAsWonAsync(Guid id, CloseOpportunityRequest request, CancellationToken cancellationToken)
         {
-            return CloseOpportunityAsync(id, WonStageId, "Won", request, cancellationToken);
+            return CloseOpportunityAsync(id, true, request, cancellationToken);
         }
 
         public Task<OpportunityListItemViewModel?> CloseAsLostAsync(Guid id, CloseOpportunityRequest request, CancellationToken cancellationToken)
         {
-            return CloseOpportunityAsync(id, LostStageId, "Lost", request, cancellationToken);
+            return CloseOpportunityAsync(id, false, request, cancellationToken);
         }
 
         public async Task<List<OpportunityStageHistoryViewModel>?> GetStageHistoryAsync(Guid id, CancellationToken cancellationToken)
@@ -355,7 +352,7 @@ namespace Opportunities.Infrastructure.Repositories
 
         public Task<bool> ProductExistsAsync(Guid productId, CancellationToken cancellationToken)
         {
-            return _dbContext.Products.AnyAsync(x => x.Id == productId && x.IsActive, cancellationToken);
+            return _dbContext.Products.AnyAsync(x => x.Id == productId && x.IsActive && !x.IsDeleted, cancellationToken);
         }
 
         public Task<bool> LeadExistsAsync(Guid leadId, CancellationToken cancellationToken)
@@ -379,18 +376,20 @@ namespace Opportunities.Infrastructure.Repositories
             return GetActiveStagesQuery().AnyAsync(x => x.Id == stageId, cancellationToken);
         }
 
-        private async Task<OpportunityListItemViewModel?> CloseOpportunityAsync(Guid id, Guid stageId, string status, CloseOpportunityRequest request, CancellationToken cancellationToken)
+        private async Task<OpportunityListItemViewModel?> CloseOpportunityAsync(Guid id, bool won, CloseOpportunityRequest request, CancellationToken cancellationToken)
         {
             var opportunity = await BaseOpportunityQuery()
                 .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-            var targetStage = await GetActiveStagesQuery()
-                .FirstOrDefaultAsync(x => x.Id == stageId, cancellationToken);
+            var targetStage = won
+                ? await GetActiveStagesQuery().FirstOrDefaultAsync(x => x.IsWonStage, cancellationToken)
+                : await GetActiveStagesQuery().FirstOrDefaultAsync(x => x.IsLostStage, cancellationToken);
 
             if (opportunity == null || targetStage == null || IsClosed(opportunity))
             {
                 return null;
             }
 
+            var status = won ? "Won" : "Lost";
             Guid? fromStageId = opportunity.StageId == Guid.Empty ? null : opportunity.StageId;
             opportunity.StageId = targetStage.Id;
             opportunity.Stage = targetStage.Name;
@@ -542,7 +541,7 @@ namespace Opportunities.Infrastructure.Repositories
                     .Where(x => x.Name.ToLower().Contains(searchTerm))
                     .Select(x => x.Id);
                 var matchingProductIds = _dbContext.Products
-                    .Where(x => x.Name.ToLower().Contains(searchTerm) || x.Code.ToLower().Contains(searchTerm))
+                    .Where(x => !x.IsDeleted && (x.Name.ToLower().Contains(searchTerm) || x.Code.ToLower().Contains(searchTerm)))
                     .Select(x => x.Id);
                 var matchingContactIds = _dbContext.ClientContacts
                     .Where(x => (x.FirstName + " " + x.LastName).ToLower().Contains(searchTerm) || (x.Email != null && x.Email.ToLower().Contains(searchTerm)))

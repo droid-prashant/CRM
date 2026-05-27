@@ -4,6 +4,7 @@ using Leads.Application.Interfaces;
 using Leads.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Opportunities.Domain.Entities;
+using Products.Domain.Entities;
 
 namespace Leads.Infrastructure.Persistence.Data
 {
@@ -135,9 +136,30 @@ namespace Leads.Infrastructure.Persistence.Data
 
             ConfigureLookup<LeadSource>(modelBuilder);
             ConfigureLookup<LeadCategory>(modelBuilder);
-            ConfigureLookup<Product>(modelBuilder);
+            ConfigureProduct(modelBuilder);
             ConfigureLookup<Country>(modelBuilder);
             ConfigureLookup<Industry>(modelBuilder);
+        }
+
+        private static void ConfigureProduct(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<Product>(entity =>
+            {
+                entity.ToTable("Products", "products");
+                entity.Property(nameof(BaseEntity.IsActive)).HasDefaultValue(true);
+                entity.HasIndex(x => x.Code).IsUnique();
+                entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+                entity.Property(x => x.Description).HasColumnType("text");
+                entity.Property(x => x.ProductType).HasConversion<int>().IsRequired();
+                entity.Property(x => x.DeploymentType).HasConversion<int>().IsRequired();
+                entity.Property(x => x.OwnershipType).HasConversion<int>().HasDefaultValue(global::Products.Domain.Enums.ProductOwnershipType.InHouse).IsRequired();
+                entity.Property(x => x.IsDeleted).HasDefaultValue(false);
+                entity.Property(x => x.IsSubscriptionBased).HasDefaultValue(false);
+                entity.Property(x => x.IsLicenseBased).HasDefaultValue(false);
+                entity.HasIndex(x => new { x.Name, x.ProductType, x.DeploymentType });
+                entity.HasIndex(x => x.OwnerPartnerId);
+            });
         }
 
         private static void ConfigureLookup<T>(ModelBuilder modelBuilder) where T : BaseEntity

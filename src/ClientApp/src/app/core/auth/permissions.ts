@@ -40,5 +40,13 @@ export const Permissions = {
         delete: 'partners:delete',
         approve: 'partners:approve',
         export: 'partners:export'
+    },
+    products: {
+        view: 'products:view',
+        create: 'products:create',
+        edit: 'products:edit',
+        delete: 'products:delete',
+        approve: 'products:approve',
+        export: 'products:export'
     }
 } as const;

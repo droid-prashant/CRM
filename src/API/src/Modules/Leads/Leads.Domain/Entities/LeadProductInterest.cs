@@ -1,4 +1,5 @@
 using ERP.Core.Entities;
+using Products.Domain.Entities;
 
 namespace Leads.Domain.Entities
 {

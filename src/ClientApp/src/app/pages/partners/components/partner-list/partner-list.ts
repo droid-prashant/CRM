@@ -14,6 +14,20 @@ import { UpdatePartnerRequest } from '../../dtos/update-partner.request';
 import { PartnerApiService } from '../../services/partner-api.service';
 import { PartnerListItemViewModel } from '../../view-models/partner-list-item.view-model';
 
+const partnerTypeOrder = new Map<string, number>([
+    ['RESELLER', 10],
+    ['VENDOR', 20],
+    ['SUPPLIER', 30],
+    ['SALES_AGENT', 40],
+    ['AFFILIATE', 50],
+    ['CONSULTANT', 60],
+    ['TECHNOLOGY_PARTNER', 70],
+    ['IMPLEMENTATION_PARTNER', 80],
+    ['SERVICE_PARTNER', 90],
+    ['STRATEGIC_PARTNER', 100],
+    ['OTHER', 110]
+]);
+
 @Component({
     selector: 'app-partner-list',
     standalone: true,
@@ -124,8 +138,9 @@ export class PartnerList implements OnInit {
         this.partnerApiService.getLookups().subscribe({
             next: (lookups) => {
                 this.fields = buildPartnerFields({
-                    partnerTypes: this.toOptions(lookups.partnerTypes),
-                    countries: this.toOptions(lookups.countries)
+                    partnerTypes: this.toPartnerTypeOptions(lookups.partnerTypes),
+                    countries: this.toOptions(lookups.countries),
+                    products: this.toOptions(lookups.products)
                 });
                 this.loadPartners();
             },
@@ -155,6 +170,7 @@ export class PartnerList implements OnInit {
     private toGridRow(partner: PartnerListItemViewModel): Record<string, unknown> {
         return {
             ...partner,
+            productIds: partner.productIds ?? [],
             isActive: partner.isActive === true
         };
     }
@@ -169,6 +185,7 @@ export class PartnerList implements OnInit {
             email: this.optionalString(value['email']),
             address: this.optionalString(value['address']),
             remarks: this.optionalString(value['remarks']),
+            productIds: this.stringArray(value['productIds']),
             isActive: true
         };
     }
@@ -183,12 +200,41 @@ export class PartnerList implements OnInit {
             email: this.optionalString(value['email']),
             address: this.optionalString(value['address']),
             remarks: this.optionalString(value['remarks']),
+            productIds: this.stringArray(value['productIds']),
             isActive: value['isActive'] === true
         };
     }
 
     private toOptions(values: LookupViewModel[]): SelectOption[] {
-        return values.map((value) => ({ label: value.name, value: value.id }));
+        return values.map((value) => ({
+            label: value.name,
+            value: value.id,
+            code: value.code,
+            partnerTypeCode: value.partnerTypeCode,
+            canOwnProducts: value.canOwnProducts,
+            canSellInHouseProducts: value.canSellInHouseProducts
+        }));
+    }
+
+    private toPartnerTypeOptions(values: LookupViewModel[]): SelectOption[] {
+        const optionsByCode = new Map<string, SelectOption>();
+
+        this.toOptions(values).forEach((option) => {
+            const code = this.normalizePartnerTypeCode(option.code ?? option.label);
+            if (!optionsByCode.has(code)) {
+                optionsByCode.set(code, { ...option, code });
+            }
+        });
+
+        return Array.from(optionsByCode.values()).sort((left, right) => {
+            const leftOrder = partnerTypeOrder.get(this.normalizePartnerTypeCode(left.code)) ?? Number.MAX_SAFE_INTEGER;
+            const rightOrder = partnerTypeOrder.get(this.normalizePartnerTypeCode(right.code)) ?? Number.MAX_SAFE_INTEGER;
+            return leftOrder - rightOrder || left.label.localeCompare(right.label);
+        });
+    }
+
+    private normalizePartnerTypeCode(value: unknown): string {
+        return String(value ?? '').trim().replace(/-/g, '_').toUpperCase();
     }
 
     private getRowId(row?: Record<string, unknown>): string | null {
@@ -197,6 +243,10 @@ export class PartnerList implements OnInit {
 
     private optionalString(value: unknown): string | null {
         return typeof value === 'string' && value.trim() ? value.trim() : null;
+    }
+
+    private stringArray(value: unknown): string[] {
+        return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && !!item.trim()) : [];
     }
 
     private showError(error: { error?: { detail?: string; title?: string; errors?: string[] } }, summary: string): void {

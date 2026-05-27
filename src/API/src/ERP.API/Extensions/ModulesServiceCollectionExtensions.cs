@@ -2,6 +2,7 @@ using Leads.Infrastructure.Extensions;
 using Microsoft.Extensions.Configuration;
 using Opportunities.Infrastructure.Extensions;
 using Partners.Infrastructure.Extensions;
+using Products.Infrastructure.Extensions;
 
 namespace ERP.API.Extensions
 {
@@ -11,6 +12,7 @@ namespace ERP.API.Extensions
         {
             services.AddPartnersModule(configuration);
             services.AddLeadsModule(configuration);
+            services.AddProductsModule(configuration);
             services.AddOpportunitiesModule(configuration);
 
             return services;
