@@ -21,8 +21,12 @@
     <p-table
         #dt
         [value]="data"
-        [rows]="10"
+        [rows]="rows"
         [paginator]="true"
+        [lazy]="lazy"
+        [lazyLoadOnInit]="lazyLoadOnInit"
+        [totalRecords]="lazy ? totalRecords : data.length"
+        [first]="first"
         [globalFilterFields]="globalFilterFields"
         [tableStyle]="{ 'min-width': '75rem' }"
         [(selection)]="selectedRows"
@@ -30,15 +34,18 @@
         [rowHover]="true"
         currentPageReportTemplate="Showing {first} to {last} of {totalRecords} records"
         [showCurrentPageReport]="true"
-        [rowsPerPageOptions]="[10, 20, 30]"
+        [rowsPerPageOptions]="rowsPerPageOptions"
+        (onLazyLoad)="lazyLoad.emit($event)"
     >
         <ng-template #caption>
             <div class="flex items-center justify-between">
                 <h5 class="m-0">Manage {{ title }}</h5>
-                <p-iconfield>
-                    <p-inputicon styleClass="pi pi-search" />
-                    <input pInputText type="text" (input)="onGlobalFilter(dt, $event)" placeholder="Search..." />
-                </p-iconfield>
+                @if (showGlobalSearch) {
+                    <p-iconfield>
+                        <p-inputicon styleClass="pi pi-search" />
+                        <input pInputText type="text" (input)="onGlobalFilter(dt, $event)" placeholder="Search..." />
+                    </p-iconfield>
+                }
             </div>
         </ng-template>
 

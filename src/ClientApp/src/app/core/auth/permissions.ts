@@ -17,6 +17,14 @@ export const Permissions = {
         view: 'permissions:view',
         edit: 'permissions:edit'
     },
+    clients: {
+        view: 'clients:view',
+        create: 'clients:create',
+        edit: 'clients:edit',
+        delete: 'clients:delete',
+        approve: 'clients:approve',
+        export: 'clients:export'
+    },
     leads: {
         view: 'leads:view',
         create: 'leads:create',

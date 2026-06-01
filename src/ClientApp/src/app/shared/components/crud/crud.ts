@@ -74,11 +74,19 @@ export class Crud implements OnChanges, OnDestroy {
     @Input() canBulkAction = true;
     @Input() canExport = true;
     @Input() canEditRowResolver?: (row: Record<string, unknown>) => boolean;
+    @Input() lazy = false;
+    @Input() lazyLoadOnInit = false;
+    @Input() totalRecords = 0;
+    @Input() first = 0;
+    @Input() rows = 10;
+    @Input() rowsPerPageOptions: number[] = [10, 20, 30];
+    @Input() showGlobalSearch = true;
 
     @Output() save = new EventEmitter<CrudSaveEvent>();
     @Output() delete = new EventEmitter<Record<string, unknown>>();
     @Output() bulkDelete = new EventEmitter<Record<string, unknown>[]>();
     @Output() view = new EventEmitter<Record<string, unknown>>();
+    @Output() lazyLoad = new EventEmitter<{ first?: number | null; rows?: number | null; sortField?: string | string[] | null; sortOrder?: number | null }>();
 
     @ViewChild('dt') dt!: Table;
 

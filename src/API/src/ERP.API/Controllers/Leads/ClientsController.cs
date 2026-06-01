@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ERP.API.Controllers.Leads
 {
+    [Route("api/leads/clients")]
     public class ClientsController : BaseApiController
     {
         private readonly ILeadService _leadService;

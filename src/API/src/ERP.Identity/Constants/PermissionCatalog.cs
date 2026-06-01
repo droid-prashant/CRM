@@ -9,6 +9,7 @@ namespace ERP.Identity.Constants
             new(PermissionModules.Users, "Users"),
             new(PermissionModules.Roles, "Roles"),
             new(PermissionModules.Permissions, "Permissions"),
+            new(PermissionModules.Clients, "Clients"),
             new(PermissionModules.Leads, "Leads"),
             new(PermissionModules.Opportunities, "Opportunities"),
             new(PermissionModules.Partners, "Partners"),

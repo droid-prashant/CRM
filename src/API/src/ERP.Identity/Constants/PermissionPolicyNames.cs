@@ -12,6 +12,12 @@ namespace ERP.Identity.Constants
         public const string RolesDelete = "Permission:roles:delete";
         public const string PermissionsView = "Permission:permissions:view";
         public const string PermissionsEdit = "Permission:permissions:edit";
+        public const string ClientsView = "Permission:clients:view";
+        public const string ClientsCreate = "Permission:clients:create";
+        public const string ClientsEdit = "Permission:clients:edit";
+        public const string ClientsDelete = "Permission:clients:delete";
+        public const string ClientsApprove = "Permission:clients:approve";
+        public const string ClientsExport = "Permission:clients:export";
         public const string LeadsView = "Permission:leads:view";
         public const string LeadsCreate = "Permission:leads:create";
         public const string LeadsEdit = "Permission:leads:edit";

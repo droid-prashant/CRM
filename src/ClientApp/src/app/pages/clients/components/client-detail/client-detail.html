@@ -1,0 +1,470 @@
+@if (isLoading) {
+    <p-toast />
+    <div class="card text-surface-600 dark:text-surface-300">Loading client...</div>
+} @else if (errorMessage) {
+    <p-toast />
+    <div class="card">
+        <p class="m-0 text-red-600">{{ errorMessage }}</p>
+        <p-button label="Back to Clients" icon="pi pi-arrow-left" text (onClick)="backToList()" />
+    </div>
+} @else if (client) {
+    <p-toast />
+
+    <section class="mb-4 rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="flex min-w-0 gap-4">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-primary text-xl font-semibold text-primary-contrast">
+                    {{ initials }}
+                </div>
+                <div class="min-w-0">
+                    <button type="button" class="mb-2 inline-flex cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-sm text-primary" (click)="backToList()">
+                        <i class="pi pi-arrow-left text-xs"></i>
+                        <span>Back to Clients</span>
+                    </button>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="m-0 text-2xl font-semibold text-surface-900 dark:text-surface-0">{{ client.name }}</h2>
+                        <p-tag [severity]="statusSeverity" [value]="client.statusName || (client.isActive ? 'Active' : 'Inactive')" />
+                    </div>
+                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-surface-600 dark:text-surface-300">
+                        <span class="font-medium text-surface-800 dark:text-surface-100">{{ client.clientCode }}</span>
+                        <span>{{ optional(client.clientTypeName) }}</span>
+                        <span>{{ optional(client.countryName) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-2">
+                @if (canEditClient) {
+                    <p-button label="Edit" icon="pi pi-pencil" severity="secondary" outlined [loading]="isLoadingEdit" (onClick)="openEditDialog()" />
+                }
+                @if (canShowStatusAction) {
+                    <p-button [label]="statusActionLabel" [icon]="statusActionIcon" [severity]="statusActionSeverity" outlined [loading]="isSavingStatus" (onClick)="toggleStatus()" />
+                }
+            </div>
+        </div>
+
+        <div class="mt-5 grid grid-cols-12 gap-3">
+            <div class="col-span-12 rounded-md border border-surface-200 px-4 py-3 dark:border-surface-700 md:col-span-3">
+                <div class="text-xs font-semibold uppercase text-surface-500">Account Owner</div>
+                <div class="mt-1 truncate font-semibold text-surface-900 dark:text-surface-0">{{ optional(client.accountOwnerUserName || client.accountOwnerUserId) }}</div>
+                <div class="mt-1 text-xs text-surface-500">Owner for relationship governance</div>
+            </div>
+            <div class="col-span-12 rounded-md border border-surface-200 px-4 py-3 dark:border-surface-700 md:col-span-3">
+                <div class="text-xs font-semibold uppercase text-surface-500">Contacts</div>
+                <div class="mt-1 font-semibold text-surface-900 dark:text-surface-0">{{ contacts.length }}</div>
+                <div class="mt-1 text-xs text-surface-500">Primary contact highlighted below</div>
+            </div>
+            <div class="col-span-12 rounded-md border border-surface-200 px-4 py-3 dark:border-surface-700 md:col-span-3">
+                <div class="text-xs font-semibold uppercase text-surface-500">Products</div>
+                <div class="mt-1 font-semibold text-surface-900 dark:text-surface-0">{{ client.products.length }}</div>
+                <div class="mt-1 text-xs text-surface-500">Mapped products and owners</div>
+            </div>
+            <div class="col-span-12 rounded-md border border-surface-200 px-4 py-3 dark:border-surface-700 md:col-span-3">
+                <div class="text-xs font-semibold uppercase text-surface-500">Opportunities</div>
+                <div class="mt-1 font-semibold text-surface-900 dark:text-surface-0">{{ client.opportunities.length }}</div>
+                <div class="mt-1 text-xs text-surface-500">Commercial pipeline items</div>
+            </div>
+        </div>
+    </section>
+
+    <div class="grid grid-cols-12 gap-4">
+        <section class="col-span-12 xl:col-span-8">
+            <div class="rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Client Profile</h3>
+                <div class="mt-4 grid grid-cols-12 gap-x-6 gap-y-5">
+                    <div class="col-span-12 md:col-span-4">
+                        <div class="text-xs font-semibold uppercase text-surface-500">Short Name</div>
+                        <div class="mt-1 font-medium text-surface-900 dark:text-surface-0">{{ optional(client.shortName) }}</div>
+                    </div>
+                    <div class="col-span-12 md:col-span-4">
+                        <div class="text-xs font-semibold uppercase text-surface-500">Industry</div>
+                        <div class="mt-1 font-medium text-surface-900 dark:text-surface-0">{{ optional(client.industryName) }}</div>
+                    </div>
+                    <div class="col-span-12 md:col-span-4">
+                        <div class="text-xs font-semibold uppercase text-surface-500">Country</div>
+                        <div class="mt-1 font-medium text-surface-900 dark:text-surface-0">{{ client.countryName }}</div>
+                    </div>
+                    <div class="col-span-12 md:col-span-4">
+                        <div class="text-xs font-semibold uppercase text-surface-500">Tax Number</div>
+                        <div class="mt-1 font-medium text-surface-900 dark:text-surface-0">{{ optional(client.taxNumber) }}</div>
+                    </div>
+                    <div class="col-span-12 md:col-span-4">
+                        <div class="text-xs font-semibold uppercase text-surface-500">Registration Number</div>
+                        <div class="mt-1 font-medium text-surface-900 dark:text-surface-0">{{ optional(client.registrationNumber) }}</div>
+                    </div>
+                    <div class="col-span-12 md:col-span-4">
+                        <div class="text-xs font-semibold uppercase text-surface-500">Website</div>
+                        @if (client.website) {
+                            <a class="mt-1 block truncate font-medium text-primary" [href]="client.website" target="_blank" rel="noopener">{{ client.website }}</a>
+                        } @else {
+                            <div class="mt-1 font-medium text-surface-900 dark:text-surface-0">Not set</div>
+                        }
+                    </div>
+                    <div class="col-span-12 border-t border-surface-200 pt-4 dark:border-surface-700">
+                        <div class="text-xs font-semibold uppercase text-surface-500">Address</div>
+                        <div class="mt-1 whitespace-pre-line text-surface-800 dark:text-surface-100">{{ optional(client.address) }}</div>
+                    </div>
+                    <div class="col-span-12 border-t border-surface-200 pt-4 dark:border-surface-700">
+                        <div class="text-xs font-semibold uppercase text-surface-500">Notes</div>
+                        <div class="mt-1 whitespace-pre-line text-surface-800 dark:text-surface-100">{{ optional(client.notes) }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Contacts</h3>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="rounded-md bg-surface-100 px-3 py-1 text-sm font-medium text-surface-700 dark:bg-surface-800 dark:text-surface-200">{{ contacts.length }} item(s)</span>
+                        @if (canEditClient) {
+                            <p-button label="Add Contact" icon="pi pi-plus" size="small" outlined (onClick)="openAddContactDialog()" />
+                        }
+                    </div>
+                </div>
+                <p-table [value]="contacts" [tableStyle]="{ 'min-width': '62rem' }">
+                    <ng-template #header>
+                        <tr>
+                            <th>Name</th>
+                            <th>Designation</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Status</th>
+                            @if (canEditClient) {
+                                <th class="w-32">Actions</th>
+                            }
+                        </tr>
+                    </ng-template>
+                    <ng-template #body let-contact>
+                        <tr [class.bg-primary-50]="contact.isPrimary">
+                            <td>
+                                <div class="font-medium">{{ contact.fullName }}</div>
+                                @if (contact.isPrimary) {
+                                    <div class="text-xs text-primary">Primary contact</div>
+                                }
+                            </td>
+                            <td>{{ optional(contact.designation || contact.department) }}</td>
+                            <td>{{ optional(contact.email) }}</td>
+                            <td>{{ optional(contact.mobile || contact.phone) }}</td>
+                            <td>
+                                <p-tag [severity]="contact.isActive ? 'success' : 'secondary'" [value]="contact.statusName || (contact.isActive ? 'Active' : 'Inactive')" />
+                            </td>
+                            @if (canEditClient) {
+                                <td>
+                                    <div class="flex gap-1">
+                                        <p-button icon="pi pi-pencil" text rounded severity="secondary" (onClick)="openEditContactDialog(contact)" />
+                                        @if (!contact.isPrimary) {
+                                            <p-button icon="pi pi-star" text rounded severity="warn" [disabled]="!contact.isActive" ariaLabel="Set primary contact" (onClick)="setPrimaryContact(contact)" />
+                                        }
+                                        <p-button
+                                            [icon]="contact.isActive ? 'pi pi-ban' : 'pi pi-check-circle'"
+                                            text
+                                            rounded
+                                            [severity]="contact.isActive ? 'danger' : 'success'"
+                                            [disabled]="contact.isPrimary && contact.isActive"
+                                            (onClick)="toggleContactStatus(contact)"
+                                        />
+                                    </div>
+                                </td>
+                            }
+                        </tr>
+                    </ng-template>
+                    <ng-template #emptymessage>
+                        <tr>
+                            <td [attr.colspan]="canEditClient ? 6 : 5">No contacts recorded for this client.</td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+            </div>
+
+            <div class="mt-4 rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Product Mapping</h3>
+                    <span class="rounded-md bg-surface-100 px-3 py-1 text-sm font-medium text-surface-700 dark:bg-surface-800 dark:text-surface-200">{{ client.products.length }} item(s)</span>
+                </div>
+                <p-table [value]="client.products" [tableStyle]="{ 'min-width': '48rem' }">
+                    <ng-template #header>
+                        <tr>
+                            <th>Code</th>
+                            <th>Product</th>
+                            <th>Relationship</th>
+                            <th>Owner</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template #body let-product>
+                        <tr>
+                            <td class="font-medium">{{ product.productCode }}</td>
+                            <td>{{ product.productName }}</td>
+                            <td>{{ optional(product.relationshipStatus) }}</td>
+                            <td>{{ optional(product.ownerUserName) }}</td>
+                        </tr>
+                    </ng-template>
+                    <ng-template #emptymessage>
+                        <tr>
+                            <td colspan="4">No products mapped to this client.</td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+            </div>
+
+            <div class="mt-4 rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Related Opportunities</h3>
+                    <span class="rounded-md bg-surface-100 px-3 py-1 text-sm font-medium text-surface-700 dark:bg-surface-800 dark:text-surface-200">{{ client.opportunities.length }} item(s)</span>
+                </div>
+                <p-table [value]="client.opportunities" [tableStyle]="{ 'min-width': '58rem' }">
+                    <ng-template #header>
+                        <tr>
+                            <th>Number</th>
+                            <th>Title</th>
+                            <th>Product</th>
+                            <th>Stage</th>
+                            <th>Value</th>
+                            <th>Status</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template #body let-opportunity>
+                        <tr>
+                            <td class="font-medium">{{ opportunity.opportunityNumber }}</td>
+                            <td>{{ opportunity.title }}</td>
+                            <td>{{ optional(opportunity.productName) }}</td>
+                            <td>{{ optional(opportunity.stageName) }}</td>
+                            <td>{{ formatCurrency(opportunity.estimatedValue) }}</td>
+                            <td>{{ optional(opportunity.status) }}</td>
+                        </tr>
+                    </ng-template>
+                    <ng-template #emptymessage>
+                        <tr>
+                            <td colspan="6">No related opportunities found.</td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+            </div>
+        </section>
+
+        <aside class="col-span-12 xl:col-span-4">
+            <div class="rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Related RFPs</h3>
+                @if (client.rfps.length) {
+                    <div class="mt-4 flex flex-col gap-3">
+                        @for (rfp of client.rfps; track rfp.id) {
+                            <article class="rounded-md border border-surface-200 p-4 dark:border-surface-700">
+                                <div class="font-semibold text-surface-900 dark:text-surface-0">{{ rfp.rfpNumber }}</div>
+                                <div class="mt-1 text-sm text-surface-700 dark:text-surface-200">{{ rfp.title }}</div>
+                                <div class="mt-2 text-xs text-surface-500">{{ optional(rfp.productName) }} / {{ optional(rfp.status) }}</div>
+                                <div class="mt-1 text-xs text-surface-500">Due {{ formatDateOnly(rfp.submissionDeadline) }}</div>
+                            </article>
+                        }
+                    </div>
+                } @else {
+                    <div class="mt-4 rounded-md border border-dashed border-surface-300 p-6 text-center text-surface-500 dark:border-surface-700">
+                        No related RFPs found.
+                    </div>
+                }
+            </div>
+
+            <div class="mt-4 rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Documents</h3>
+                @if (client.documents.length) {
+                    <div class="mt-4 flex flex-col gap-3">
+                        @for (document of client.documents; track document.id) {
+                            <article class="rounded-md border border-surface-200 p-4 dark:border-surface-700">
+                                <div class="font-semibold text-surface-900 dark:text-surface-0">{{ document.fileName }}</div>
+                                <div class="mt-1 text-sm text-surface-500">{{ optional(document.documentType) }}</div>
+                                <div class="mt-2 text-xs text-surface-500">{{ optional(document.uploadedByUserName) }} / {{ formatDate(document.uploadedAt) }}</div>
+                            </article>
+                        }
+                    </div>
+                } @else {
+                    <div class="mt-4 rounded-md border border-dashed border-surface-300 p-6 text-center text-surface-500 dark:border-surface-700">
+                        No documents uploaded for this client.
+                    </div>
+                }
+            </div>
+
+            <div class="mt-4 rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Audit</h3>
+                <div class="mt-4 divide-y divide-surface-200 dark:divide-surface-700">
+                    <div class="flex items-center justify-between gap-4 py-3 first:pt-0">
+                        <span class="text-sm text-surface-500">Created</span>
+                        <span class="text-right font-medium text-surface-900 dark:text-surface-0">{{ formatDate(client.createdAt) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 py-3">
+                        <span class="text-sm text-surface-500">Created By</span>
+                        <span class="text-right font-medium text-surface-900 dark:text-surface-0">{{ optional(client.createdBy) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 py-3">
+                        <span class="text-sm text-surface-500">Updated</span>
+                        <span class="text-right font-medium text-surface-900 dark:text-surface-0">{{ formatDate(client.updatedAt) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 py-3 last:pb-0">
+                        <span class="text-sm text-surface-500">Updated By</span>
+                        <span class="text-right font-medium text-surface-900 dark:text-surface-0">{{ optional(client.updatedBy) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Timeline</h3>
+                @if (timeline.length) {
+                    <div class="mt-4 flex flex-col gap-3">
+                        @for (entry of timeline; track entry.id) {
+                            <article class="flex gap-3 rounded-md border border-surface-200 p-4 dark:border-surface-700">
+                                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-100 text-primary dark:bg-surface-800">
+                                    <i [ngClass]="timelineIcon(entry.eventType)"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="font-semibold text-surface-900 dark:text-surface-0">{{ entry.eventType }}</div>
+                                    <div class="mt-1 text-sm leading-6 text-surface-700 dark:text-surface-200">{{ entry.description }}</div>
+                                    <div class="mt-1 text-xs text-surface-500">{{ formatDate(entry.createdAt) }}</div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                } @else {
+                    <div class="mt-4 rounded-md border border-dashed border-surface-300 p-6 text-center text-surface-500 dark:border-surface-700">
+                        No timeline activity recorded.
+                    </div>
+                }
+            </div>
+        </aside>
+    </div>
+
+    <p-dialog [(visible)]="editDialog" [modal]="true" [style]="{ width: 'min(1080px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" header="Edit Client">
+        <form [formGroup]="editForm" class="grid grid-cols-12 gap-4">
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Client Code</label>
+                <input pInputText formControlName="clientCode" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Client Name <span class="text-red-500">*</span></label>
+                <input pInputText formControlName="name" class="w-full" />
+                @if (editForm.get('name')?.errors && editForm.get('name')?.touched) {
+                    <span class="p-error mt-1 block text-sm text-red-600">Client name is required</span>
+                }
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Short Name</label>
+                <input pInputText formControlName="shortName" class="w-full" />
+            </div>
+
+            @if (lookups) {
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Client Type</label>
+                    <p-select [options]="lookups.clientTypes" optionLabel="name" optionValue="id" appendTo="body" formControlName="clientTypeId" [showClear]="true" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Country <span class="text-red-500">*</span></label>
+                    <p-select [options]="lookups.countries" optionLabel="name" optionValue="id" appendTo="body" formControlName="countryId" class="w-full" />
+                    @if (editForm.get('countryId')?.errors && editForm.get('countryId')?.touched) {
+                        <span class="p-error mt-1 block text-sm text-red-600">Country is required</span>
+                    }
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Industry</label>
+                    <p-select [options]="lookups.industries" optionLabel="name" optionValue="id" appendTo="body" formControlName="industryId" [showClear]="true" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-6">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Account Owner</label>
+                    <p-select [options]="lookups.accountOwners" optionLabel="fullName" optionValue="id" appendTo="body" formControlName="accountOwnerUserId" [showClear]="true" class="w-full" />
+                </div>
+            } @else {
+                <div class="col-span-12 rounded-md border border-dashed border-surface-300 p-4 text-sm text-surface-500 dark:border-surface-700">
+                    Loading lookup values...
+                </div>
+            }
+
+            <div class="col-span-12 md:col-span-6">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Status</label>
+                <p-select [options]="statusOptions" optionLabel="label" optionValue="value" appendTo="body" formControlName="status" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Website</label>
+                <input pInputText formControlName="website" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Tax Number</label>
+                <input pInputText formControlName="taxNumber" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Registration Number</label>
+                <input pInputText formControlName="registrationNumber" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-6">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Address</label>
+                <textarea pTextarea rows="4" formControlName="address" class="w-full"></textarea>
+            </div>
+            <div class="col-span-12 md:col-span-6">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Notes</label>
+                <textarea pTextarea rows="4" formControlName="notes" class="w-full"></textarea>
+            </div>
+        </form>
+
+        <ng-template #footer>
+            <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSavingClient" (onClick)="editDialog = false" />
+            <p-button label="Save" icon="pi pi-check" [loading]="isSavingClient" [disabled]="!lookups" (onClick)="updateClient()" />
+        </ng-template>
+    </p-dialog>
+
+    <p-dialog [(visible)]="contactDialog" [modal]="true" [style]="{ width: 'min(920px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" [header]="contactMode === 'create' ? 'Add Contact' : 'Edit Contact'">
+        <form [formGroup]="contactForm" class="grid grid-cols-12 gap-4">
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Full Name <span class="text-red-500">*</span></label>
+                <input pInputText formControlName="fullName" class="w-full" />
+                @if (contactForm.get('fullName')?.errors && contactForm.get('fullName')?.touched) {
+                    <span class="p-error mt-1 block text-sm text-red-600">Full name is required</span>
+                }
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">First Name</label>
+                <input pInputText formControlName="firstName" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Last Name</label>
+                <input pInputText formControlName="lastName" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Designation</label>
+                <input pInputText formControlName="designation" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Department</label>
+                <input pInputText formControlName="department" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Email</label>
+                <input pInputText formControlName="email" class="w-full" />
+                @if (contactForm.get('email')?.errors && contactForm.get('email')?.touched) {
+                    <span class="p-error mt-1 block text-sm text-red-600">Email must be valid</span>
+                }
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Phone</label>
+                <input pInputText formControlName="phone" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Mobile</label>
+                <input pInputText formControlName="mobile" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Status</label>
+                <p-select [options]="statusOptions" optionLabel="label" optionValue="value" appendTo="body" formControlName="status" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-4">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Primary Contact</label>
+                <label class="flex h-10 items-center gap-2 text-sm text-surface-700 dark:text-surface-200">
+                    <input type="checkbox" formControlName="isPrimary" />
+                    <span>Mark as primary</span>
+                </label>
+            </div>
+            <div class="col-span-12 md:col-span-8">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Notes</label>
+                <textarea pTextarea rows="3" formControlName="notes" class="w-full"></textarea>
+            </div>
+        </form>
+
+        <ng-template #footer>
+            <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSavingContact" (onClick)="contactDialog = false" />
+            <p-button label="Save Contact" icon="pi pi-check" [loading]="isSavingContact" (onClick)="saveContact()" />
+        </ng-template>
+    </p-dialog>
+}

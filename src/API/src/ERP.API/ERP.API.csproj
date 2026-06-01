@@ -33,6 +33,8 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\ERP.Identity\ERP.Identity.csproj" />
+	  <ProjectReference Include="..\Modules\Clients\Clients.Application\Clients.Application.csproj" />
+	  <ProjectReference Include="..\Modules\Clients\Clients.Infrastructure\Clients.Infrastructure.csproj" />
 	  <ProjectReference Include="..\Modules\Leads\Leads.Application\Leads.Application.csproj" />
 	  <ProjectReference Include="..\Modules\Leads\Leads.Infrastructure\Leads.Infrastructure.csproj" />
 	  <ProjectReference Include="..\Modules\Opportunities\Opportunities.Application\Opportunities.Application.csproj" />

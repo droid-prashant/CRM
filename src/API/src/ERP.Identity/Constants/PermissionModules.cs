@@ -5,6 +5,7 @@ namespace ERP.Identity.Constants
         public const string Users = "users";
         public const string Roles = "roles";
         public const string Permissions = "permissions";
+        public const string Clients = "clients";
         public const string Leads = "leads";
         public const string Opportunities = "opportunities";
         public const string Partners = "partners";
