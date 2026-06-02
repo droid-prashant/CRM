@@ -9,6 +9,10 @@ namespace Leads.Application.ViewModels
         public string? CampaignName { get; set; }
         public DateTime? SourceStartDate { get; set; }
         public DateTime? SourceEndDate { get; set; }
+        public Guid? ClientId { get; set; }
+        public Guid? ClientContactId { get; set; }
+        public string? ClientName { get; set; }
+        public string? ClientContactName { get; set; }
         public string CompanyName { get; set; } = string.Empty;
         public string? Website { get; set; }
         public string ContactPersonName { get; set; } = string.Empty;

@@ -2,8 +2,8 @@ import { DynamicColumn } from '@/shared/dynamic-form/models/dynamicFields/column
 
 export const LeadColumns: DynamicColumn[] = [
     { field: 'leadNumber', header: 'Lead #', type: 'text', width: '150px', sortable: true },
-    { field: 'companyName', header: 'Company', type: 'text', width: '220px', sortable: true },
-    { field: 'contactPersonName', header: 'Contact', type: 'text', width: '200px', sortable: true },
+    { field: 'clientName', header: 'Client', type: 'text', width: '220px', sortable: true },
+    { field: 'clientContactName', header: 'Contact', type: 'text', width: '200px', sortable: true },
     { field: 'email', header: 'Email', type: 'email', width: '220px', sortable: true },
     { field: 'phone', header: 'Phone', type: 'text', width: '160px', sortable: false },
     { field: 'sourceName', header: 'Source', type: 'text', width: '150px', sortable: true },

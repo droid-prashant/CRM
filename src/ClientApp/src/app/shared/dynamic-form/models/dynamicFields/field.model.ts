@@ -8,6 +8,7 @@ export interface SelectOption {
     productIds?: string[];
     ownershipType?: number;
     ownerPartnerId?: string | null;
+    clientId?: string;
     canOwnProducts?: boolean;
     canSellInHouseProducts?: boolean;
 }

@@ -21,7 +21,7 @@
                         <span>Back to Leads</span>
                     </button>
                     <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="m-0 text-2xl font-semibold text-surface-900 dark:text-surface-0">{{ lead.companyName }}</h2>
+                        <h2 class="m-0 text-2xl font-semibold text-surface-900 dark:text-surface-0">{{ lead.clientName || lead.companyName }}</h2>
                         <p-tag [severity]="statusSeverity" [value]="lead.status" />
                     </div>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-surface-600 dark:text-surface-300">
@@ -218,7 +218,7 @@
                 <div class="mt-4 flex flex-col gap-4">
                     <div>
                         <div class="text-xs font-semibold uppercase text-surface-500">Name</div>
-                        <div class="mt-1 font-medium text-surface-900 dark:text-surface-0">{{ lead.contactPersonName }}</div>
+                        <div class="mt-1 font-medium text-surface-900 dark:text-surface-0">{{ lead.clientContactName || lead.contactPersonName }}</div>
                         <div class="mt-1 text-sm text-surface-500">{{ optional(lead.jobTitle) }}</div>
                     </div>
                     <div class="grid grid-cols-1 gap-3">
@@ -385,13 +385,13 @@
                     </div>
                 }
 
-                <div class="col-span-12 md:col-span-4">
-                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Company Name <span class="text-red-500">*</span></label>
-                    <input pInputText formControlName="companyName" class="w-full" />
+                <div class="col-span-12 md:col-span-6">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Client <span class="text-red-500">*</span></label>
+                    <p-select [options]="leadLookups.clients" optionLabel="name" optionValue="id" appendTo="body" formControlName="clientId" class="w-full" />
                 </div>
-                <div class="col-span-12 md:col-span-4">
-                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Website</label>
-                    <input pInputText formControlName="website" class="w-full" />
+                <div class="col-span-12 md:col-span-6">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Contact <span class="text-red-500">*</span></label>
+                    <p-select [options]="editContactOptions" optionLabel="fullName" optionValue="id" appendTo="body" formControlName="clientContactId" class="w-full" />
                 </div>
                 @if (isEditCampaignSource) {
                     <div class="col-span-12">
@@ -432,38 +432,8 @@
                 }
 
                 <div class="col-span-12 md:col-span-4">
-                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Contact Person <span class="text-red-500">*</span></label>
-                    <input pInputText formControlName="contactPersonName" class="w-full" />
-                </div>
-                <div class="col-span-12 md:col-span-4">
-                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Job Title</label>
-                    <input pInputText formControlName="jobTitle" class="w-full" />
-                </div>
-                <div class="col-span-12 md:col-span-4">
                     <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Lead Score</label>
                     <p-inputnumber formControlName="leadScore" [useGrouping]="false" class="w-full" />
-                </div>
-
-                <div class="col-span-12 md:col-span-4">
-                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Email</label>
-                    <input pInputText formControlName="email" class="w-full" />
-                </div>
-                <div class="col-span-12 md:col-span-4">
-                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Phone</label>
-                    <input pInputText formControlName="phone" class="w-full" />
-                </div>
-                <div class="col-span-12 md:col-span-4">
-                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Alternate Phone</label>
-                    <input pInputText formControlName="alternatePhone" class="w-full" />
-                </div>
-
-                <div class="col-span-12 md:col-span-4">
-                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Country <span class="text-red-500">*</span></label>
-                    <p-select [options]="leadLookups.countries" optionLabel="name" optionValue="id" appendTo="body" formControlName="countryId" class="w-full" />
-                </div>
-                <div class="col-span-12 md:col-span-4">
-                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Industry</label>
-                    <p-select [options]="leadLookups.industries" optionLabel="name" optionValue="id" appendTo="body" formControlName="industryId" class="w-full" />
                 </div>
                 <div class="col-span-12 md:col-span-4">
                     <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Products <span class="text-red-500">*</span></label>

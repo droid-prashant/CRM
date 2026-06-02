@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\..\ERP.Identity\ERP.Identity.csproj" />
     <ProjectReference Include="..\Leads.Application\Leads.Application.csproj" />
     <ProjectReference Include="..\Leads.Domain\Leads.Domain.csproj" />
+    <ProjectReference Include="..\..\Clients\Clients.Domain\Clients.Domain.csproj" />
     <ProjectReference Include="..\..\Opportunities\Opportunities.Domain\Opportunities.Domain.csproj" />
     <ProjectReference Include="..\..\Partners\Partners.Application\Partners.Application.csproj" />
     <ProjectReference Include="..\..\Products\Products.Domain\Products.Domain.csproj" />

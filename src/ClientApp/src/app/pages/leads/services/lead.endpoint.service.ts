@@ -10,4 +10,6 @@ export class LeadEndpointService {
     readonly partners = apiUrl('/leads/lookups/partners');
     readonly countries = apiUrl('/leads/lookups/countries');
     readonly leadIndustries = apiUrl('/leads/lookups/industries');
+    readonly clientLookups = apiUrl('/leads/clients/lookups');
+    readonly clientContacts = apiUrl('/leads/clients/contacts');
 }

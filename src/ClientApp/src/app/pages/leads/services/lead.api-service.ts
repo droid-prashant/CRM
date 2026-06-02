@@ -16,6 +16,8 @@ export interface LeadLookupBundle {
     countries: LookupViewModel[];
     industries: LookupViewModel[];
     products: LookupViewModel[];
+    clients: ClientLookupViewModel[];
+    contacts: ContactLookupViewModel[];
 }
 
 export interface QualifyLeadRequest {
@@ -219,7 +221,9 @@ export class LeadApiService {
             partners: this.http.get<LookupViewModel[]>(this.endpoints.partners),
             countries: this.http.get<LookupViewModel[]>(this.endpoints.countries),
             industries: this.http.get<LookupViewModel[]>(this.endpoints.leadIndustries),
-            products: this.http.get<LookupViewModel[]>(this.endpoints.products)
+            products: this.http.get<LookupViewModel[]>(this.endpoints.products),
+            clients: this.http.get<ClientLookupViewModel[]>(this.endpoints.clientLookups),
+            contacts: this.http.get<ContactLookupViewModel[]>(this.endpoints.clientContacts)
         });
     }
 }

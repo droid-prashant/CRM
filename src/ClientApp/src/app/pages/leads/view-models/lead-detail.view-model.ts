@@ -10,6 +10,13 @@ export interface LeadDetailViewModel {
     campaignName?: string;
     sourceStartDate?: string;
     sourceEndDate?: string;
+    clientId?: string;
+    clientContactId?: string;
+    clientCode?: string;
+    clientName?: string;
+    clientContactName?: string;
+    clientContactEmail?: string;
+    clientContactPhone?: string;
     companyName: string;
     website?: string;
     contactPersonName: string;

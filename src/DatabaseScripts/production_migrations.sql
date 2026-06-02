@@ -1137,4 +1137,270 @@ BEGIN
 END
 $migration$;
 
+-- -------------------------------------------------------------------------
+-- 20260602110000_LinkLeadsToClientModule
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260602110000_LinkLeadsToClientModule') THEN
+        RETURN;
+    END IF;
+
+    CREATE SCHEMA IF NOT EXISTS "clients";
+
+    CREATE TABLE IF NOT EXISTS "clients"."ClientTypes" (
+        "Id" uuid NOT NULL,
+        "Code" character varying(50) NOT NULL,
+        "Name" character varying(150) NOT NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL DEFAULT true,
+        CONSTRAINT "PK_ClientTypes" PRIMARY KEY ("Id")
+    );
+
+    CREATE TABLE IF NOT EXISTS "clients"."Clients" (
+        "Id" uuid NOT NULL,
+        "ClientCode" character varying(50) NOT NULL,
+        "Name" character varying(250) NOT NULL,
+        "NormalizedName" character varying(250) NOT NULL,
+        "ShortName" character varying(100) NULL,
+        "ClientTypeId" uuid NULL,
+        "IndustryId" uuid NULL,
+        "CountryId" uuid NOT NULL,
+        "Address" character varying(500) NULL,
+        "Website" character varying(250) NULL,
+        "TaxNumber" character varying(100) NULL,
+        "RegistrationNumber" character varying(100) NULL,
+        "AccountOwnerUserId" uuid NULL,
+        "Notes" character varying(2000) NULL,
+        "Status" integer NOT NULL DEFAULT 1,
+        "IsDeleted" boolean NOT NULL DEFAULT false,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL DEFAULT true,
+        CONSTRAINT "PK_Clients" PRIMARY KEY ("Id")
+    );
+
+    CREATE TABLE IF NOT EXISTS "clients"."ClientContacts" (
+        "Id" uuid NOT NULL,
+        "ClientId" uuid NOT NULL,
+        "FirstName" character varying(100) NOT NULL,
+        "LastName" character varying(100) NOT NULL,
+        "FullName" character varying(250) NOT NULL,
+        "Designation" character varying(150) NULL,
+        "Department" character varying(150) NULL,
+        "Email" character varying(320) NULL,
+        "NormalizedEmail" character varying(320) NULL,
+        "Phone" character varying(50) NULL,
+        "Mobile" character varying(50) NULL,
+        "IsPrimary" boolean NOT NULL DEFAULT false,
+        "Status" integer NOT NULL DEFAULT 1,
+        "Notes" character varying(1000) NULL,
+        "IsDeleted" boolean NOT NULL DEFAULT false,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL DEFAULT true,
+        CONSTRAINT "PK_ClientContacts" PRIMARY KEY ("Id")
+    );
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_ClientContacts_Clients_ClientId' AND conrelid = '"clients"."ClientContacts"'::regclass) THEN
+        ALTER TABLE "clients"."ClientContacts" ADD CONSTRAINT "FK_ClientContacts_Clients_ClientId"
+        FOREIGN KEY ("ClientId") REFERENCES "clients"."Clients" ("Id") ON DELETE CASCADE;
+    END IF;
+
+    ALTER TABLE "leads"."Leads"
+        ADD COLUMN IF NOT EXISTS "ClientId" uuid NULL,
+        ADD COLUMN IF NOT EXISTS "ClientContactId" uuid NULL;
+
+    CREATE INDEX IF NOT EXISTS "IX_Leads_ClientId" ON "leads"."Leads" ("ClientId");
+    CREATE INDEX IF NOT EXISTS "IX_Leads_ClientContactId" ON "leads"."Leads" ("ClientContactId");
+    CREATE UNIQUE INDEX IF NOT EXISTS "IX_Clients_ClientCode" ON "clients"."Clients" ("ClientCode");
+    CREATE INDEX IF NOT EXISTS "IX_Clients_NormalizedName_CountryId" ON "clients"."Clients" ("NormalizedName", "CountryId");
+    CREATE INDEX IF NOT EXISTS "IX_ClientContacts_ClientId" ON "clients"."ClientContacts" ("ClientId");
+    CREATE UNIQUE INDEX IF NOT EXISTS "IX_ClientContacts_ClientId_NormalizedEmail"
+        ON "clients"."ClientContacts" ("ClientId", "NormalizedEmail")
+        WHERE "NormalizedEmail" IS NOT NULL AND "IsDeleted" = false;
+
+    INSERT INTO "clients"."Clients"
+        ("Id", "ClientCode", "Name", "NormalizedName", "IndustryId", "CountryId", "Address", "Website", "Status", "IsDeleted", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive")
+    WITH lead_clients AS (
+        SELECT
+            UPPER(TRIM("CompanyName")) AS normalized_name,
+            MIN(TRIM("CompanyName")) AS name,
+            "CountryId",
+            (array_agg("IndustryId" ORDER BY "CreatedOn"))[1] AS industry_id,
+            MIN("Address") AS address,
+            MIN("Website") AS website,
+            (array_agg("CreatedBy" ORDER BY "CreatedOn"))[1] AS created_by,
+            MIN("CreatedOn") AS created_on
+        FROM "leads"."Leads"
+        WHERE "ClientId" IS NULL
+            AND COALESCE(TRIM("CompanyName"), '') <> ''
+            AND "CountryId" <> '00000000-0000-0000-0000-000000000000'::uuid
+        GROUP BY UPPER(TRIM("CompanyName")), "CountryId"
+    ),
+    numbered AS (
+        SELECT
+            *,
+            ROW_NUMBER() OVER (ORDER BY normalized_name, "CountryId") AS rn
+        FROM lead_clients lc
+        WHERE NOT EXISTS (
+            SELECT 1 FROM "clients"."Clients" c
+            WHERE c."NormalizedName" = lc.normalized_name
+                AND c."CountryId" = lc."CountryId"
+                AND c."IsDeleted" = false
+        )
+    )
+    SELECT
+        (md5('lead-client:' || normalized_name || ':' || "CountryId"))::uuid,
+        'CL-' || UPPER(SUBSTRING(md5(normalized_name || ':' || "CountryId") FROM 1 FOR 10)),
+        name,
+        normalized_name,
+        industry_id,
+        "CountryId",
+        address,
+        website,
+        1,
+        false,
+        COALESCE(created_by, '00000000-0000-0000-0000-000000000000'::uuid),
+        COALESCE(created_on, NOW()),
+        NULL,
+        NULL,
+        true
+    FROM numbered
+    ON CONFLICT ("Id") DO NOTHING;
+
+    UPDATE "leads"."Leads" l
+    SET "ClientId" = c."Id"
+    FROM "clients"."Clients" c
+    WHERE l."ClientId" IS NULL
+        AND c."NormalizedName" = UPPER(TRIM(l."CompanyName"))
+        AND c."CountryId" = l."CountryId"
+        AND c."IsDeleted" = false;
+
+    INSERT INTO "clients"."ClientContacts"
+        ("Id", "ClientId", "FirstName", "LastName", "FullName", "Designation", "Email", "NormalizedEmail", "Phone", "Mobile", "IsPrimary", "Status", "IsDeleted", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive")
+    WITH lead_contacts AS (
+        SELECT DISTINCT ON (l."ClientId", UPPER(TRIM(COALESCE(l."Email", ''))), UPPER(TRIM(l."ContactPersonName")))
+            l."ClientId",
+            TRIM(l."ContactPersonName") AS full_name,
+            NULLIF(TRIM(l."JobTitle"), '') AS designation,
+            NULLIF(TRIM(l."Email"), '') AS email,
+            UPPER(NULLIF(TRIM(l."Email"), '')) AS normalized_email,
+            NULLIF(TRIM(l."Phone"), '') AS phone,
+            NULLIF(TRIM(l."AlternatePhone"), '') AS mobile,
+            l."CreatedBy" AS created_by,
+            l."CreatedOn" AS created_on
+        FROM "leads"."Leads" l
+        WHERE l."ClientContactId" IS NULL
+            AND l."ClientId" IS NOT NULL
+            AND COALESCE(TRIM(l."ContactPersonName"), '') <> ''
+        ORDER BY l."ClientId", UPPER(TRIM(COALESCE(l."Email", ''))), UPPER(TRIM(l."ContactPersonName")), l."CreatedOn"
+    )
+    SELECT
+        (md5('lead-contact:' || "ClientId" || ':' || COALESCE(normalized_email, UPPER(full_name))))::uuid,
+        "ClientId",
+        COALESCE(NULLIF(split_part(full_name, ' ', 1), ''), full_name),
+        COALESCE(NULLIF(substring(full_name from '\s(.+)$'), ''), '-'),
+        full_name,
+        designation,
+        email,
+        normalized_email,
+        phone,
+        mobile,
+        NOT EXISTS (SELECT 1 FROM "clients"."ClientContacts" existing WHERE existing."ClientId" = lead_contacts."ClientId" AND existing."IsPrimary" = true AND existing."IsDeleted" = false),
+        1,
+        false,
+        COALESCE(created_by, '00000000-0000-0000-0000-000000000000'::uuid),
+        COALESCE(created_on, NOW()),
+        NULL,
+        NULL,
+        true
+    FROM lead_contacts
+    WHERE NOT EXISTS (
+        SELECT 1 FROM "clients"."ClientContacts" cc
+        WHERE cc."ClientId" = lead_contacts."ClientId"
+            AND cc."IsDeleted" = false
+            AND (
+                (lead_contacts.normalized_email IS NOT NULL AND cc."NormalizedEmail" = lead_contacts.normalized_email)
+                OR (lead_contacts.normalized_email IS NULL AND UPPER(cc."FullName") = UPPER(lead_contacts.full_name))
+            )
+    )
+    ON CONFLICT ("Id") DO NOTHING;
+
+    UPDATE "leads"."Leads" l
+    SET "ClientContactId" = cc."Id"
+    FROM "clients"."ClientContacts" cc
+    WHERE l."ClientContactId" IS NULL
+        AND l."ClientId" = cc."ClientId"
+        AND cc."IsDeleted" = false
+        AND (
+            (NULLIF(TRIM(l."Email"), '') IS NOT NULL AND cc."NormalizedEmail" = UPPER(TRIM(l."Email")))
+            OR (NULLIF(TRIM(l."Email"), '') IS NULL AND UPPER(cc."FullName") = UPPER(TRIM(l."ContactPersonName")))
+        );
+
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Opportunities_Clients_ClientId') THEN
+        ALTER TABLE "leads"."Opportunities" DROP CONSTRAINT "FK_Opportunities_Clients_ClientId";
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Opportunities_ClientContacts_ContactId') THEN
+        ALTER TABLE "leads"."Opportunities" DROP CONSTRAINT "FK_Opportunities_ClientContacts_ContactId";
+    END IF;
+
+    UPDATE "leads"."Opportunities" o
+    SET "ClientId" = l."ClientId",
+        "ContactId" = l."ClientContactId"
+    FROM "leads"."Leads" l
+    WHERE o."LeadId" = l."Id"
+        AND l."ClientId" IS NOT NULL
+        AND l."ClientContactId" IS NOT NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_Clients_ClientId')
+        AND NOT EXISTS (
+            SELECT 1 FROM "leads"."Leads" l
+            LEFT JOIN "clients"."Clients" c ON c."Id" = l."ClientId"
+            WHERE l."ClientId" IS NOT NULL AND c."Id" IS NULL
+        ) THEN
+        ALTER TABLE "leads"."Leads" ADD CONSTRAINT "FK_Leads_Clients_ClientId"
+        FOREIGN KEY ("ClientId") REFERENCES "clients"."Clients" ("Id") ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_ClientContacts_ClientContactId')
+        AND NOT EXISTS (
+            SELECT 1 FROM "leads"."Leads" l
+            LEFT JOIN "clients"."ClientContacts" cc ON cc."Id" = l."ClientContactId"
+            WHERE l."ClientContactId" IS NOT NULL AND cc."Id" IS NULL
+        ) THEN
+        ALTER TABLE "leads"."Leads" ADD CONSTRAINT "FK_Leads_ClientContacts_ClientContactId"
+        FOREIGN KEY ("ClientContactId") REFERENCES "clients"."ClientContacts" ("Id") ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Opportunities_Clients_ClientId')
+        AND NOT EXISTS (
+            SELECT 1 FROM "leads"."Opportunities" o
+            LEFT JOIN "clients"."Clients" c ON c."Id" = o."ClientId"
+            WHERE c."Id" IS NULL
+        ) THEN
+        ALTER TABLE "leads"."Opportunities" ADD CONSTRAINT "FK_Opportunities_Clients_ClientId"
+        FOREIGN KEY ("ClientId") REFERENCES "clients"."Clients" ("Id") ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Opportunities_ClientContacts_ContactId')
+        AND NOT EXISTS (
+            SELECT 1 FROM "leads"."Opportunities" o
+            LEFT JOIN "clients"."ClientContacts" cc ON cc."Id" = o."ContactId"
+            WHERE cc."Id" IS NULL
+        ) THEN
+        ALTER TABLE "leads"."Opportunities" ADD CONSTRAINT "FK_Opportunities_ClientContacts_ContactId"
+        FOREIGN KEY ("ContactId") REFERENCES "clients"."ClientContacts" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260602110000_LinkLeadsToClientModule', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
 COMMIT;

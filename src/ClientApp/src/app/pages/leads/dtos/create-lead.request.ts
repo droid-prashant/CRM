@@ -5,6 +5,8 @@ export interface CreateLeadRequest {
     campaignName?: string | null;
     sourceStartDate?: string | null;
     sourceEndDate?: string | null;
+    clientId: string;
+    clientContactId: string;
     companyName: string;
     website?: string | null;
     contactPersonName: string;

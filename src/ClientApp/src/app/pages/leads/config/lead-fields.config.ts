@@ -7,6 +7,8 @@ export interface LeadFieldOptions {
     countries: SelectOption[];
     industries: SelectOption[];
     products: SelectOption[];
+    clients: SelectOption[];
+    contacts: SelectOption[];
 }
 
 export function buildLeadFields(options: LeadFieldOptions): DynamicField[] {
@@ -27,21 +29,18 @@ export function buildLeadFields(options: LeadFieldOptions): DynamicField[] {
 
         return selectedPartnerProductIds(formValue, options.partners).has(String(option.value));
     };
+    const contactBelongsToSelectedClient = (option: SelectOption, formValue: Record<string, unknown>): boolean => {
+        const selectedClientId = formValue['clientId'];
+        return !!selectedClientId && option.clientId === selectedClientId;
+    };
 
     return [
         { key: 'sourceId', label: 'Source', type: 'select', required: true, options: options.sources, colSpan: 3, section: 'Lead Classification', placeholder: 'Select lead source' },
         { key: 'categoryId', label: 'Category', type: 'select', required: true, options: options.categories, colSpan: 3, section: 'Lead Classification', placeholder: 'Select lead category' },
         { key: 'partnerId', label: 'Partner', type: 'select', options: options.partners, colSpan: 3, section: 'Lead Classification', placeholder: 'Select lead partner', visibleWhen: isPartnerSource, requiredWhen: isPartnerSource },
         { key: 'leadScore', label: 'Lead Score', type: 'number', colSpan: 3, section: 'Lead Classification' },
-        { key: 'companyName', label: 'Company Name', type: 'text', required: true, colSpan: 4, section: 'Company & Contact', placeholder: 'Prospect company' },
-        { key: 'website', label: 'Website', type: 'text', colSpan: 4, section: 'Company & Contact', placeholder: 'https://example.com' },
-        { key: 'countryId', label: 'Country', type: 'select', required: true, options: options.countries, colSpan: 4, section: 'Company & Contact', placeholder: 'Select country' },
-        { key: 'contactPersonName', label: 'Contact Person', type: 'text', required: true, colSpan: 4, section: 'Company & Contact', placeholder: 'Full name' },
-        { key: 'jobTitle', label: 'Job Title', type: 'text', colSpan: 4, section: 'Company & Contact', placeholder: 'Job title' },
-        { key: 'industryId', label: 'Industry', type: 'select', options: options.industries, colSpan: 4, section: 'Company & Contact', placeholder: 'Select industry' },
-        { key: 'email', label: 'Email', type: 'email', colSpan: 4, section: 'Company & Contact', placeholder: 'name@company.com' },
-        { key: 'phone', label: 'Phone', type: 'text', colSpan: 4, section: 'Company & Contact', placeholder: 'Phone number' },
-        { key: 'alternatePhone', label: 'Alternate Phone', type: 'text', colSpan: 4, section: 'Company & Contact', placeholder: 'Alternate phone number' },
+        { key: 'clientId', label: 'Client', type: 'select', required: true, options: options.clients, colSpan: 6, section: 'Client', placeholder: 'Select existing client' },
+        { key: 'clientContactId', label: 'Contact', type: 'select', required: true, options: options.contacts, colSpan: 6, section: 'Client', placeholder: 'Select client contact', optionFilter: contactBelongsToSelectedClient },
         { key: 'productIds', label: 'Product Interests', type: 'multiSelect', required: true, options: options.products, colSpan: 12, section: 'Product Interest', placeholder: 'Select products', optionFilter: availableProductInterest },
         { key: 'campaignName', label: 'Campaign Name', type: 'text', colSpan: 3, section: 'Source Details', visibleWhen: isCampaignSource, requiredWhen: isCampaignSource },
         { key: 'sourceStartDate', label: 'Start Date', type: 'date', colSpan: 3, section: 'Source Details', visibleWhen: isCampaignSource, requiredWhen: isCampaignSource },

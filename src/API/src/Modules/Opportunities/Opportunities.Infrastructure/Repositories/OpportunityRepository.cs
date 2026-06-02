@@ -70,28 +70,27 @@ namespace Opportunities.Infrastructure.Repositories
         {
             return new OpportunityLookupViewModel
             {
-                Clients = await _dbContext.Clients
+                Clients = await _dbContext.CrmClients
                     .AsNoTracking()
-                    .Include(x => x.Country)
-                    .Where(x => x.IsActive)
+                    .Where(x => x.IsActive && !x.IsDeleted)
                     .OrderBy(x => x.Name)
                     .Select(x => new OpportunityClientLookupViewModel
                     {
                         Id = x.Id,
                         Name = x.Name,
-                        Country = x.Country != null ? x.Country.Name : string.Empty
+                        Country = string.Empty
                     })
                     .ToListAsync(cancellationToken),
-                Contacts = await _dbContext.ClientContacts
+                Contacts = await _dbContext.CrmClientContacts
                     .AsNoTracking()
-                    .Where(x => x.IsActive)
+                    .Where(x => x.IsActive && !x.IsDeleted)
                     .OrderBy(x => x.FirstName)
                     .ThenBy(x => x.LastName)
                     .Select(x => new OpportunityContactLookupViewModel
                     {
                         Id = x.Id,
                         ClientId = x.ClientId,
-                        FullName = (x.FirstName + " " + x.LastName).Trim(),
+                        FullName = x.FullName,
                         Email = x.Email
                     })
                     .ToListAsync(cancellationToken),
@@ -347,7 +346,7 @@ namespace Opportunities.Infrastructure.Repositories
 
         public Task<bool> ClientExistsAsync(Guid clientId, CancellationToken cancellationToken)
         {
-            return _dbContext.Clients.AnyAsync(x => x.Id == clientId && x.IsActive, cancellationToken);
+            return _dbContext.CrmClients.AnyAsync(x => x.Id == clientId && x.IsActive && !x.IsDeleted, cancellationToken);
         }
 
         public Task<bool> ProductExistsAsync(Guid productId, CancellationToken cancellationToken)
@@ -362,7 +361,7 @@ namespace Opportunities.Infrastructure.Repositories
 
         public Task<bool> ContactBelongsToClientAsync(Guid contactId, Guid clientId, CancellationToken cancellationToken)
         {
-            return _dbContext.ClientContacts.AnyAsync(x => x.Id == contactId && x.ClientId == clientId && x.IsActive, cancellationToken);
+            return _dbContext.CrmClientContacts.AnyAsync(x => x.Id == contactId && x.ClientId == clientId && x.IsActive && !x.IsDeleted, cancellationToken);
         }
 
         public async Task<bool> UserExistsAsync(Guid userId)
@@ -446,7 +445,7 @@ namespace Opportunities.Infrastructure.Repositories
 
         private async Task<OpportunityListItemViewModel> MapOpportunityAsync(Opportunity opportunity, CancellationToken cancellationToken)
         {
-            var clientName = await _dbContext.Clients
+            var clientName = await _dbContext.CrmClients
                 .Where(x => x.Id == opportunity.ClientId)
                 .Select(x => x.Name)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -456,9 +455,9 @@ namespace Opportunities.Infrastructure.Repositories
                 .Select(x => x.Name)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            var contactName = await _dbContext.ClientContacts
+            var contactName = await _dbContext.CrmClientContacts
                 .Where(x => x.Id == opportunity.ContactId)
-                .Select(x => (x.FirstName + " " + x.LastName).Trim())
+                .Select(x => x.FullName)
                 .FirstOrDefaultAsync(cancellationToken);
 
             var leadNumber = opportunity.LeadId.HasValue
@@ -537,14 +536,14 @@ namespace Opportunities.Infrastructure.Repositories
             if (!string.IsNullOrWhiteSpace(query.SearchTerm))
             {
                 var searchTerm = query.SearchTerm.Trim().ToLower();
-                var matchingClientIds = _dbContext.Clients
+                var matchingClientIds = _dbContext.CrmClients
                     .Where(x => x.Name.ToLower().Contains(searchTerm))
                     .Select(x => x.Id);
                 var matchingProductIds = _dbContext.Products
                     .Where(x => !x.IsDeleted && (x.Name.ToLower().Contains(searchTerm) || x.Code.ToLower().Contains(searchTerm)))
                     .Select(x => x.Id);
-                var matchingContactIds = _dbContext.ClientContacts
-                    .Where(x => (x.FirstName + " " + x.LastName).ToLower().Contains(searchTerm) || (x.Email != null && x.Email.ToLower().Contains(searchTerm)))
+                var matchingContactIds = _dbContext.CrmClientContacts
+                    .Where(x => x.FullName.ToLower().Contains(searchTerm) || (x.Email != null && x.Email.ToLower().Contains(searchTerm)))
                     .Select(x => x.Id);
                 var matchingLeadIds = _dbContext.Leads
                     .Where(x => x.LeadNumber.ToLower().Contains(searchTerm) || x.CompanyName.ToLower().Contains(searchTerm))

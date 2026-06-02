@@ -23,6 +23,13 @@ namespace ERP.API.Controllers.Leads
             return await _leadService.GetClientLookupsAsync(cancellationToken);
         }
 
+        [HttpGet("contacts")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsView)]
+        public async Task<ActionResult<List<ContactLookupViewModel>>> GetAllClientContacts(CancellationToken cancellationToken)
+        {
+            return await _leadService.GetAllClientContactsAsync(cancellationToken);
+        }
+
         [HttpGet("{id:guid}/contacts")]
         [Authorize(Policy = PermissionPolicyNames.LeadsView)]
         public async Task<ActionResult<List<ContactLookupViewModel>>> GetClientContacts(Guid id, CancellationToken cancellationToken)

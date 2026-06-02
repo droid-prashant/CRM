@@ -11,6 +11,8 @@ using Microsoft.EntityFrameworkCore;
 using Opportunities.Domain.Entities;
 using Partners.Application.Services;
 using System.Text.RegularExpressions;
+using CrmClient = Clients.Domain.Entities.Client;
+using CrmClientContact = Clients.Domain.Entities.ClientContact;
 
 namespace Leads.Infrastructure.Repositories
 {
@@ -41,37 +43,60 @@ namespace Leads.Infrastructure.Repositories
 
             var partnerNames = (await _partnerLookupService.GetActivePartnersAsync(cancellationToken))
                 .ToDictionary(x => x.Id, x => x.Name);
+            var clientIds = leads.Select(x => x.ClientId).Where(x => x.HasValue).Select(x => x!.Value).Distinct().ToList();
+            var contactIds = leads.Select(x => x.ClientContactId).Where(x => x.HasValue).Select(x => x!.Value).Distinct().ToList();
+            var clients = await _dbContext.CrmClients
+                .AsNoTracking()
+                .Where(x => clientIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, cancellationToken);
+            var contacts = await _dbContext.CrmClientContacts
+                .AsNoTracking()
+                .Where(x => contactIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, cancellationToken);
 
-            return leads.Select(x => new LeadListItemViewModel
+            return leads.Select(x =>
             {
-                Id = x.Id,
-                LeadNumber = x.LeadNumber,
-                SourceId = x.SourceId,
-                CategoryId = x.CategoryId,
-                PartnerId = x.PartnerId,
-                PartnerName = x.PartnerId.HasValue ? partnerNames.GetValueOrDefault(x.PartnerId.Value) : null,
-                CampaignName = x.CampaignName,
-                SourceStartDate = x.SourceStartDate,
-                SourceEndDate = x.SourceEndDate,
-                CompanyName = x.CompanyName,
-                Website = x.Website,
-                ContactPersonName = x.ContactPersonName,
-                JobTitle = x.JobTitle,
-                Email = x.Email,
-                Phone = x.Phone,
-                AlternatePhone = x.AlternatePhone,
-                CountryId = x.CountryId,
-                Address = x.Address,
-                IndustryId = x.IndustryId,
-                Notes = x.Notes,
-                LeadScore = x.LeadScore,
-                ProductIds = x.ProductInterests.Where(p => p.IsActive).Select(p => p.ProductId).ToList(),
-                SourceName = x.Source?.Name ?? string.Empty,
-                CategoryName = x.Category?.Name ?? string.Empty,
-                CountryName = x.Country?.Name ?? string.Empty,
-                Status = x.Status.ToString(),
-                ProductNames = string.Join(", ", x.ProductInterests.Where(p => p.IsActive).Select(p => p.Product?.Name).Where(p => !string.IsNullOrWhiteSpace(p))),
-                CreatedAt = x.CreatedOn
+                CrmClient? client = x.ClientId.HasValue && clients.TryGetValue(x.ClientId.Value, out var foundClient) ? foundClient : null;
+                CrmClientContact? contact = x.ClientContactId.HasValue && contacts.TryGetValue(x.ClientContactId.Value, out var foundContact) ? foundContact : null;
+
+                return new LeadListItemViewModel
+                {
+                    Id = x.Id,
+                    LeadNumber = x.LeadNumber,
+                    SourceId = x.SourceId,
+                    CategoryId = x.CategoryId,
+                    PartnerId = x.PartnerId,
+                    PartnerName = x.PartnerId.HasValue ? partnerNames.GetValueOrDefault(x.PartnerId.Value) : null,
+                    CampaignName = x.CampaignName,
+                    SourceStartDate = x.SourceStartDate,
+                    SourceEndDate = x.SourceEndDate,
+                    ClientId = x.ClientId,
+                    ClientContactId = x.ClientContactId,
+                    ClientCode = client?.ClientCode,
+                    ClientName = client?.Name,
+                    ClientContactName = contact?.FullName,
+                    ClientContactEmail = contact?.Email,
+                    ClientContactPhone = contact?.Phone ?? contact?.Mobile,
+                    CompanyName = x.CompanyName,
+                    Website = x.Website,
+                    ContactPersonName = x.ContactPersonName,
+                    JobTitle = x.JobTitle,
+                    Email = x.Email,
+                    Phone = x.Phone,
+                    AlternatePhone = x.AlternatePhone,
+                    CountryId = x.CountryId,
+                    Address = x.Address,
+                    IndustryId = x.IndustryId,
+                    Notes = x.Notes,
+                    LeadScore = x.LeadScore,
+                    ProductIds = x.ProductInterests.Where(p => p.IsActive).Select(p => p.ProductId).ToList(),
+                    SourceName = x.Source?.Name ?? string.Empty,
+                    CategoryName = x.Category?.Name ?? string.Empty,
+                    CountryName = x.Country?.Name ?? string.Empty,
+                    Status = x.Status.ToString(),
+                    ProductNames = string.Join(", ", x.ProductInterests.Where(p => p.IsActive).Select(p => p.Product?.Name).Where(p => !string.IsNullOrWhiteSpace(p))),
+                    CreatedAt = x.CreatedOn
+                };
             }).ToList();
         }
 
@@ -93,6 +118,7 @@ namespace Leads.Infrastructure.Repositories
             }
 
             var detail = MapDetail(lead, false);
+            await PopulateLeadClientFieldsAsync(detail, cancellationToken);
             if (lead.PartnerId.HasValue)
             {
                 detail.PartnerName = await _partnerLookupService.GetPartnerNameAsync(lead.PartnerId.Value, cancellationToken);
@@ -104,7 +130,7 @@ namespace Leads.Infrastructure.Repositories
 
         public async Task<LeadEditViewModel?> GetLeadEditAsync(Guid id, CancellationToken cancellationToken)
         {
-            return await _dbContext.Leads
+            var edit = await _dbContext.Leads
                 .AsNoTracking()
                 .Where(x => x.Id == id && x.IsActive)
                 .Select(x => new LeadEditViewModel
@@ -116,6 +142,8 @@ namespace Leads.Infrastructure.Repositories
                     CampaignName = x.CampaignName,
                     SourceStartDate = x.SourceStartDate,
                     SourceEndDate = x.SourceEndDate,
+                    ClientId = x.ClientId,
+                    ClientContactId = x.ClientContactId,
                     CompanyName = x.CompanyName,
                     Website = x.Website,
                     ContactPersonName = x.ContactPersonName,
@@ -131,6 +159,13 @@ namespace Leads.Infrastructure.Repositories
                     SelectedProductIds = x.ProductInterests.Where(p => p.IsActive).Select(p => p.ProductId).ToList()
                 })
                 .FirstOrDefaultAsync(cancellationToken);
+
+            if (edit != null)
+            {
+                await PopulateLeadClientFieldsAsync(edit, cancellationToken);
+            }
+
+            return edit;
         }
 
         public Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(CancellationToken cancellationToken)
@@ -231,16 +266,13 @@ namespace Leads.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public Task<bool> DuplicateCompanyEmailExistsAsync(string companyName, string email, CancellationToken cancellationToken)
+        public Task<bool> ActiveLeadExistsForClientContactAsync(Guid clientId, Guid clientContactId, Guid? excludingId, CancellationToken cancellationToken)
         {
-            var normalizedCompany = companyName.Trim().ToLower();
-            var normalizedEmail = email.Trim().ToLower();
-
             return _dbContext.Leads.AnyAsync(
                 x => x.IsActive
-                    && x.CompanyName.ToLower() == normalizedCompany
-                    && x.Email != null
-                    && x.Email.ToLower() == normalizedEmail,
+                    && x.ClientId == clientId
+                    && x.ClientContactId == clientContactId
+                    && (!excludingId.HasValue || x.Id != excludingId.Value),
                 cancellationToken);
         }
 
@@ -254,6 +286,9 @@ namespace Leads.Infrastructure.Repositories
 
         public async Task<LeadDetailViewModel> CreateLeadAsync(CreateLeadRequest request, string leadNumber, bool hasDuplicateWarning, CancellationToken cancellationToken)
         {
+            var selected = await GetSelectedClientContactAsync(request.ClientId, request.ClientContactId, cancellationToken)
+                ?? throw new InvalidOperationException("Selected client/contact was not found.");
+
             var lead = new Lead
             {
                 LeadNumber = leadNumber,
@@ -263,16 +298,6 @@ namespace Leads.Infrastructure.Repositories
                 CampaignName = Clean(request.CampaignName),
                 SourceStartDate = request.SourceStartDate?.ToUniversalTime(),
                 SourceEndDate = request.SourceEndDate?.ToUniversalTime(),
-                CompanyName = request.CompanyName.Trim(),
-                Website = Clean(request.Website),
-                ContactPersonName = request.ContactPersonName.Trim(),
-                JobTitle = Clean(request.JobTitle),
-                Email = Clean(request.Email),
-                Phone = Clean(request.Phone),
-                AlternatePhone = Clean(request.AlternatePhone),
-                CountryId = request.CountryId,
-                Address = Clean(request.Address),
-                IndustryId = request.IndustryId,
                 Notes = Clean(request.Notes),
                 LeadScore = request.LeadScore,
                 Status = LeadStatus.New,
@@ -289,13 +314,14 @@ namespace Leads.Infrastructure.Repositories
                     }
                 }
             };
+            SnapshotClientContact(lead, selected.Client, selected.Contact);
 
             _dbContext.Leads.Add(lead);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             var detail = await GetLeadDetailAsync(lead.Id, cancellationToken);
             detail!.HasDuplicateWarning = hasDuplicateWarning;
-            detail.DuplicateWarning = hasDuplicateWarning ? "A lead with the same company and email already exists." : null;
+            detail.DuplicateWarning = hasDuplicateWarning ? "An active lead already exists for the selected client contact." : null;
             return detail;
         }
 
@@ -313,6 +339,12 @@ namespace Leads.Infrastructure.Repositories
                 return null;
             }
 
+            var selected = await GetSelectedClientContactAsync(request.ClientId, request.ClientContactId, cancellationToken);
+            if (selected is not { } selectedClientContact)
+            {
+                return null;
+            }
+
             var previousStatus = lead.Status;
             lead.SourceId = request.SourceId;
             lead.CategoryId = request.CategoryId;
@@ -320,18 +352,9 @@ namespace Leads.Infrastructure.Repositories
             lead.CampaignName = Clean(request.CampaignName);
             lead.SourceStartDate = request.SourceStartDate?.ToUniversalTime();
             lead.SourceEndDate = request.SourceEndDate?.ToUniversalTime();
-            lead.CompanyName = request.CompanyName.Trim();
-            lead.Website = Clean(request.Website);
-            lead.ContactPersonName = request.ContactPersonName.Trim();
-            lead.JobTitle = Clean(request.JobTitle);
-            lead.Email = Clean(request.Email);
-            lead.Phone = Clean(request.Phone);
-            lead.AlternatePhone = Clean(request.AlternatePhone);
-            lead.CountryId = request.CountryId;
-            lead.Address = Clean(request.Address);
-            lead.IndustryId = request.IndustryId;
             lead.Notes = Clean(request.Notes);
             lead.LeadScore = request.LeadScore;
+            SnapshotClientContact(lead, selectedClientContact.Client, selectedClientContact.Contact);
 
             UpdateProductInterests(lead, request.ProductIds);
             lead.TimelineEntries.Add(new LeadTimelineEntry
@@ -459,8 +482,6 @@ namespace Leads.Infrastructure.Repositories
 
             var existingClients = await GetClientLookupsAsync(cancellationToken);
             var existingContacts = await GetContactLookupsAsync(cancellationToken);
-            var selectedClientId = FindMatchingClientId(lead.CompanyName, existingClients);
-            var selectedContactId = FindMatchingContactId(lead.ContactPersonName, lead.Email, selectedClientId, existingContacts);
 
             return new LeadConversionViewModel
             {
@@ -470,8 +491,8 @@ namespace Leads.Infrastructure.Repositories
                 ContactPersonName = lead.ContactPersonName,
                 Email = lead.Email,
                 Phone = lead.Phone,
-                SelectedClientId = selectedClientId,
-                SelectedContactId = selectedContactId,
+                SelectedClientId = lead.ClientId,
+                SelectedContactId = lead.ClientContactId,
                 ProductInterests = lead.ProductInterests
                     .Where(x => x.IsActive)
                     .Select(x => new LeadProductInterestViewModel
@@ -489,7 +510,11 @@ namespace Leads.Infrastructure.Repositories
                 OwnerUsers = await GetActiveUserLookupsAsync(cancellationToken),
                 DefaultOwnerUserId = lead.AssignedToUserId,
                 DefaultOwnerUserName = await GetUserFullNameAsync(lead.AssignedToUserId),
-                CanConvert = lead.Status == LeadStatus.Qualified && lead.AssignedToUserId.HasValue && !lead.ConvertedOpportunityId.HasValue
+                CanConvert = lead.Status == LeadStatus.Qualified
+                    && lead.AssignedToUserId.HasValue
+                    && lead.ClientId.HasValue
+                    && lead.ClientContactId.HasValue
+                    && !lead.ConvertedOpportunityId.HasValue
             };
         }
 
@@ -512,35 +537,22 @@ namespace Leads.Infrastructure.Repositories
                 return null;
             }
 
-            var client = request.ClientId.HasValue
-                ? await _dbContext.Clients.FirstOrDefaultAsync(x => x.Id == request.ClientId.Value && x.IsActive, cancellationToken)
-                : CreateClient(request.NewClient!);
-
-            if (client == null)
+            if (!lead.ClientId.HasValue || !lead.ClientContactId.HasValue)
             {
                 return null;
             }
 
-            if (!request.ClientId.HasValue)
-            {
-                _dbContext.Clients.Add(client);
-            }
+            var client = await _dbContext.CrmClients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == lead.ClientId.Value && x.IsActive && !x.IsDeleted, cancellationToken);
+            var contact = await _dbContext.CrmClientContacts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == lead.ClientContactId.Value && x.ClientId == lead.ClientId.Value && x.IsActive && !x.IsDeleted, cancellationToken);
 
-            var contact = request.ContactId.HasValue
-                ? await _dbContext.ClientContacts.FirstOrDefaultAsync(x => x.Id == request.ContactId.Value && x.ClientId == client.Id && x.IsActive, cancellationToken)
-                : CreateContact(client, request.NewContact!);
-
-            if (contact == null)
+            if (client == null || contact == null)
             {
                 return null;
             }
-
-            if (!request.ContactId.HasValue)
-            {
-                _dbContext.ClientContacts.Add(contact);
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
 
             var defaultStage = await _dbContext.OpportunityStages
                 .Where(x => x.IsActive && !x.IsDeleted)
@@ -697,18 +709,22 @@ namespace Leads.Infrastructure.Repositories
 
         public Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken)
         {
-            return _dbContext.Clients
+            return _dbContext.CrmClients
                 .AsNoTracking()
-                .Include(x => x.Country)
-                .Where(x => x.IsActive)
+                .Where(x => x.IsActive && !x.IsDeleted)
                 .OrderBy(x => x.Name)
                 .Select(x => new ClientLookupViewModel
                 {
                     Id = x.Id,
                     Name = x.Name,
-                    Country = x.Country != null ? x.Country.Name : string.Empty
+                    Country = string.Empty
                 })
                 .ToListAsync(cancellationToken);
+        }
+
+        public Task<List<ContactLookupViewModel>> GetAllClientContactsAsync(CancellationToken cancellationToken)
+        {
+            return GetContactLookupsAsync(cancellationToken);
         }
 
         public async Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken)
@@ -719,16 +735,16 @@ namespace Leads.Infrastructure.Repositories
                 return null;
             }
 
-            return await _dbContext.ClientContacts
+            return await _dbContext.CrmClientContacts
                 .AsNoTracking()
-                .Where(x => x.ClientId == clientId && x.IsActive)
+                .Where(x => x.ClientId == clientId && x.IsActive && !x.IsDeleted)
                 .OrderBy(x => x.FirstName)
                 .ThenBy(x => x.LastName)
                 .Select(x => new ContactLookupViewModel
                 {
                     Id = x.Id,
                     ClientId = x.ClientId,
-                    FullName = (x.FirstName + " " + x.LastName).Trim(),
+                    FullName = x.FullName,
                     Email = x.Email
                 })
                 .ToListAsync(cancellationToken);
@@ -736,12 +752,12 @@ namespace Leads.Infrastructure.Repositories
 
         public Task<bool> ClientExistsAsync(Guid clientId, CancellationToken cancellationToken)
         {
-            return _dbContext.Clients.AnyAsync(x => x.Id == clientId && x.IsActive, cancellationToken);
+            return _dbContext.CrmClients.AnyAsync(x => x.Id == clientId && x.IsActive && !x.IsDeleted, cancellationToken);
         }
 
         public Task<bool> ContactBelongsToClientAsync(Guid contactId, Guid clientId, CancellationToken cancellationToken)
         {
-            return _dbContext.ClientContacts.AnyAsync(x => x.Id == contactId && x.ClientId == clientId && x.IsActive, cancellationToken);
+            return _dbContext.CrmClientContacts.AnyAsync(x => x.Id == contactId && x.ClientId == clientId && x.IsActive && !x.IsDeleted, cancellationToken);
         }
 
         public async Task<bool> UserExistsAsync(Guid userId)
@@ -807,6 +823,8 @@ namespace Leads.Infrastructure.Repositories
                 CampaignName = lead.CampaignName,
                 SourceStartDate = lead.SourceStartDate,
                 SourceEndDate = lead.SourceEndDate,
+                ClientId = lead.ClientId,
+                ClientContactId = lead.ClientContactId,
                 CompanyName = lead.CompanyName,
                 Website = lead.Website,
                 ContactPersonName = lead.ContactPersonName,
@@ -857,6 +875,62 @@ namespace Leads.Infrastructure.Repositories
         private static string? Clean(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
+        private async Task<(CrmClient Client, CrmClientContact Contact)?> GetSelectedClientContactAsync(Guid clientId, Guid contactId, CancellationToken cancellationToken)
+        {
+            var client = await _dbContext.CrmClients
+                .FirstOrDefaultAsync(x => x.Id == clientId && x.IsActive && !x.IsDeleted, cancellationToken);
+            if (client == null)
+            {
+                return null;
+            }
+
+            var contact = await _dbContext.CrmClientContacts
+                .FirstOrDefaultAsync(x => x.Id == contactId && x.ClientId == clientId && x.IsActive && !x.IsDeleted, cancellationToken);
+            return contact == null ? null : (client, contact);
+        }
+
+        private static void SnapshotClientContact(Lead lead, CrmClient client, CrmClientContact contact)
+        {
+            lead.ClientId = client.Id;
+            lead.ClientContactId = contact.Id;
+            lead.CompanyName = client.Name.Trim();
+            lead.Website = Clean(client.Website);
+            lead.ContactPersonName = Clean(contact.FullName) ?? $"{contact.FirstName} {contact.LastName}".Trim();
+            lead.JobTitle = Clean(contact.Designation);
+            lead.Email = Clean(contact.Email);
+            lead.Phone = Clean(contact.Phone) ?? Clean(contact.Mobile);
+            lead.AlternatePhone = Clean(contact.Mobile);
+            lead.CountryId = client.CountryId;
+            lead.Address = Clean(client.Address);
+            lead.IndustryId = client.IndustryId;
+        }
+
+        private async Task PopulateLeadClientFieldsAsync(LeadDetailViewModel detail, CancellationToken cancellationToken)
+        {
+            var client = detail.ClientId.HasValue
+                ? await _dbContext.CrmClients.AsNoTracking().FirstOrDefaultAsync(x => x.Id == detail.ClientId.Value, cancellationToken)
+                : null;
+            var contact = detail.ClientContactId.HasValue
+                ? await _dbContext.CrmClientContacts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == detail.ClientContactId.Value, cancellationToken)
+                : null;
+
+            detail.ClientCode = client?.ClientCode;
+            detail.ClientName = client?.Name;
+            detail.ClientContactName = contact?.FullName;
+            detail.ClientContactEmail = contact?.Email;
+            detail.ClientContactPhone = contact?.Phone ?? contact?.Mobile;
+        }
+
+        private async Task PopulateLeadClientFieldsAsync(LeadEditViewModel edit, CancellationToken cancellationToken)
+        {
+            edit.ClientName = edit.ClientId.HasValue
+                ? await _dbContext.CrmClients.AsNoTracking().Where(x => x.Id == edit.ClientId.Value).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken)
+                : null;
+            edit.ClientContactName = edit.ClientContactId.HasValue
+                ? await _dbContext.CrmClientContacts.AsNoTracking().Where(x => x.Id == edit.ClientContactId.Value).Select(x => x.FullName).FirstOrDefaultAsync(cancellationToken)
+                : null;
         }
 
         private static LeadQualificationViewModel MapQualification(Lead lead, string? assignedToUserName)
@@ -1003,16 +1077,16 @@ namespace Leads.Infrastructure.Repositories
 
         private Task<List<ContactLookupViewModel>> GetContactLookupsAsync(CancellationToken cancellationToken)
         {
-            return _dbContext.ClientContacts
+            return _dbContext.CrmClientContacts
                 .AsNoTracking()
-                .Where(x => x.IsActive)
+                .Where(x => x.IsActive && !x.IsDeleted)
                 .OrderBy(x => x.FirstName)
                 .ThenBy(x => x.LastName)
                 .Select(x => new ContactLookupViewModel
                 {
                     Id = x.Id,
                     ClientId = x.ClientId,
-                    FullName = (x.FirstName + " " + x.LastName).Trim(),
+                    FullName = x.FullName,
                     Email = x.Email
                 })
                 .ToListAsync(cancellationToken);

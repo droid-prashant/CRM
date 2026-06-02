@@ -27,7 +27,7 @@ namespace Leads.Application.Repositories
         Task<List<Guid>> GetActiveProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken);
         Task<List<Guid>> GetActiveInHouseProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken);
         Task<List<Guid>> GetActivePartnerOwnedProductIdsAsync(Guid ownerPartnerId, IEnumerable<Guid> productIds, CancellationToken cancellationToken);
-        Task<bool> DuplicateCompanyEmailExistsAsync(string companyName, string email, CancellationToken cancellationToken);
+        Task<bool> ActiveLeadExistsForClientContactAsync(Guid clientId, Guid clientContactId, Guid? excludingId, CancellationToken cancellationToken);
         Task<string> GenerateNextLeadNumberAsync(CancellationToken cancellationToken);
         Task<LeadDetailViewModel> CreateLeadAsync(CreateLeadRequest request, string leadNumber, bool hasDuplicateWarning, CancellationToken cancellationToken);
         Task<LeadDetailViewModel?> UpdateLeadAsync(Guid id, UpdateLeadRequest request, CancellationToken cancellationToken);
@@ -40,6 +40,7 @@ namespace Leads.Application.Repositories
         Task<List<LeadInteractionViewModel>?> GetLeadInteractionsAsync(Guid id, CancellationToken cancellationToken);
         Task<LeadInteractionViewModel?> CreateLeadInteractionAsync(Guid id, CreateLeadInteractionRequest request, CancellationToken cancellationToken);
         Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken);
+        Task<List<ContactLookupViewModel>> GetAllClientContactsAsync(CancellationToken cancellationToken);
         Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken);
         Task<bool> ClientExistsAsync(Guid clientId, CancellationToken cancellationToken);
         Task<bool> ContactBelongsToClientAsync(Guid contactId, Guid clientId, CancellationToken cancellationToken);

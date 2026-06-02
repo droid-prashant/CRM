@@ -67,6 +67,7 @@ export class LeadDetail implements OnInit, OnDestroy {
     private readonly messageService = inject(MessageService);
     private sourceSubscription?: Subscription;
     private partnerSubscription?: Subscription;
+    private clientSubscription?: Subscription;
 
     qualificationForm = this.fb.group({
         qualificationRemarks: ['', [Validators.maxLength(1000)]]
@@ -97,16 +98,9 @@ export class LeadDetail implements OnInit, OnDestroy {
         campaignName: [''],
         sourceStartDate: [''],
         sourceEndDate: [''],
-        companyName: ['', Validators.required],
-        website: [''],
-        contactPersonName: ['', Validators.required],
-        jobTitle: [''],
-        email: [''],
-        phone: [''],
-        alternatePhone: [''],
-        countryId: ['', Validators.required],
+        clientId: ['', Validators.required],
+        clientContactId: ['', Validators.required],
         address: [''],
-        industryId: [''],
         notes: [''],
         leadScore: [null as number | null],
         productIds: [[] as string[], Validators.required]
@@ -145,12 +139,14 @@ export class LeadDetail implements OnInit, OnDestroy {
         this.canApproveLead = this.authService.hasPermission(Permissions.leads.approve);
         this.sourceSubscription = this.editForm.controls.sourceId.valueChanges.subscribe(() => this.applyEditSourceRules());
         this.partnerSubscription = this.editForm.controls.partnerId.valueChanges.subscribe(() => this.clearUnavailableEditProducts());
+        this.clientSubscription = this.editForm.controls.clientId.valueChanges.subscribe(() => this.clearUnavailableEditContact());
         this.loadLead();
     }
 
     ngOnDestroy(): void {
         this.sourceSubscription?.unsubscribe();
         this.partnerSubscription?.unsubscribe();
+        this.clientSubscription?.unsubscribe();
     }
 
     loadLead(): void {
@@ -218,7 +214,7 @@ export class LeadDetail implements OnInit, OnDestroy {
     }
 
     get leadInitials(): string {
-        return this.getInitials(this.lead?.companyName ?? '');
+        return this.getInitials(this.lead?.clientName || this.lead?.companyName || '');
     }
 
     get latestInteraction(): LeadInteractionViewModel | undefined {
@@ -330,21 +326,15 @@ export class LeadDetail implements OnInit, OnDestroy {
                     campaignName: lead.campaignName ?? '',
                     sourceStartDate: this.formatDateInput(lead.sourceStartDate),
                     sourceEndDate: this.formatDateInput(lead.sourceEndDate),
-                    companyName: lead.companyName,
-                    website: lead.website ?? '',
-                    contactPersonName: lead.contactPersonName,
-                    jobTitle: lead.jobTitle ?? '',
-                    email: lead.email ?? '',
-                    phone: lead.phone ?? '',
-                    alternatePhone: lead.alternatePhone ?? '',
-                    countryId: lead.countryId,
+                    clientId: lead.clientId ?? '',
+                    clientContactId: lead.clientContactId ?? '',
                     address: lead.address ?? '',
-                    industryId: lead.industryId ?? '',
                     notes: '',
                     leadScore: lead.leadScore ?? null,
                     productIds: lead.selectedProductIds
                 });
                 this.applyEditSourceRules();
+                this.clearUnavailableEditContact();
                 this.editDialog = true;
                 this.isSavingLead = false;
             },
@@ -622,6 +612,11 @@ export class LeadDetail implements OnInit, OnDestroy {
         return this.leadLookups.products.filter((product) => assignedProductIds.has(product.id));
     }
 
+    get editContactOptions() {
+        const clientId = this.editForm.controls.clientId.value;
+        return this.leadLookups?.contacts.filter((contact) => contact.clientId === clientId) ?? [];
+    }
+
     private get isPartnerOwnedEditProductContext(): boolean {
         if (!this.isEditPartnerSource) {
             return false;
@@ -658,16 +653,18 @@ export class LeadDetail implements OnInit, OnDestroy {
             campaignName: this.optionalFormString(value.campaignName),
             sourceStartDate: this.optionalFormString(value.sourceStartDate),
             sourceEndDate: this.optionalFormString(value.sourceEndDate),
-            companyName: value.companyName ?? '',
-            website: this.optionalFormString(value.website),
-            contactPersonName: value.contactPersonName ?? '',
-            jobTitle: this.optionalFormString(value.jobTitle),
-            email: this.optionalFormString(value.email),
-            phone: this.optionalFormString(value.phone),
-            alternatePhone: this.optionalFormString(value.alternatePhone),
-            countryId: value.countryId ?? '',
+            clientId: value.clientId ?? '',
+            clientContactId: value.clientContactId ?? '',
+            companyName: '',
+            website: null,
+            contactPersonName: '',
+            jobTitle: null,
+            email: null,
+            phone: null,
+            alternatePhone: null,
+            countryId: '00000000-0000-0000-0000-000000000000',
             address: this.optionalFormString(value.address),
-            industryId: this.optionalFormString(value.industryId),
+            industryId: null,
             notes: null,
             leadScore: value.leadScore,
             productIds: value.productIds ?? []
@@ -723,6 +720,15 @@ export class LeadDetail implements OnInit, OnDestroy {
         }
     }
 
+    private clearUnavailableEditContact(): void {
+        const contactId = this.editForm.controls.clientContactId.value;
+        if (!contactId || this.editContactOptions.some((contact) => contact.id === contactId)) {
+            return;
+        }
+
+        this.editForm.controls.clientContactId.reset('', { emitEvent: false });
+    }
+
     private buildConversionRequest(): ConvertLeadRequest {
         const value = this.conversionForm.getRawValue();
         const request: ConvertLeadRequest = {
@@ -733,27 +739,6 @@ export class LeadDetail implements OnInit, OnDestroy {
             expectedCloseDate: value.expectedCloseDate ? new Date(value.expectedCloseDate).toISOString() : undefined,
             ownerUserId: value.ownerUserId ?? ''
         };
-
-        if (value.clientMode === 'existing') {
-            request.clientId = value.clientId ?? undefined;
-        } else {
-            request.newClient = {
-                name: value.newClientName ?? '',
-                countryId: value.newClientCountryId ?? '',
-                industryId: value.newClientIndustryId ?? undefined
-            };
-        }
-
-        if (value.contactMode === 'existing') {
-            request.contactId = value.contactId ?? undefined;
-        } else {
-            request.newContact = {
-                firstName: value.newContactFirstName ?? '',
-                lastName: value.newContactLastName ?? '',
-                email: value.newContactEmail ?? undefined,
-                phone: value.newContactPhone ?? undefined
-            };
-        }
 
         return request;
     }

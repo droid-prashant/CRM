@@ -5,6 +5,8 @@ using Leads.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Opportunities.Domain.Entities;
 using Products.Domain.Entities;
+using CrmClient = Clients.Domain.Entities.Client;
+using CrmClientContact = Clients.Domain.Entities.ClientContact;
 
 namespace Leads.Infrastructure.Persistence.Data
 {
@@ -28,6 +30,8 @@ namespace Leads.Infrastructure.Persistence.Data
         public DbSet<Industry> Industries { get; set; }
         public DbSet<Client> Clients { get; set; }
         public DbSet<ClientContact> ClientContacts { get; set; }
+        public DbSet<CrmClient> CrmClients { get; set; }
+        public DbSet<CrmClientContact> CrmClientContacts { get; set; }
         public DbSet<Opportunity> Opportunities { get; set; }
         public DbSet<OpportunityStage> OpportunityStages { get; set; }
         public DbSet<OpportunityStageHistory> OpportunityStageHistories { get; set; }
@@ -53,6 +57,10 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.Property(x => x.Email).HasMaxLength(250);
                 entity.Property(x => x.Phone).HasMaxLength(50);
                 entity.Property(x => x.Status).HasConversion<int>();
+                entity.HasIndex(x => x.ClientId);
+                entity.HasIndex(x => x.ClientContactId);
+                entity.HasOne<CrmClient>().WithMany().HasForeignKey(x => x.ClientId);
+                entity.HasOne<CrmClientContact>().WithMany().HasForeignKey(x => x.ClientContactId);
                 entity.HasOne<Opportunity>().WithMany().HasForeignKey(x => x.ConvertedOpportunityId);
                 entity.HasMany(x => x.ProductInterests).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
                 entity.HasMany(x => x.TimelineEntries).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
@@ -91,6 +99,42 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.HasIndex(x => new { x.ClientId, x.Email });
             });
 
+            modelBuilder.Entity<CrmClient>(entity =>
+            {
+                entity.ToTable("Clients", "clients");
+                entity.Property(x => x.ClientCode).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
+                entity.Property(x => x.NormalizedName).HasMaxLength(250).IsRequired();
+                entity.Property(x => x.ShortName).HasMaxLength(100);
+                entity.Property(x => x.Address).HasMaxLength(500);
+                entity.Property(x => x.Website).HasMaxLength(250);
+                entity.Property(x => x.TaxNumber).HasMaxLength(100);
+                entity.Property(x => x.RegistrationNumber).HasMaxLength(100);
+                entity.Property(x => x.Notes).HasMaxLength(2000);
+                entity.Property(x => x.Status).HasConversion<int>();
+                entity.Ignore(x => x.ClientType);
+                entity.Ignore(x => x.Contacts);
+                entity.Ignore(x => x.Products);
+                entity.Ignore(x => x.TimelineEntries);
+            });
+
+            modelBuilder.Entity<CrmClientContact>(entity =>
+            {
+                entity.ToTable("ClientContacts", "clients");
+                entity.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
+                entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
+                entity.Property(x => x.FullName).HasMaxLength(250).IsRequired();
+                entity.Property(x => x.Designation).HasMaxLength(150);
+                entity.Property(x => x.Department).HasMaxLength(150);
+                entity.Property(x => x.Email).HasMaxLength(320);
+                entity.Property(x => x.NormalizedEmail).HasMaxLength(320);
+                entity.Property(x => x.Phone).HasMaxLength(50);
+                entity.Property(x => x.Mobile).HasMaxLength(50);
+                entity.Property(x => x.Notes).HasMaxLength(1000);
+                entity.Property(x => x.Status).HasConversion<int>();
+                entity.Ignore(x => x.Client);
+            });
+
             modelBuilder.Entity<Opportunity>(entity =>
             {
                 entity.HasIndex(x => x.OpportunityNumber).IsUnique();
@@ -104,8 +148,8 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.Property(x => x.LostReason).HasMaxLength(500);
                 entity.HasOne<Lead>().WithMany().HasForeignKey(x => x.LeadId);
                 entity.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId);
-                entity.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId);
-                entity.HasOne<ClientContact>().WithMany().HasForeignKey(x => x.ContactId);
+                entity.HasOne<CrmClient>().WithMany().HasForeignKey(x => x.ClientId);
+                entity.HasOne<CrmClientContact>().WithMany().HasForeignKey(x => x.ContactId);
                 entity.HasOne(x => x.CurrentStage).WithMany().HasForeignKey(x => x.StageId);
             });
 

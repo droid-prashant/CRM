@@ -6,6 +6,10 @@ export interface LeadEditViewModel {
     campaignName?: string;
     sourceStartDate?: string;
     sourceEndDate?: string;
+    clientId?: string;
+    clientContactId?: string;
+    clientName?: string;
+    clientContactName?: string;
     companyName: string;
     website?: string;
     contactPersonName: string;

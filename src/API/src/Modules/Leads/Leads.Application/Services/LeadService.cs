@@ -27,6 +27,7 @@ namespace Leads.Application.Services
         public Task<List<LeadStatusHistoryItemViewModel>?> GetLeadStatusHistoryAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadStatusHistoryAsync(id, cancellationToken);
         public Task<LeadConversionViewModel?> GetLeadConversionAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadConversionAsync(id, cancellationToken);
         public Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken) => _leadRepository.GetClientLookupsAsync(cancellationToken);
+        public Task<List<ContactLookupViewModel>> GetAllClientContactsAsync(CancellationToken cancellationToken) => _leadRepository.GetAllClientContactsAsync(cancellationToken);
         public Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken) => _leadRepository.GetClientContactsAsync(clientId, cancellationToken);
         public Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.DeleteLeadAsync(id, cancellationToken);
 
@@ -38,8 +39,11 @@ namespace Leads.Application.Services
                 return new CreateLeadResult { Errors = errors };
             }
 
-            var hasDuplicateWarning = !string.IsNullOrWhiteSpace(request.Email)
-                && await _leadRepository.DuplicateCompanyEmailExistsAsync(request.CompanyName.Trim(), request.Email.Trim(), cancellationToken);
+            var hasDuplicateWarning = await _leadRepository.ActiveLeadExistsForClientContactAsync(
+                request.ClientId,
+                request.ClientContactId,
+                null,
+                cancellationToken);
 
             var leadNumber = await _leadRepository.GenerateNextLeadNumberAsync(cancellationToken);
             var lead = await _leadRepository.CreateLeadAsync(request, leadNumber, hasDuplicateWarning, cancellationToken);
@@ -60,7 +64,7 @@ namespace Leads.Application.Services
                 return new CreateLeadResult { Errors = new List<string> { "Converted leads cannot be updated." } };
             }
 
-            var errors = await ValidateUpdateRequestAsync(request, cancellationToken);
+            var errors = await ValidateUpdateRequestAsync(id, request, cancellationToken);
             if (errors.Count > 0)
             {
                 return new CreateLeadResult { Errors = errors };
@@ -199,46 +203,24 @@ namespace Leads.Application.Services
         {
             var errors = new List<string>();
 
-            if (request.SourceId == Guid.Empty) errors.Add("SourceId is required.");
-            if (request.CategoryId == Guid.Empty) errors.Add("CategoryId is required.");
-            if (request.CountryId == Guid.Empty) errors.Add("CountryId is required.");
-            if (string.IsNullOrWhiteSpace(request.CompanyName)) errors.Add("CompanyName is required.");
-            if (string.IsNullOrWhiteSpace(request.ContactPersonName)) errors.Add("ContactPersonName is required.");
-            if (string.IsNullOrWhiteSpace(request.Email) && string.IsNullOrWhiteSpace(request.Phone)) errors.Add("At least one contact method, Email or Phone, is required.");
-            if (request.ProductIds.Count == 0) errors.Add("At least one product interest is required.");
-            if (request.ProductIds.Count != request.ProductIds.Distinct().Count()) errors.Add("ProductIds must be unique.");
-
-            if (!string.IsNullOrWhiteSpace(request.Email) && !IsValidEmail(request.Email))
-            {
-                errors.Add("Email must be valid.");
-            }
-
-            if (errors.Count > 0)
-            {
-                return errors;
-            }
-
-            if (!await _leadRepository.SourceExistsAsync(request.SourceId, cancellationToken)) errors.Add("SourceId is invalid.");
-            if (!await _leadRepository.CategoryExistsAsync(request.CategoryId, cancellationToken)) errors.Add("CategoryId is invalid.");
-            if (!await _leadRepository.CountryExistsAsync(request.CountryId, cancellationToken)) errors.Add("CountryId is invalid.");
-            if (request.PartnerId.HasValue && !await _partnerLookupService.PartnerExistsAsync(request.PartnerId.Value, cancellationToken)) errors.Add("PartnerId is invalid.");
-            if (request.IndustryId.HasValue && !await _leadRepository.IndustryExistsAsync(request.IndustryId.Value, cancellationToken)) errors.Add("IndustryId is invalid.");
-
-            errors.AddRange(await ValidateSourceDetailsAsync(
+            errors.AddRange(await ValidateLeadFieldsAsync(
                 request.SourceId,
+                request.CategoryId,
                 request.PartnerId,
                 request.CampaignName,
                 request.SourceStartDate,
                 request.SourceEndDate,
                 request.Address,
+                request.ClientId,
+                request.ClientContactId,
+                request.ProductIds,
+                null,
                 cancellationToken));
-
-            errors.AddRange(await ValidateProductInterestAvailabilityAsync(request.SourceId, request.PartnerId, request.ProductIds, cancellationToken));
 
             return errors;
         }
 
-        private Task<List<string>> ValidateUpdateRequestAsync(UpdateLeadRequest request, CancellationToken cancellationToken)
+        private Task<List<string>> ValidateUpdateRequestAsync(Guid id, UpdateLeadRequest request, CancellationToken cancellationToken)
         {
             return ValidateLeadFieldsAsync(
                 request.SourceId,
@@ -248,13 +230,10 @@ namespace Leads.Application.Services
                 request.SourceStartDate,
                 request.SourceEndDate,
                 request.Address,
-                request.CompanyName,
-                request.ContactPersonName,
-                request.Email,
-                request.Phone,
-                request.CountryId,
-                request.IndustryId,
+                request.ClientId,
+                request.ClientContactId,
                 request.ProductIds,
+                id,
                 cancellationToken);
         }
 
@@ -266,30 +245,20 @@ namespace Leads.Application.Services
             DateTime? sourceStartDate,
             DateTime? sourceEndDate,
             string? address,
-            string companyName,
-            string contactPersonName,
-            string? email,
-            string? phone,
-            Guid countryId,
-            Guid? industryId,
+            Guid clientId,
+            Guid clientContactId,
             List<Guid> productIds,
+            Guid? excludingLeadId,
             CancellationToken cancellationToken)
         {
             var errors = new List<string>();
 
             if (sourceId == Guid.Empty) errors.Add("SourceId is required.");
             if (categoryId == Guid.Empty) errors.Add("CategoryId is required.");
-            if (countryId == Guid.Empty) errors.Add("CountryId is required.");
-            if (string.IsNullOrWhiteSpace(companyName)) errors.Add("CompanyName is required.");
-            if (string.IsNullOrWhiteSpace(contactPersonName)) errors.Add("ContactPersonName is required.");
-            if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(phone)) errors.Add("At least one contact method, Email or Phone, is required.");
+            if (clientId == Guid.Empty) errors.Add("ClientId is required.");
+            if (clientContactId == Guid.Empty) errors.Add("ClientContactId is required.");
             if (productIds.Count == 0) errors.Add("At least one product interest is required.");
             if (productIds.Count != productIds.Distinct().Count()) errors.Add("ProductIds must be unique.");
-
-            if (!string.IsNullOrWhiteSpace(email) && !IsValidEmail(email))
-            {
-                errors.Add("Email must be valid.");
-            }
 
             if (errors.Count > 0)
             {
@@ -298,9 +267,13 @@ namespace Leads.Application.Services
 
             if (!await _leadRepository.SourceExistsAsync(sourceId, cancellationToken)) errors.Add("SourceId is invalid.");
             if (!await _leadRepository.CategoryExistsAsync(categoryId, cancellationToken)) errors.Add("CategoryId is invalid.");
-            if (!await _leadRepository.CountryExistsAsync(countryId, cancellationToken)) errors.Add("CountryId is invalid.");
+            if (!await _leadRepository.ClientExistsAsync(clientId, cancellationToken)) errors.Add("ClientId is invalid.");
+            if (!await _leadRepository.ContactBelongsToClientAsync(clientContactId, clientId, cancellationToken)) errors.Add("ClientContactId does not belong to the selected client.");
             if (partnerId.HasValue && !await _partnerLookupService.PartnerExistsAsync(partnerId.Value, cancellationToken)) errors.Add("PartnerId is invalid.");
-            if (industryId.HasValue && !await _leadRepository.IndustryExistsAsync(industryId.Value, cancellationToken)) errors.Add("IndustryId is invalid.");
+            if (await _leadRepository.ActiveLeadExistsForClientContactAsync(clientId, clientContactId, excludingLeadId, cancellationToken))
+            {
+                errors.Add("An active lead already exists for the selected client contact.");
+            }
 
             errors.AddRange(await ValidateSourceDetailsAsync(sourceId, partnerId, campaignName, sourceStartDate, sourceEndDate, address, cancellationToken));
 
@@ -479,53 +452,9 @@ namespace Leads.Application.Services
                 errors.Add("Opportunity owner must match the assigned lead user.");
             }
 
-            if (!request.ClientId.HasValue && request.NewClient == null)
+            if (!conversion.SelectedClientId.HasValue || !conversion.SelectedContactId.HasValue)
             {
-                errors.Add("ClientId or NewClient is required.");
-            }
-
-            if (request.ClientId.HasValue && request.NewClient != null)
-            {
-                errors.Add("Provide either ClientId or NewClient, not both.");
-            }
-
-            if (request.ClientId.HasValue && !await _leadRepository.ClientExistsAsync(request.ClientId.Value, cancellationToken))
-            {
-                errors.Add("ClientId is invalid.");
-            }
-
-            if (request.NewClient != null)
-            {
-                if (string.IsNullOrWhiteSpace(request.NewClient.Name)) errors.Add("NewClient.Name is required.");
-                if (request.NewClient.CountryId == Guid.Empty || !await _leadRepository.CountryExistsAsync(request.NewClient.CountryId, cancellationToken)) errors.Add("NewClient.CountryId is invalid.");
-                if (request.NewClient.IndustryId.HasValue && !await _leadRepository.IndustryExistsAsync(request.NewClient.IndustryId.Value, cancellationToken)) errors.Add("NewClient.IndustryId is invalid.");
-            }
-
-            if (!request.ContactId.HasValue && request.NewContact == null)
-            {
-                errors.Add("ContactId or NewContact is required.");
-            }
-
-            if (request.ContactId.HasValue && request.NewContact != null)
-            {
-                errors.Add("Provide either ContactId or NewContact, not both.");
-            }
-
-            if (request.ContactId.HasValue && !request.ClientId.HasValue)
-            {
-                errors.Add("Existing contact selection requires an existing ClientId.");
-            }
-
-            if (request.ContactId.HasValue && request.ClientId.HasValue && !await _leadRepository.ContactBelongsToClientAsync(request.ContactId.Value, request.ClientId.Value, cancellationToken))
-            {
-                errors.Add("ContactId does not belong to the selected client.");
-            }
-
-            if (request.NewContact != null)
-            {
-                if (string.IsNullOrWhiteSpace(request.NewContact.FirstName)) errors.Add("NewContact.FirstName is required.");
-                if (string.IsNullOrWhiteSpace(request.NewContact.LastName)) errors.Add("NewContact.LastName is required.");
-                if (!string.IsNullOrWhiteSpace(request.NewContact.Email) && !IsValidEmail(request.NewContact.Email)) errors.Add("NewContact.Email must be valid.");
+                errors.Add("Lead must be linked to a client and contact before conversion.");
             }
 
             return errors;

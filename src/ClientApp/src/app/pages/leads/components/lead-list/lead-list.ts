@@ -22,6 +22,7 @@ import { LookupViewModel } from '../../view-models/lookup.view-model';
     providers: [MessageService]
 })
 export class LeadList implements OnInit {
+    private readonly emptyGuid = '00000000-0000-0000-0000-000000000000';
     title = 'Lead';
     columns = LeadColumns;
     fields: DynamicField[] = [];
@@ -184,16 +185,18 @@ export class LeadList implements OnInit {
             campaignName: this.optionalString(value['campaignName']),
             sourceStartDate: this.optionalString(value['sourceStartDate']),
             sourceEndDate: this.optionalString(value['sourceEndDate']),
-            companyName: String(value['companyName'] ?? ''),
-            website: this.optionalString(value['website']),
-            contactPersonName: String(value['contactPersonName'] ?? ''),
-            jobTitle: this.optionalString(value['jobTitle']),
-            email: this.optionalString(value['email']),
-            phone: this.optionalString(value['phone']),
-            alternatePhone: this.optionalString(value['alternatePhone']),
-            countryId: String(value['countryId']),
+            clientId: String(value['clientId'] ?? ''),
+            clientContactId: String(value['clientContactId'] ?? ''),
+            companyName: '',
+            website: null,
+            contactPersonName: '',
+            jobTitle: null,
+            email: null,
+            phone: null,
+            alternatePhone: null,
+            countryId: this.emptyGuid,
             address: this.optionalString(value['address']),
-            industryId: this.optionalString(value['industryId']),
+            industryId: null,
             notes: null,
             leadScore: typeof value['leadScore'] === 'number' ? value['leadScore'] : null,
             productIds: Array.isArray(value['productIds']) ? value['productIds'].map(String) : []
@@ -207,7 +210,16 @@ export class LeadList implements OnInit {
             partners: this.toOptions(lookups.partners),
             countries: this.toOptions(lookups.countries),
             industries: this.toOptions(lookups.industries),
-            products: this.toOptions(lookups.products)
+            products: this.toOptions(lookups.products),
+            clients: lookups.clients.map((client) => ({
+                label: client.name,
+                value: client.id
+            })),
+            contacts: lookups.contacts.map((contact) => ({
+                label: contact.email ? `${contact.fullName} (${contact.email})` : contact.fullName,
+                value: contact.id,
+                clientId: contact.clientId
+            }))
         };
     }
 

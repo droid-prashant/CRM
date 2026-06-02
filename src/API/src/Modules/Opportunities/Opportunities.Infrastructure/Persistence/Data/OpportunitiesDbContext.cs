@@ -4,6 +4,8 @@ using Leads.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Opportunities.Domain.Entities;
 using Products.Domain.Entities;
+using CrmClient = Clients.Domain.Entities.Client;
+using CrmClientContact = Clients.Domain.Entities.ClientContact;
 
 namespace Opportunities.Infrastructure.Persistence.Data
 {
@@ -21,6 +23,8 @@ namespace Opportunities.Infrastructure.Persistence.Data
         public DbSet<Product> Products { get; set; }
         public DbSet<Client> Clients { get; set; }
         public DbSet<ClientContact> ClientContacts { get; set; }
+        public DbSet<CrmClient> CrmClients { get; set; }
+        public DbSet<CrmClientContact> CrmClientContacts { get; set; }
         public DbSet<Country> Countries { get; set; }
         public DbSet<OpportunityStage> OpportunityStages { get; set; }
         public DbSet<OpportunityStageHistory> OpportunityStageHistories { get; set; }
@@ -50,8 +54,8 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Property(x => x.LostReason).HasMaxLength(500);
                 entity.HasOne<Lead>().WithMany().HasForeignKey(x => x.LeadId);
                 entity.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId);
-                entity.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId);
-                entity.HasOne<ClientContact>().WithMany().HasForeignKey(x => x.ContactId);
+                entity.HasOne<CrmClient>().WithMany().HasForeignKey(x => x.ClientId);
+                entity.HasOne<CrmClientContact>().WithMany().HasForeignKey(x => x.ContactId);
                 entity.HasOne(x => x.CurrentStage).WithMany().HasForeignKey(x => x.StageId);
             });
 
@@ -124,6 +128,30 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
                 entity.Property(x => x.Email).HasMaxLength(250);
                 entity.Property(x => x.Phone).HasMaxLength(50);
+                entity.Ignore(x => x.Client);
+            });
+
+            modelBuilder.Entity<CrmClient>(entity =>
+            {
+                entity.ToTable("Clients", "clients");
+                entity.Property(x => x.ClientCode).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
+                entity.Property(x => x.NormalizedName).HasMaxLength(250).IsRequired();
+                entity.Property(x => x.Status).HasConversion<int>();
+                entity.Ignore(x => x.ClientType);
+                entity.Ignore(x => x.Contacts);
+                entity.Ignore(x => x.Products);
+                entity.Ignore(x => x.TimelineEntries);
+            });
+
+            modelBuilder.Entity<CrmClientContact>(entity =>
+            {
+                entity.ToTable("ClientContacts", "clients");
+                entity.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
+                entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
+                entity.Property(x => x.FullName).HasMaxLength(250).IsRequired();
+                entity.Property(x => x.NormalizedEmail).HasMaxLength(320);
+                entity.Property(x => x.Status).HasConversion<int>();
                 entity.Ignore(x => x.Client);
             });
         }
