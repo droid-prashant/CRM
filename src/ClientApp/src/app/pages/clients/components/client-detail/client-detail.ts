@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { catchError, forkJoin, of } from 'rxjs';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
@@ -18,30 +19,46 @@ import { ClientApiService } from '../../services/client-api.service';
 import { ClientContactViewModel } from '../../view-models/client-contact.view-model';
 import { ClientDetailViewModel, ClientTimelineEntryViewModel } from '../../view-models/client-detail.view-model';
 import { ClientLookupBundleViewModel } from '../../view-models/client-lookup-bundle.view-model';
+import { ClientProductLookupBundleViewModel } from '../../view-models/client-product-lookup-bundle.view-model';
+import { ClientProductViewModel } from '../../view-models/client-product.view-model';
+import { ClientRelatedRecordsSummaryViewModel } from '../../view-models/client-related-records-summary.view-model';
+import { ClientTimelineResponseViewModel, ClientTimelineViewModel } from '../../view-models/client-timeline.view-model';
 
 @Component({
     selector: 'app-client-detail',
     standalone: true,
-    imports: [ButtonModule, CommonModule, DialogModule, InputTextModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, TextareaModule, ToastModule],
+    imports: [ButtonModule, CommonModule, DialogModule, FormsModule, InputTextModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, TextareaModule, ToastModule],
     templateUrl: './client-detail.html',
     providers: [MessageService]
 })
 export class ClientDetail implements OnInit {
+    readonly timelinePageSize = 10;
     client?: ClientDetailViewModel;
     contacts: ClientContactViewModel[] = [];
+    productMappings: ClientProductViewModel[] = [];
+    timelineResponse: ClientTimelineResponseViewModel = this.emptyTimelineResponse();
+    relatedSummary: ClientRelatedRecordsSummaryViewModel = this.emptyRelatedSummary();
     lookups?: ClientLookupBundleViewModel;
+    productLookups?: ClientProductLookupBundleViewModel;
     isLoading = true;
     isSavingStatus = false;
     isSavingClient = false;
     isSavingContact = false;
+    isSavingProduct = false;
+    isLoadingTimeline = false;
     isLoadingEdit = false;
+    isLoadingProductLookups = false;
     editDialog = false;
     contactDialog = false;
+    productDialog = false;
     contactMode: 'create' | 'update' = 'create';
+    productMode: 'create' | 'update' = 'create';
     selectedContact?: ClientContactViewModel;
+    selectedProduct?: ClientProductViewModel;
     errorMessage = '';
     canEditClient = false;
     canDeleteClient = false;
+    timelineActivityType: string | null = null;
     readonly statusOptions = [
         { label: 'Active', value: 1 },
         { label: 'Inactive', value: 2 }
@@ -79,6 +96,16 @@ export class ClientDetail implements OnInit {
         notes: ['']
     });
 
+    productForm = this.fb.group({
+        productId: ['', Validators.required],
+        relationshipStatus: ['', Validators.required],
+        opportunityId: [''],
+        ownerUserId: [''],
+        startDate: [''],
+        endDate: [''],
+        notes: ['']
+    });
+
     constructor(
         private readonly route: ActivatedRoute,
         private readonly router: Router,
@@ -103,11 +130,17 @@ export class ClientDetail implements OnInit {
 
         forkJoin({
             client: this.clientApiService.getClient(id),
-            contacts: this.clientApiService.getClientContacts(id)
+            contacts: this.clientApiService.getClientContacts(id).pipe(catchError(() => of([] as ClientContactViewModel[]))),
+            products: this.clientApiService.getClientProducts(id).pipe(catchError(() => of([] as ClientProductViewModel[]))),
+            timeline: this.clientApiService.getClientTimeline(id, { pageNumber: 1, pageSize: this.timelinePageSize }).pipe(catchError(() => of(this.emptyTimelineResponse()))),
+            relatedSummary: this.clientApiService.getClientRelatedSummary(id).pipe(catchError(() => of(this.emptyRelatedSummary())))
         }).subscribe({
-            next: ({ client, contacts }) => {
+            next: ({ client, contacts, products, timeline, relatedSummary }) => {
                 this.client = client;
                 this.contacts = contacts;
+                this.productMappings = products;
+                this.timelineResponse = timeline;
+                this.relatedSummary = relatedSummary;
                 this.errorMessage = '';
                 this.isLoading = false;
             },
@@ -217,6 +250,37 @@ export class ClientDetail implements OnInit {
                     const detail = error.error?.errors?.join?.(' ') ?? 'Client could not be updated.';
                     this.messageService.add({ severity: 'error', summary: 'Update failed', detail, life: 6000 });
                     this.isSavingClient = false;
+                }
+            });
+    }
+
+    loadTimeline(resetPage = true): void {
+        if (!this.client || this.isLoadingTimeline) {
+            return;
+        }
+
+        const nextPage = resetPage ? 1 : this.timelineResponse.pageNumber + 1;
+        this.isLoadingTimeline = true;
+
+        this.clientApiService
+            .getClientTimeline(this.client.id, {
+                activityType: this.timelineActivityType,
+                pageNumber: nextPage,
+                pageSize: this.timelinePageSize
+            })
+            .subscribe({
+                next: (response) => {
+                    this.timelineResponse = resetPage
+                        ? response
+                        : {
+                              ...response,
+                              items: [...this.timelineResponse.items, ...response.items]
+                          };
+                    this.isLoadingTimeline = false;
+                },
+                error: () => {
+                    this.messageService.add({ severity: 'error', summary: 'Timeline unavailable', detail: 'Client timeline could not be loaded.', life: 5000 });
+                    this.isLoadingTimeline = false;
                 }
             });
     }
@@ -361,6 +425,89 @@ export class ClientDetail implements OnInit {
         });
     }
 
+    openAddProductDialog(): void {
+        if (!this.client || !this.canEditClient) {
+            return;
+        }
+
+        this.productMode = 'create';
+        this.selectedProduct = undefined;
+        this.productForm.reset({
+            productId: '',
+            relationshipStatus: '',
+            opportunityId: '',
+            ownerUserId: '',
+            startDate: '',
+            endDate: '',
+            notes: ''
+        });
+        this.productDialog = true;
+        this.loadProductLookups();
+    }
+
+    openEditProductDialog(product: ClientProductViewModel): void {
+        if (!this.canEditClient) {
+            return;
+        }
+
+        this.productMode = 'update';
+        this.selectedProduct = product;
+        this.productForm.reset({
+            productId: product.productId,
+            relationshipStatus: product.relationshipStatus,
+            opportunityId: product.opportunityId ?? '',
+            ownerUserId: product.ownerUserId ?? '',
+            startDate: this.toDateInputValue(product.startDate),
+            endDate: this.toDateInputValue(product.endDate),
+            notes: product.notes ?? ''
+        });
+        this.productDialog = true;
+        this.loadProductLookups();
+    }
+
+    saveProductMapping(): void {
+        if (!this.client) {
+            return;
+        }
+
+        this.productForm.markAllAsTouched();
+        if (this.productForm.invalid) {
+            return;
+        }
+
+        const value = this.productForm.getRawValue();
+        this.isSavingProduct = true;
+
+        const request = {
+            productId: value.productId ?? '',
+            relationshipStatus: value.relationshipStatus ?? '',
+            opportunityId: this.optionalFormString(value.opportunityId),
+            ownerUserId: this.optionalFormString(value.ownerUserId),
+            startDate: this.optionalFormString(value.startDate),
+            endDate: this.optionalFormString(value.endDate),
+            notes: this.optionalFormString(value.notes)
+        };
+
+        const saveRequest = this.productMode === 'create'
+            ? this.clientApiService.createClientProduct({ clientId: this.client.id, ...request })
+            : this.clientApiService.updateClientProduct(this.selectedProduct?.id ?? '', request);
+
+        saveRequest.subscribe({
+            next: () => {
+                const summary = this.productMode === 'create' ? 'Product mapped' : 'Product mapping updated';
+                this.messageService.add({ severity: 'success', summary, detail: 'Client product mapping was saved.', life: 3000 });
+                this.productDialog = false;
+                this.loadClient();
+                this.isSavingProduct = false;
+            },
+            error: (error) => {
+                const detail = error.error?.errors?.join?.(' ') ?? 'Product mapping could not be saved.';
+                this.messageService.add({ severity: 'error', summary: 'Product mapping failed', detail, life: 6000 });
+                this.isSavingProduct = false;
+            }
+        });
+    }
+
     backToList(): void {
         this.router.navigate(['/pages/clients']);
     }
@@ -409,12 +556,23 @@ export class ClientDetail implements OnInit {
             .toUpperCase();
     }
 
-    get timeline(): ClientTimelineEntryViewModel[] {
-        return this.client?.timeline?.length ? this.client.timeline : (this.client?.timelineEntries ?? []);
+    get timeline(): ClientTimelineViewModel[] {
+        return this.timelineResponse.items;
+    }
+
+    get timelineActivityOptions(): { label: string; value: string }[] {
+        return this.timelineResponse.activityTypes.map((activityType) => ({ label: activityType, value: activityType }));
+    }
+
+    get canLoadMoreTimeline(): boolean {
+        return this.timelineResponse.pageNumber < this.timelineResponse.totalPages;
     }
 
     timelineIcon(eventType?: string): string {
         const normalized = eventType?.toLowerCase() ?? '';
+        if (normalized.includes('opportunity')) return 'pi pi-chart-line';
+        if (normalized.includes('interaction') || normalized.includes('call') || normalized.includes('meeting')) return 'pi pi-comments';
+        if (normalized.includes('lead')) return 'pi pi-briefcase';
         if (normalized.includes('created')) return 'pi pi-plus';
         if (normalized.includes('updated')) return 'pi pi-pencil';
         if (normalized.includes('activated')) return 'pi pi-check-circle';
@@ -453,7 +611,50 @@ export class ClientDetail implements OnInit {
         });
     }
 
+    private loadProductLookups(): void {
+        if (!this.client || this.productLookups || this.isLoadingProductLookups) {
+            return;
+        }
+
+        this.isLoadingProductLookups = true;
+        this.clientApiService.getClientProductLookups(this.client.id).subscribe({
+            next: (lookups) => {
+                this.productLookups = lookups;
+                this.isLoadingProductLookups = false;
+            },
+            error: () => {
+                this.messageService.add({ severity: 'error', summary: 'Product lookups unavailable', detail: 'Product mapping lookup values could not be loaded.', life: 5000 });
+                this.isLoadingProductLookups = false;
+            }
+        });
+    }
+
     private optionalFormString(value: string | null | undefined): string | null {
         return value?.trim() ? value.trim() : null;
+    }
+
+    private toDateInputValue(value?: string | null): string {
+        return value ? new Date(value).toISOString().slice(0, 10) : '';
+    }
+
+    private emptyTimelineResponse(): ClientTimelineResponseViewModel {
+        return {
+            items: [],
+            pageNumber: 1,
+            pageSize: this.timelinePageSize,
+            totalCount: 0,
+            totalPages: 0,
+            activityTypes: []
+        };
+    }
+
+    private emptyRelatedSummary(): ClientRelatedRecordsSummaryViewModel {
+        return {
+            totalOpportunities: 0,
+            totalRfps: 0,
+            totalTasks: 0,
+            totalDocuments: 0,
+            totalInteractions: 0
+        };
     }
 }

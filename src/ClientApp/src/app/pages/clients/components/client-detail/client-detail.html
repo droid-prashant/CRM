@@ -56,12 +56,12 @@
             </div>
             <div class="col-span-12 rounded-md border border-surface-200 px-4 py-3 dark:border-surface-700 md:col-span-3">
                 <div class="text-xs font-semibold uppercase text-surface-500">Products</div>
-                <div class="mt-1 font-semibold text-surface-900 dark:text-surface-0">{{ client.products.length }}</div>
+                <div class="mt-1 font-semibold text-surface-900 dark:text-surface-0">{{ productMappings.length }}</div>
                 <div class="mt-1 text-xs text-surface-500">Mapped products and owners</div>
             </div>
             <div class="col-span-12 rounded-md border border-surface-200 px-4 py-3 dark:border-surface-700 md:col-span-3">
                 <div class="text-xs font-semibold uppercase text-surface-500">Opportunities</div>
-                <div class="mt-1 font-semibold text-surface-900 dark:text-surface-0">{{ client.opportunities.length }}</div>
+                <div class="mt-1 font-semibold text-surface-900 dark:text-surface-0">{{ relatedSummary.totalOpportunities }}</div>
                 <div class="mt-1 text-xs text-surface-500">Commercial pipeline items</div>
             </div>
         </div>
@@ -179,15 +179,25 @@
             <div class="mt-4 rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Product Mapping</h3>
-                    <span class="rounded-md bg-surface-100 px-3 py-1 text-sm font-medium text-surface-700 dark:bg-surface-800 dark:text-surface-200">{{ client.products.length }} item(s)</span>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="rounded-md bg-surface-100 px-3 py-1 text-sm font-medium text-surface-700 dark:bg-surface-800 dark:text-surface-200">{{ productMappings.length }} item(s)</span>
+                        @if (canEditClient) {
+                            <p-button label="Add Product" icon="pi pi-plus" size="small" outlined (onClick)="openAddProductDialog()" />
+                        }
+                    </div>
                 </div>
-                <p-table [value]="client.products" [tableStyle]="{ 'min-width': '48rem' }">
+                <p-table [value]="productMappings" [tableStyle]="{ 'min-width': '68rem' }">
                     <ng-template #header>
                         <tr>
                             <th>Code</th>
                             <th>Product</th>
                             <th>Relationship</th>
+                            <th>Opportunity</th>
                             <th>Owner</th>
+                            <th>Dates</th>
+                            @if (canEditClient) {
+                                <th class="w-20">Actions</th>
+                            }
                         </tr>
                     </ng-template>
                     <ng-template #body let-product>
@@ -195,12 +205,25 @@
                             <td class="font-medium">{{ product.productCode }}</td>
                             <td>{{ product.productName }}</td>
                             <td>{{ optional(product.relationshipStatus) }}</td>
+                            <td>{{ optional(product.opportunityNumber || product.opportunityTitle) }}</td>
                             <td>{{ optional(product.ownerUserName) }}</td>
+                            <td>
+                                @if (product.startDate || product.endDate) {
+                                    <span>{{ formatDateOnly(product.startDate) }} - {{ formatDateOnly(product.endDate) }}</span>
+                                } @else {
+                                    <span>Not set</span>
+                                }
+                            </td>
+                            @if (canEditClient) {
+                                <td>
+                                    <p-button icon="pi pi-pencil" text rounded severity="secondary" (onClick)="openEditProductDialog(product)" />
+                                </td>
+                            }
                         </tr>
                     </ng-template>
                     <ng-template #emptymessage>
                         <tr>
-                            <td colspan="4">No products mapped to this client.</td>
+                            <td [attr.colspan]="canEditClient ? 7 : 6">No products mapped to this client.</td>
                         </tr>
                     </ng-template>
                 </p-table>
@@ -243,6 +266,32 @@
 
         <aside class="col-span-12 xl:col-span-4">
             <div class="rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Related Summary</h3>
+                <div class="mt-4 grid grid-cols-2 gap-3">
+                    <div class="rounded-md border border-surface-200 px-3 py-2 dark:border-surface-700">
+                        <div class="text-xs uppercase text-surface-500">Opportunities</div>
+                        <div class="mt-1 text-lg font-semibold">{{ relatedSummary.totalOpportunities }}</div>
+                    </div>
+                    <div class="rounded-md border border-surface-200 px-3 py-2 dark:border-surface-700">
+                        <div class="text-xs uppercase text-surface-500">Interactions</div>
+                        <div class="mt-1 text-lg font-semibold">{{ relatedSummary.totalInteractions }}</div>
+                    </div>
+                    <div class="rounded-md border border-surface-200 px-3 py-2 dark:border-surface-700">
+                        <div class="text-xs uppercase text-surface-500">RFPs</div>
+                        <div class="mt-1 text-lg font-semibold">{{ relatedSummary.totalRfps }}</div>
+                    </div>
+                    <div class="rounded-md border border-surface-200 px-3 py-2 dark:border-surface-700">
+                        <div class="text-xs uppercase text-surface-500">Tasks</div>
+                        <div class="mt-1 text-lg font-semibold">{{ relatedSummary.totalTasks }}</div>
+                    </div>
+                    <div class="col-span-2 rounded-md border border-surface-200 px-3 py-2 dark:border-surface-700">
+                        <div class="text-xs uppercase text-surface-500">Documents</div>
+                        <div class="mt-1 text-lg font-semibold">{{ relatedSummary.totalDocuments }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
                 <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Related RFPs</h3>
                 @if (client.rfps.length) {
                     <div class="mt-4 flex flex-col gap-3">
@@ -304,22 +353,51 @@
             </div>
 
             <div class="mt-4 rounded-lg border border-surface-200 bg-surface-0 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Timeline</h3>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="m-0 text-lg font-semibold text-surface-900 dark:text-surface-0">Timeline</h3>
+                        <div class="mt-1 text-sm text-surface-500">{{ timelineResponse.totalCount }} activity item(s)</div>
+                    </div>
+                    <p-select
+                        [options]="timelineActivityOptions"
+                        optionLabel="label"
+                        optionValue="value"
+                        [(ngModel)]="timelineActivityType"
+                        [showClear]="true"
+                        placeholder="All activity"
+                        appendTo="body"
+                        class="min-w-44"
+                        (onChange)="loadTimeline(true)"
+                    />
+                </div>
                 @if (timeline.length) {
                     <div class="mt-4 flex flex-col gap-3">
-                        @for (entry of timeline; track entry.id) {
+                        @for (entry of timeline; track entry.entityId) {
                             <article class="flex gap-3 rounded-md border border-surface-200 p-4 dark:border-surface-700">
                                 <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-100 text-primary dark:bg-surface-800">
-                                    <i [ngClass]="timelineIcon(entry.eventType)"></i>
+                                    <i [ngClass]="timelineIcon(entry.activityType)"></i>
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="font-semibold text-surface-900 dark:text-surface-0">{{ entry.eventType }}</div>
-                                    <div class="mt-1 text-sm leading-6 text-surface-700 dark:text-surface-200">{{ entry.description }}</div>
-                                    <div class="mt-1 text-xs text-surface-500">{{ formatDate(entry.createdAt) }}</div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <div class="font-semibold text-surface-900 dark:text-surface-0">{{ entry.title }}</div>
+                                        <p-tag severity="info" [value]="entry.activityType" />
+                                    </div>
+                                    <div class="mt-1 text-sm leading-6 text-surface-700 dark:text-surface-200">{{ optional(entry.description) }}</div>
+                                    <div class="mt-1 text-xs text-surface-500">
+                                        {{ formatDate(entry.activityDate) }}
+                                        @if (entry.createdByUserName) {
+                                            <span>/ {{ entry.createdByUserName }}</span>
+                                        }
+                                    </div>
                                 </div>
                             </article>
                         }
                     </div>
+                    @if (canLoadMoreTimeline) {
+                        <div class="mt-4 text-center">
+                            <p-button label="Load More" icon="pi pi-chevron-down" outlined size="small" [loading]="isLoadingTimeline" (onClick)="loadTimeline(false)" />
+                        </div>
+                    }
                 } @else {
                     <div class="mt-4 rounded-md border border-dashed border-surface-300 p-6 text-center text-surface-500 dark:border-surface-700">
                         No timeline activity recorded.
@@ -465,6 +543,57 @@
         <ng-template #footer>
             <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSavingContact" (onClick)="contactDialog = false" />
             <p-button label="Save Contact" icon="pi pi-check" [loading]="isSavingContact" (onClick)="saveContact()" />
+        </ng-template>
+    </p-dialog>
+
+    <p-dialog [(visible)]="productDialog" [modal]="true" [style]="{ width: 'min(920px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" [header]="productMode === 'create' ? 'Add Product Mapping' : 'Edit Product Mapping'">
+        <form [formGroup]="productForm" class="grid grid-cols-12 gap-4">
+            @if (productLookups) {
+                <div class="col-span-12 md:col-span-6">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Product <span class="text-red-500">*</span></label>
+                    <p-select [options]="productLookups.products" optionLabel="name" optionValue="id" appendTo="body" formControlName="productId" class="w-full" />
+                    @if (productForm.get('productId')?.errors && productForm.get('productId')?.touched) {
+                        <span class="p-error mt-1 block text-sm text-red-600">Product is required</span>
+                    }
+                </div>
+                <div class="col-span-12 md:col-span-6">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Relationship Status <span class="text-red-500">*</span></label>
+                    <p-select [options]="productLookups.relationshipStatuses" optionLabel="name" optionValue="code" appendTo="body" formControlName="relationshipStatus" class="w-full" />
+                    @if (productForm.get('relationshipStatus')?.errors && productForm.get('relationshipStatus')?.touched) {
+                        <span class="p-error mt-1 block text-sm text-red-600">Relationship status is required</span>
+                    }
+                </div>
+                <div class="col-span-12 md:col-span-6">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Opportunity</label>
+                    <p-select [options]="productLookups.opportunities" optionLabel="displayName" optionValue="id" appendTo="body" formControlName="opportunityId" [showClear]="true" class="w-full" />
+                </div>
+                <div class="col-span-12 md:col-span-6">
+                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Owner</label>
+                    <p-select [options]="productLookups.owners" optionLabel="fullName" optionValue="id" appendTo="body" formControlName="ownerUserId" [showClear]="true" class="w-full" />
+                </div>
+            } @else {
+                <div class="col-span-12 rounded-md border border-dashed border-surface-300 p-4 text-sm text-surface-500 dark:border-surface-700">
+                    Loading product lookup values...
+                </div>
+            }
+
+            <div class="col-span-12 md:col-span-6">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Start Date</label>
+                <input pInputText type="date" formControlName="startDate" class="w-full" />
+            </div>
+            <div class="col-span-12 md:col-span-6">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">End Date</label>
+                <input pInputText type="date" formControlName="endDate" class="w-full" />
+            </div>
+            <div class="col-span-12">
+                <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Notes</label>
+                <textarea pTextarea rows="3" formControlName="notes" class="w-full"></textarea>
+            </div>
+        </form>
+
+        <ng-template #footer>
+            <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSavingProduct" (onClick)="productDialog = false" />
+            <p-button label="Save Mapping" icon="pi pi-check" [loading]="isSavingProduct" [disabled]="!productLookups" (onClick)="saveProductMapping()" />
         </ng-template>
     </p-dialog>
 }

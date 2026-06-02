@@ -68,6 +68,17 @@ namespace Clients.Application.Services
             return client;
         }
 
+        public Task<ClientTimelineResponseViewModel?> GetClientTimelineAsync(Guid id, ClientTimelineQueryRequest request, CancellationToken cancellationToken)
+        {
+            Clean(request);
+            return _clientRepository.GetClientTimelineAsync(id, request, cancellationToken);
+        }
+
+        public Task<ClientRelatedRecordsSummaryViewModel?> GetRelatedRecordsSummaryAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return _clientRepository.GetRelatedRecordsSummaryAsync(id, cancellationToken);
+        }
+
         public Task<ClientEditViewModel?> GetClientEditAsync(Guid id, CancellationToken cancellationToken)
         {
             return _clientRepository.GetClientEditAsync(id, cancellationToken);
@@ -334,6 +345,13 @@ namespace Clients.Application.Services
             if (request.CountryId == Guid.Empty) request.CountryId = null;
             if (request.IndustryId == Guid.Empty) request.IndustryId = null;
             if (request.AccountOwnerUserId == Guid.Empty) request.AccountOwnerUserId = null;
+        }
+
+        private static void Clean(ClientTimelineQueryRequest request)
+        {
+            request.ActivityType = CleanOptional(request.ActivityType);
+            request.PageNumber = Math.Max(1, request.PageNumber);
+            request.PageSize = Math.Clamp(request.PageSize, 1, 100);
         }
 
         private static bool IsAccountOwnerSort(string? sortBy) => string.Equals(sortBy?.Trim(), "accountOwnerUserName", StringComparison.OrdinalIgnoreCase);

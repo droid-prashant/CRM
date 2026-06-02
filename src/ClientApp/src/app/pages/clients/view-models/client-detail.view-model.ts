@@ -25,7 +25,14 @@ export interface ClientProductSummaryViewModel {
     productCode: string;
     productName: string;
     relationshipStatus: string;
+    opportunityId?: string | null;
+    opportunityNumber?: string | null;
+    opportunityTitle?: string | null;
+    ownerUserId?: string | null;
     ownerUserName?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    notes?: string | null;
 }
 
 export interface ClientRelatedOpportunityViewModel {

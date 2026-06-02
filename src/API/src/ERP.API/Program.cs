@@ -38,6 +38,7 @@ builder.Services.RegisterAllModules(builder.Configuration);
 
 var app = builder.Build();
 
+await app.ApplyModuleMigrationsAsync();
 await SeedData.InitializeDefaultData(app);
 
 // Configure the HTTP request pipeline.

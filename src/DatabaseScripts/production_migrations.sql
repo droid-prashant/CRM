@@ -1090,4 +1090,51 @@ BEGIN
 END
 $migration$;
 
+-- -------------------------------------------------------------------------
+-- 20260528140000_ClientProductMappings
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260528140000_ClientProductMappings') THEN
+        RETURN;
+    END IF;
+
+    CREATE TABLE IF NOT EXISTS "clients"."ClientProducts" (
+        "Id" uuid NOT NULL,
+        "ClientId" uuid NOT NULL,
+        "ProductId" uuid NOT NULL,
+        "RelationshipStatus" character varying(100) NOT NULL,
+        "OpportunityId" uuid NULL,
+        "OwnerUserId" uuid NULL,
+        "StartDate" timestamp with time zone NULL,
+        "EndDate" timestamp with time zone NULL,
+        "Notes" character varying(1000) NULL,
+        "IsDeleted" boolean NOT NULL DEFAULT false,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL DEFAULT true,
+        CONSTRAINT "PK_ClientProducts" PRIMARY KEY ("Id")
+    );
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_ClientProducts_Clients_ClientId') THEN
+        ALTER TABLE "clients"."ClientProducts" ADD CONSTRAINT "FK_ClientProducts_Clients_ClientId"
+        FOREIGN KEY ("ClientId") REFERENCES "clients"."Clients" ("Id") ON DELETE CASCADE;
+    END IF;
+
+    CREATE INDEX IF NOT EXISTS "IX_ClientProducts_ClientId" ON "clients"."ClientProducts" ("ClientId");
+    CREATE INDEX IF NOT EXISTS "IX_ClientProducts_ProductId" ON "clients"."ClientProducts" ("ProductId");
+    CREATE INDEX IF NOT EXISTS "IX_ClientProducts_OpportunityId" ON "clients"."ClientProducts" ("OpportunityId");
+    CREATE INDEX IF NOT EXISTS "IX_ClientProducts_OwnerUserId" ON "clients"."ClientProducts" ("OwnerUserId");
+    CREATE UNIQUE INDEX IF NOT EXISTS "IX_ClientProducts_ClientId_ProductId"
+        ON "clients"."ClientProducts" ("ClientId", "ProductId")
+        WHERE "IsDeleted" = false;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260528140000_ClientProductMappings', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
 COMMIT;

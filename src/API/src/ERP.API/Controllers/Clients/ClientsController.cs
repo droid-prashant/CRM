@@ -11,11 +11,13 @@ namespace ERP.API.Controllers.Clients
     {
         private readonly IClientService _clientService;
         private readonly IClientContactService _contactService;
+        private readonly IClientProductService _productService;
 
-        public ClientsController(IClientService clientService, IClientContactService contactService)
+        public ClientsController(IClientService clientService, IClientContactService contactService, IClientProductService productService)
         {
             _clientService = clientService;
             _contactService = contactService;
+            _productService = productService;
         }
 
         [HttpGet]
@@ -41,7 +43,7 @@ namespace ERP.API.Controllers.Clients
         [HttpGet("{id:guid}")]
         [Authorize(Policy = PermissionPolicyNames.ClientsView)]
         public async Task<ActionResult<ClientDetailViewModel>> GetClient(Guid id, CancellationToken cancellationToken)
-        {
+            {
             var client = await _clientService.GetClientDetailAsync(id, cancellationToken);
             return client == null ? NotFound() : client;
         }
@@ -52,6 +54,38 @@ namespace ERP.API.Controllers.Clients
         {
             var contacts = await _contactService.GetContactsAsync(id, cancellationToken);
             return contacts == null ? NotFound() : contacts;
+        }
+
+        [HttpGet("{id:guid}/timeline")]
+        [Authorize(Policy = PermissionPolicyNames.ClientsView)]
+        public async Task<ActionResult<ClientTimelineResponseViewModel>> GetClientTimeline(Guid id, [FromQuery] ClientTimelineQueryRequest request, CancellationToken cancellationToken)
+        {
+            var timeline = await _clientService.GetClientTimelineAsync(id, request, cancellationToken);
+            return timeline == null ? NotFound() : timeline;
+        }
+
+        [HttpGet("{id:guid}/related-summary")]
+        [Authorize(Policy = PermissionPolicyNames.ClientsView)]
+        public async Task<ActionResult<ClientRelatedRecordsSummaryViewModel>> GetClientRelatedSummary(Guid id, CancellationToken cancellationToken)
+        {
+            var summary = await _clientService.GetRelatedRecordsSummaryAsync(id, cancellationToken);
+            return summary == null ? NotFound() : summary;
+        }
+
+        [HttpGet("{id:guid}/products")]
+        [Authorize(Policy = PermissionPolicyNames.ClientsView)]
+        public async Task<ActionResult<List<ClientProductViewModel>>> GetClientProducts(Guid id, CancellationToken cancellationToken)
+        {
+            var products = await _productService.GetProductsAsync(id, cancellationToken);
+            return products == null ? NotFound() : products;
+        }
+
+        [HttpGet("{id:guid}/products/lookups")]
+        [Authorize(Policy = PermissionPolicyNames.ClientsView)]
+        public async Task<ActionResult<ClientProductLookupBundleViewModel>> GetClientProductLookups(Guid id, CancellationToken cancellationToken)
+        {
+            var lookups = await _productService.GetLookupsAsync(id, cancellationToken);
+            return lookups == null ? NotFound() : lookups;
         }
 
         [HttpGet("{id:guid}/edit")]

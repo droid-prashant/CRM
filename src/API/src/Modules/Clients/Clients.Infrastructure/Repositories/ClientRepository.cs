@@ -5,6 +5,7 @@ using Clients.Domain.Entities;
 using Clients.Domain.Enums;
 using Clients.Infrastructure.Persistence.Data;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Clients.Infrastructure.Repositories
 {
@@ -86,6 +87,88 @@ namespace Clients.Infrastructure.Repositories
                 .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
             return client == null ? null : await MapClientDetailAsync(client, cancellationToken);
+        }
+
+        public async Task<ClientTimelineResponseViewModel?> GetClientTimelineAsync(Guid id, ClientTimelineQueryRequest request, CancellationToken cancellationToken)
+        {
+            if (!await ClientExistsAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            var items = await BuildTimelineAsync(id, cancellationToken);
+            var activityTypes = items
+                .Select(item => item.ActivityType)
+                .Where(type => !string.IsNullOrWhiteSpace(type))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(type => type)
+                .ToList();
+
+            if (!string.IsNullOrWhiteSpace(request.ActivityType))
+            {
+                items = items
+                    .Where(item => string.Equals(item.ActivityType, request.ActivityType, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(item.EntityType, request.ActivityType, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            var totalCount = items.Count;
+            var page = Math.Max(request.PageNumber, 1);
+            var pageSize = Math.Clamp(request.PageSize, 1, 100);
+
+            return new ClientTimelineResponseViewModel
+            {
+                Items = items
+                    .OrderByDescending(item => item.ActivityDate)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList(),
+                PageNumber = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize),
+                ActivityTypes = activityTypes
+            };
+        }
+
+        public async Task<ClientRelatedRecordsSummaryViewModel?> GetRelatedRecordsSummaryAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await ClientExistsAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            var opportunityIds = await _dbContext.Opportunities
+                .AsNoTracking()
+                .Where(opportunity => opportunity.ClientId == id && opportunity.IsActive)
+                .Select(opportunity => opportunity.Id)
+                .ToListAsync(cancellationToken);
+
+            var leadIds = await _dbContext.Opportunities
+                .AsNoTracking()
+                .Where(opportunity => opportunity.ClientId == id && opportunity.IsActive && opportunity.LeadId.HasValue)
+                .Select(opportunity => opportunity.LeadId!.Value)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            var opportunityInteractions = await _dbContext.OpportunityActivities
+                .AsNoTracking()
+                .Where(activity => opportunityIds.Contains(activity.OpportunityId) && activity.IsActive)
+                .CountAsync(cancellationToken);
+
+            var leadInteractions = await _dbContext.LeadInteractions
+                .AsNoTracking()
+                .Where(interaction => leadIds.Contains(interaction.LeadId) && interaction.IsActive)
+                .CountAsync(cancellationToken);
+
+            return new ClientRelatedRecordsSummaryViewModel
+            {
+                TotalOpportunities = opportunityIds.Count,
+                TotalRfps = 0,
+                TotalTasks = 0,
+                TotalDocuments = 0,
+                TotalInteractions = opportunityInteractions + leadInteractions
+            };
         }
 
         public Task<ClientEditViewModel?> GetClientEditAsync(Guid id, CancellationToken cancellationToken)
@@ -286,6 +369,11 @@ namespace Clients.Infrastructure.Repositories
                 cancellationToken);
         }
 
+        private Task<bool> ClientExistsAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return _dbContext.Clients.AnyAsync(client => client.Id == id && !client.IsDeleted, cancellationToken);
+        }
+
         public Task<bool> CodeExistsAsync(string clientCode, CancellationToken cancellationToken)
         {
             var normalizedCode = clientCode.Trim().ToUpperInvariant();
@@ -365,7 +453,9 @@ namespace Clients.Infrastructure.Repositories
                 .Select(group => new { ClientId = group.Key, Count = group.Count() })
                 .ToDictionaryAsync(item => item.ClientId, item => item.Count, cancellationToken);
 
-            return clients.Select(client => MapList(client, countries, industries, contactCounts)).ToList();
+            var productCounts = await GetProductCountsAsync(clientIds, cancellationToken);
+
+            return clients.Select(client => MapList(client, countries, industries, contactCounts, productCounts)).ToList();
         }
 
         private async Task<ClientCreatedViewModel> MapDetailAsync(Client client, CancellationToken cancellationToken)
@@ -446,11 +536,208 @@ namespace Clients.Infrastructure.Repositories
                 TimelineEntries = detail.TimelineEntries,
                 Timeline = detail.TimelineEntries,
                 Contacts = await GetContactSummariesAsync(client.Id, cancellationToken),
-                Products = new List<ClientProductSummaryViewModel>(),
-                Opportunities = new List<ClientRelatedOpportunityViewModel>(),
+                Products = await GetProductSummariesAsync(client.Id, cancellationToken),
+                Opportunities = await GetOpportunitySummariesAsync(client.Id, cancellationToken),
                 Rfps = new List<ClientRelatedRfpViewModel>(),
                 Documents = new List<ClientDocumentSummaryViewModel>()
             };
+        }
+
+        private async Task<List<ClientTimelineViewModel>> BuildTimelineAsync(Guid clientId, CancellationToken cancellationToken)
+        {
+            var timeline = new List<ClientTimelineViewModel>();
+
+            var opportunityRows = await _dbContext.Opportunities
+                .AsNoTracking()
+                .Where(opportunity => opportunity.ClientId == clientId && opportunity.IsActive)
+                .Select(opportunity => new
+                {
+                    opportunity.Id,
+                    opportunity.OpportunityNumber,
+                    opportunity.Title,
+                    opportunity.Status,
+                    opportunity.CreatedOn,
+                    opportunity.CreatedBy,
+                    opportunity.LeadId
+                })
+                .ToListAsync(cancellationToken);
+
+            var opportunityIds = opportunityRows.Select(opportunity => opportunity.Id).ToList();
+            var leadIds = opportunityRows
+                .Where(opportunity => opportunity.LeadId.HasValue)
+                .Select(opportunity => opportunity.LeadId!.Value)
+                .Distinct()
+                .ToList();
+
+            timeline.AddRange((await _dbContext.ClientTimelineEntries
+                .AsNoTracking()
+                .Where(entry => entry.ClientId == clientId && entry.IsActive)
+                .ToListAsync(cancellationToken))
+                .Select(entry => new ClientTimelineViewModel
+                {
+                    EntityType = "Client",
+                    EntityId = entry.Id,
+                    ActivityType = entry.EventType,
+                    Title = entry.EventType,
+                    Description = entry.Description,
+                    ActivityDate = entry.CreatedOn,
+                    CreatedByUserName = null,
+                    IsSystemGenerated = true,
+                    ReferenceEntity = "ClientTimelineEntry"
+                }));
+
+            timeline.AddRange(opportunityRows.Select(opportunity => new ClientTimelineViewModel
+            {
+                EntityType = "Opportunity",
+                EntityId = opportunity.Id,
+                ActivityType = "Opportunity",
+                Title = $"{opportunity.OpportunityNumber} - {opportunity.Title}",
+                Description = $"Opportunity created with status {opportunity.Status}.",
+                ActivityDate = opportunity.CreatedOn,
+                CreatedByUserName = null,
+                IsSystemGenerated = true,
+                ReferenceEntity = "Opportunity"
+            }));
+
+            timeline.AddRange((await _dbContext.OpportunityActivities
+                .AsNoTracking()
+                .Where(activity => opportunityIds.Contains(activity.OpportunityId) && activity.IsActive)
+                .ToListAsync(cancellationToken))
+                .Select(activity => new ClientTimelineViewModel
+                {
+                    EntityType = "OpportunityActivity",
+                    EntityId = activity.Id,
+                    ActivityType = activity.ActivityType,
+                    Title = string.IsNullOrWhiteSpace(activity.Subject) ? activity.ActivityType : activity.Subject,
+                    Description = activity.Notes,
+                    ActivityDate = activity.ActivityDate,
+                    CreatedByUserName = null,
+                    IsSystemGenerated = false,
+                    ReferenceEntity = "OpportunityActivity"
+                }));
+
+            var stages = await _dbContext.OpportunityStages
+                .AsNoTracking()
+                .Where(stage => stage.IsActive && !stage.IsDeleted)
+                .Select(stage => new { stage.Id, stage.Name })
+                .ToDictionaryAsync(stage => stage.Id, stage => stage.Name, cancellationToken);
+
+            timeline.AddRange((await _dbContext.OpportunityStageHistories
+                .AsNoTracking()
+                .Where(history => opportunityIds.Contains(history.OpportunityId) && history.IsActive)
+                .ToListAsync(cancellationToken))
+                .Select(history =>
+                {
+                    stages.TryGetValue(history.ToStageId, out var toStageName);
+                    return new ClientTimelineViewModel
+                    {
+                        EntityType = "OpportunityStage",
+                        EntityId = history.Id,
+                        ActivityType = "OpportunityStage",
+                        Title = $"Stage changed to {toStageName ?? "another stage"}",
+                        Description = history.Remarks,
+                        ActivityDate = history.CreatedOn,
+                        CreatedByUserName = null,
+                        IsSystemGenerated = true,
+                        ReferenceEntity = "OpportunityStageHistory"
+                    };
+                }));
+
+            timeline.AddRange((await _dbContext.LeadTimelineEntries
+                .AsNoTracking()
+                .Where(entry => leadIds.Contains(entry.LeadId) && entry.IsActive)
+                .ToListAsync(cancellationToken))
+                .Select(entry => new ClientTimelineViewModel
+                {
+                    EntityType = "Lead",
+                    EntityId = entry.Id,
+                    ActivityType = entry.EventType,
+                    Title = entry.EventType,
+                    Description = entry.Description,
+                    ActivityDate = entry.CreatedOn,
+                    CreatedByUserName = null,
+                    IsSystemGenerated = true,
+                    ReferenceEntity = "LeadTimelineEntry"
+                }));
+
+            timeline.AddRange((await _dbContext.LeadInteractions
+                .AsNoTracking()
+                .Where(interaction => leadIds.Contains(interaction.LeadId) && interaction.IsActive)
+                .ToListAsync(cancellationToken))
+                .Select(interaction => new ClientTimelineViewModel
+                {
+                    EntityType = "LeadInteraction",
+                    EntityId = interaction.Id,
+                    ActivityType = interaction.InteractionType.ToString(),
+                    Title = string.IsNullOrWhiteSpace(interaction.Subject) ? interaction.InteractionType.ToString() : interaction.Subject,
+                    Description = interaction.Notes,
+                    ActivityDate = interaction.InteractionDate,
+                    CreatedByUserName = null,
+                    IsSystemGenerated = false,
+                    ReferenceEntity = "LeadInteraction"
+                }));
+
+            await PopulateTimelineUserNamesAsync(timeline, cancellationToken);
+            return timeline.OrderByDescending(item => item.ActivityDate).ToList();
+        }
+
+        private async Task PopulateTimelineUserNamesAsync(List<ClientTimelineViewModel> timeline, CancellationToken cancellationToken)
+        {
+            if (timeline.Count == 0)
+            {
+                return;
+            }
+
+            var timelineIds = timeline
+                .Select(item => item.EntityId)
+                .Distinct()
+                .ToList();
+            var createdByByTimelineId = new Dictionary<Guid, Guid>();
+
+            foreach (var entry in await _dbContext.ClientTimelineEntries.AsNoTracking().Where(entry => timelineIds.Contains(entry.Id)).Select(entry => new { entry.Id, entry.CreatedBy }).ToListAsync(cancellationToken))
+            {
+                createdByByTimelineId[entry.Id] = entry.CreatedBy;
+            }
+
+            foreach (var entry in await _dbContext.LeadTimelineEntries.AsNoTracking().Where(entry => timelineIds.Contains(entry.Id)).Select(entry => new { entry.Id, entry.CreatedBy }).ToListAsync(cancellationToken))
+            {
+                createdByByTimelineId[entry.Id] = entry.CreatedBy;
+            }
+
+            foreach (var entry in await _dbContext.OpportunityActivities.AsNoTracking().Where(entry => timelineIds.Contains(entry.Id)).Select(entry => new { entry.Id, entry.CreatedBy }).ToListAsync(cancellationToken))
+            {
+                createdByByTimelineId[entry.Id] = entry.CreatedBy;
+            }
+
+            foreach (var entry in await _dbContext.OpportunityStageHistories.AsNoTracking().Where(entry => timelineIds.Contains(entry.Id)).Select(entry => new { entry.Id, entry.CreatedBy }).ToListAsync(cancellationToken))
+            {
+                createdByByTimelineId[entry.Id] = entry.CreatedBy;
+            }
+
+            foreach (var entry in await _dbContext.LeadInteractions.AsNoTracking().Where(entry => timelineIds.Contains(entry.Id)).Select(entry => new { entry.Id, entry.CreatedBy }).ToListAsync(cancellationToken))
+            {
+                createdByByTimelineId[entry.Id] = entry.CreatedBy;
+            }
+
+            foreach (var entry in await _dbContext.Opportunities.AsNoTracking().Where(entry => timelineIds.Contains(entry.Id)).Select(entry => new { entry.Id, entry.CreatedBy }).ToListAsync(cancellationToken))
+            {
+                createdByByTimelineId[entry.Id] = entry.CreatedBy;
+            }
+
+            var userIds = createdByByTimelineId.Values.Where(id => id != Guid.Empty).Distinct().ToList();
+            var users = await _dbContext.Users
+                .AsNoTracking()
+                .Where(user => userIds.Contains(user.Id))
+                .Select(user => new { user.Id, user.FullName })
+                .ToDictionaryAsync(user => user.Id, user => user.FullName, cancellationToken);
+
+            foreach (var item in timeline)
+            {
+                if (createdByByTimelineId.TryGetValue(item.EntityId, out var userId))
+                {
+                    item.CreatedByUserName = users.GetValueOrDefault(userId);
+                }
+            }
         }
 
         private async Task<List<ClientContactSummaryViewModel>> GetContactSummariesAsync(Guid clientId, CancellationToken cancellationToken)
@@ -475,7 +762,132 @@ namespace Clients.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        private static ClientListItemViewModel MapList(Client client, IReadOnlyDictionary<Guid, string> countries, IReadOnlyDictionary<Guid, string> industries, IReadOnlyDictionary<Guid, int> contactCounts)
+        private async Task<List<ClientRelatedOpportunityViewModel>> GetOpportunitySummariesAsync(Guid clientId, CancellationToken cancellationToken)
+        {
+            var opportunities = await _dbContext.Opportunities
+                .AsNoTracking()
+                .Where(opportunity => opportunity.ClientId == clientId && opportunity.IsActive)
+                .OrderByDescending(opportunity => opportunity.CreatedOn)
+                .Select(opportunity => new
+                {
+                    opportunity.Id,
+                    opportunity.OpportunityNumber,
+                    opportunity.Title,
+                    opportunity.ProductId,
+                    opportunity.StageId,
+                    opportunity.EstimatedValue,
+                    opportunity.Status
+                })
+                .ToListAsync(cancellationToken);
+
+            var productIds = opportunities.Select(opportunity => opportunity.ProductId).Distinct().ToList();
+            var stageIds = opportunities.Select(opportunity => opportunity.StageId).Distinct().ToList();
+
+            var products = await _dbContext.Products
+                .AsNoTracking()
+                .Where(product => productIds.Contains(product.Id))
+                .Select(product => new { product.Id, product.Name })
+                .ToDictionaryAsync(product => product.Id, product => product.Name, cancellationToken);
+
+            var stages = await _dbContext.OpportunityStages
+                .AsNoTracking()
+                .Where(stage => stageIds.Contains(stage.Id))
+                .Select(stage => new { stage.Id, stage.Name })
+                .ToDictionaryAsync(stage => stage.Id, stage => stage.Name, cancellationToken);
+
+            return opportunities.Select(opportunity => new ClientRelatedOpportunityViewModel
+            {
+                Id = opportunity.Id,
+                OpportunityNumber = opportunity.OpportunityNumber,
+                Title = opportunity.Title,
+                ProductName = products.GetValueOrDefault(opportunity.ProductId),
+                StageName = stages.GetValueOrDefault(opportunity.StageId) ?? string.Empty,
+                EstimatedValue = opportunity.EstimatedValue,
+                Status = opportunity.Status
+            }).ToList();
+        }
+
+        private async Task<List<ClientProductSummaryViewModel>> GetProductSummariesAsync(Guid clientId, CancellationToken cancellationToken)
+        {
+            List<ClientProduct> mappings;
+            try
+            {
+                mappings = await _dbContext.ClientProducts
+                    .AsNoTracking()
+                    .Where(product => product.ClientId == clientId && !product.IsDeleted)
+                    .OrderBy(product => product.RelationshipStatus)
+                    .ThenBy(product => product.CreatedOn)
+                    .ToListAsync(cancellationToken);
+            }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UndefinedTable)
+            {
+                return new List<ClientProductSummaryViewModel>();
+            }
+
+            var productIds = mappings.Select(mapping => mapping.ProductId).Distinct().ToList();
+            var ownerIds = mappings.Select(mapping => mapping.OwnerUserId).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+            var opportunityIds = mappings.Select(mapping => mapping.OpportunityId).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+
+            var products = await _dbContext.Products
+                .AsNoTracking()
+                .Where(product => productIds.Contains(product.Id))
+                .Select(product => new { product.Id, product.Code, product.Name })
+                .ToDictionaryAsync(product => product.Id, cancellationToken);
+
+            var owners = await _dbContext.Users
+                .AsNoTracking()
+                .Where(user => ownerIds.Contains(user.Id))
+                .Select(user => new { user.Id, user.FullName })
+                .ToDictionaryAsync(user => user.Id, user => user.FullName, cancellationToken);
+
+            var opportunities = await _dbContext.Opportunities
+                .AsNoTracking()
+                .Where(opportunity => opportunityIds.Contains(opportunity.Id))
+                .Select(opportunity => new { opportunity.Id, opportunity.OpportunityNumber, opportunity.Title })
+                .ToDictionaryAsync(opportunity => opportunity.Id, cancellationToken);
+
+            return mappings.Select(mapping =>
+            {
+                products.TryGetValue(mapping.ProductId, out var product);
+                var opportunity = mapping.OpportunityId.HasValue ? opportunities.GetValueOrDefault(mapping.OpportunityId.Value) : null;
+
+                return new ClientProductSummaryViewModel
+                {
+                    Id = mapping.Id,
+                    ProductId = mapping.ProductId,
+                    ProductCode = product?.Code ?? string.Empty,
+                    ProductName = product?.Name ?? string.Empty,
+                    RelationshipStatus = mapping.RelationshipStatus,
+                    OpportunityId = mapping.OpportunityId,
+                    OpportunityNumber = opportunity?.OpportunityNumber,
+                    OpportunityTitle = opportunity?.Title,
+                    OwnerUserId = mapping.OwnerUserId,
+                    OwnerUserName = mapping.OwnerUserId.HasValue ? owners.GetValueOrDefault(mapping.OwnerUserId.Value) : null,
+                    StartDate = mapping.StartDate,
+                    EndDate = mapping.EndDate,
+                    Notes = mapping.Notes
+                };
+            }).ToList();
+        }
+
+        private async Task<Dictionary<Guid, int>> GetProductCountsAsync(List<Guid> clientIds, CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await _dbContext.ClientProducts
+                    .AsNoTracking()
+                    .Where(product => clientIds.Contains(product.ClientId) && !product.IsDeleted)
+                    .GroupBy(product => product.ClientId)
+                    .Select(group => new { ClientId = group.Key, Count = group.Count() })
+                    .ToDictionaryAsync(item => item.ClientId, item => item.Count, cancellationToken);
+            }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UndefinedTable)
+            {
+                return new Dictionary<Guid, int>();
+            }
+        }
+
+        private static ClientListItemViewModel MapList(Client client, IReadOnlyDictionary<Guid, string> countries, IReadOnlyDictionary<Guid, string> industries, IReadOnlyDictionary<Guid, int> contactCounts, IReadOnlyDictionary<Guid, int> productCounts)
         {
             return new ClientListItemViewModel
             {
@@ -498,7 +910,7 @@ namespace Clients.Infrastructure.Repositories
                 Status = client.Status,
                 StatusName = client.Status.ToString(),
                 ContactCount = contactCounts.GetValueOrDefault(client.Id),
-                ProductCount = 0,
+                ProductCount = productCounts.GetValueOrDefault(client.Id),
                 IsActive = client.IsActive,
                 CreatedAt = client.CreatedOn
             };

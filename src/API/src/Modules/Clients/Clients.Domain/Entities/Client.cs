@@ -23,6 +23,7 @@ namespace Clients.Domain.Entities
 
         public ClientType? ClientType { get; set; }
         public ICollection<ClientContact> Contacts { get; set; } = new List<ClientContact>();
+        public ICollection<ClientProduct> Products { get; set; } = new List<ClientProduct>();
         public ICollection<ClientTimelineEntry> TimelineEntries { get; set; } = new List<ClientTimelineEntry>();
     }
 }

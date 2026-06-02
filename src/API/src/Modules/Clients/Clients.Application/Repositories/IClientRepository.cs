@@ -8,6 +8,8 @@ namespace Clients.Application.Repositories
         Task<ClientListResponseViewModel> GetClientsAsync(ClientQueryRequest request, CancellationToken cancellationToken);
         Task<ClientCreatedViewModel?> GetClientAsync(Guid id, CancellationToken cancellationToken);
         Task<ClientDetailViewModel?> GetClientDetailAsync(Guid id, CancellationToken cancellationToken);
+        Task<ClientTimelineResponseViewModel?> GetClientTimelineAsync(Guid id, ClientTimelineQueryRequest request, CancellationToken cancellationToken);
+        Task<ClientRelatedRecordsSummaryViewModel?> GetRelatedRecordsSummaryAsync(Guid id, CancellationToken cancellationToken);
         Task<ClientEditViewModel?> GetClientEditAsync(Guid id, CancellationToken cancellationToken);
         Task<ClientCreatedViewModel> CreateClientAsync(CreateClientRequest request, string clientCode, CancellationToken cancellationToken);
         Task<ClientCreatedViewModel?> UpdateClientAsync(Guid id, UpdateClientRequest request, CancellationToken cancellationToken);

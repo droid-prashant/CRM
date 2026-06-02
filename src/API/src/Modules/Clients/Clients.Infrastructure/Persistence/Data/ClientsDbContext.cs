@@ -4,6 +4,11 @@ using ERP.Core.Entities;
 using ERP.Identity.Entities;
 using ERP.Identity.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Opportunities.Domain.Entities;
+using Products.Domain.Entities;
+using Lead = Leads.Domain.Entities.Lead;
+using LeadInteraction = Leads.Domain.Entities.LeadInteraction;
+using LeadTimelineEntry = Leads.Domain.Entities.LeadTimelineEntry;
 
 namespace Clients.Infrastructure.Persistence.Data
 {
@@ -18,11 +23,20 @@ namespace Clients.Infrastructure.Persistence.Data
 
         public DbSet<Client> Clients { get; set; }
         public DbSet<ClientContact> ClientContacts { get; set; }
+        public DbSet<ClientProduct> ClientProducts { get; set; }
         public DbSet<ClientTimelineEntry> ClientTimelineEntries { get; set; }
         public DbSet<ClientType> ClientTypes { get; set; }
         public DbSet<CountryLookup> Countries { get; set; }
         public DbSet<IndustryLookup> Industries { get; set; }
         public DbSet<ApplicationUser> Users { get; set; }
+        public DbSet<Product> Products { get; set; }
+        public DbSet<Opportunity> Opportunities { get; set; }
+        public DbSet<OpportunityActivity> OpportunityActivities { get; set; }
+        public DbSet<OpportunityStage> OpportunityStages { get; set; }
+        public DbSet<OpportunityStageHistory> OpportunityStageHistories { get; set; }
+        public DbSet<Lead> Leads { get; set; }
+        public DbSet<LeadInteraction> LeadInteractions { get; set; }
+        public DbSet<LeadTimelineEntry> LeadTimelineEntries { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -56,6 +70,7 @@ namespace Clients.Infrastructure.Persistence.Data
                 entity.HasIndex(x => new { x.IsActive, x.IsDeleted });
                 entity.HasOne(x => x.ClientType).WithMany().HasForeignKey(x => x.ClientTypeId);
                 entity.HasMany(x => x.Contacts).WithOne(x => x.Client).HasForeignKey(x => x.ClientId);
+                entity.HasMany(x => x.Products).WithOne(x => x.Client).HasForeignKey(x => x.ClientId);
                 entity.HasMany(x => x.TimelineEntries).WithOne(x => x.Client).HasForeignKey(x => x.ClientId);
             });
 
@@ -82,6 +97,20 @@ namespace Clients.Infrastructure.Persistence.Data
                 entity.HasIndex(x => new { x.ClientId, x.IsPrimary }).IsUnique().HasFilter("\"IsPrimary\" = true AND \"IsDeleted\" = false");
             });
 
+            modelBuilder.Entity<ClientProduct>(entity =>
+            {
+                entity.ToTable("ClientProducts", "clients");
+                entity.Property(x => x.RelationshipStatus).HasMaxLength(100).IsRequired();
+                entity.Property(x => x.Notes).HasMaxLength(1000);
+                entity.Property(x => x.IsDeleted).HasDefaultValue(false);
+                entity.Property(x => x.IsActive).HasDefaultValue(true);
+                entity.HasIndex(x => x.ClientId);
+                entity.HasIndex(x => x.ProductId);
+                entity.HasIndex(x => x.OpportunityId);
+                entity.HasIndex(x => x.OwnerUserId);
+                entity.HasIndex(x => new { x.ClientId, x.ProductId }).IsUnique().HasFilter("\"IsDeleted\" = false");
+            });
+
             modelBuilder.Entity<ClientTimelineEntry>(entity =>
             {
                 entity.ToTable("ClientTimelineEntries", "clients");
@@ -105,7 +134,72 @@ namespace Clients.Infrastructure.Persistence.Data
 
             modelBuilder.Entity<ApplicationUser>(entity =>
             {
-                entity.ToTable("AspNetUsers");
+                entity.ToTable("AspNetUsers", "public");
+            });
+
+            modelBuilder.Entity<Product>(entity =>
+            {
+                entity.ToTable("Products", "products");
+            });
+
+            modelBuilder.Entity<Opportunity>(entity =>
+            {
+                entity.ToTable("Opportunities", "leads");
+                entity.Ignore(x => x.CurrentStage);
+                entity.Ignore(x => x.StageHistories);
+                entity.Ignore(x => x.Activities);
+            });
+
+            modelBuilder.Entity<OpportunityActivity>(entity =>
+            {
+                entity.ToTable("OpportunityActivities", "leads");
+                entity.Property(x => x.ActivityType).HasMaxLength(30).IsRequired();
+                entity.Property(x => x.Subject).HasMaxLength(250);
+                entity.Ignore(x => x.Opportunity);
+            });
+
+            modelBuilder.Entity<OpportunityStage>(entity =>
+            {
+                entity.ToTable("OpportunityStages", "leads");
+                entity.Property(x => x.Name).HasMaxLength(100).IsRequired();
+                entity.Property(x => x.IsDeleted).HasDefaultValue(false);
+            });
+
+            modelBuilder.Entity<OpportunityStageHistory>(entity =>
+            {
+                entity.ToTable("OpportunityStageHistories", "leads");
+                entity.Property(x => x.Remarks).HasMaxLength(1000);
+                entity.Ignore(x => x.Opportunity);
+                entity.Ignore(x => x.FromStage);
+                entity.Ignore(x => x.ToStage);
+            });
+
+            modelBuilder.Entity<Lead>(entity =>
+            {
+                entity.ToTable("Leads", "leads");
+                entity.Property(x => x.Status).HasConversion<int>();
+                entity.Ignore(x => x.Source);
+                entity.Ignore(x => x.Category);
+                entity.Ignore(x => x.Country);
+                entity.Ignore(x => x.Industry);
+                entity.Ignore(x => x.ProductInterests);
+                entity.Ignore(x => x.TimelineEntries);
+                entity.Ignore(x => x.Interactions);
+            });
+
+            modelBuilder.Entity<LeadInteraction>(entity =>
+            {
+                entity.ToTable("LeadInteractions", "leads");
+                entity.Property(x => x.InteractionType).HasConversion<string>().HasMaxLength(30).IsRequired();
+                entity.Property(x => x.Subject).HasMaxLength(250);
+                entity.Ignore(x => x.Lead);
+            });
+
+            modelBuilder.Entity<LeadTimelineEntry>(entity =>
+            {
+                entity.ToTable("LeadTimelineEntries", "leads");
+                entity.Property(x => x.EventType).HasMaxLength(100).IsRequired();
+                entity.Ignore(x => x.Lead);
             });
         }
 

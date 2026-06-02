@@ -18,8 +18,10 @@ namespace Clients.Infrastructure.Extensions
 
             services.AddScoped<IClientService, ClientService>();
             services.AddScoped<IClientContactService, ClientContactService>();
+            services.AddScoped<IClientProductService, ClientProductService>();
             services.AddScoped<IClientRepository, ClientRepository>();
             services.AddScoped<IClientContactRepository, ClientContactRepository>();
+            services.AddScoped<IClientProductRepository, ClientProductRepository>();
             services.AddScoped<IClientUserLookupService, ClientUserLookupService>();
 
             return services;
