@@ -35,6 +35,8 @@
 	  <ProjectReference Include="..\ERP.Identity\ERP.Identity.csproj" />
 	  <ProjectReference Include="..\Modules\Clients\Clients.Application\Clients.Application.csproj" />
 	  <ProjectReference Include="..\Modules\Clients\Clients.Infrastructure\Clients.Infrastructure.csproj" />
+	  <ProjectReference Include="..\Modules\Dashboard\Dashboard.Application\Dashboard.Application.csproj" />
+	  <ProjectReference Include="..\Modules\Dashboard\Dashboard.Infrastructure\Dashboard.Infrastructure.csproj" />
 	  <ProjectReference Include="..\Modules\Leads\Leads.Application\Leads.Application.csproj" />
 	  <ProjectReference Include="..\Modules\Leads\Leads.Infrastructure\Leads.Infrastructure.csproj" />
 	  <ProjectReference Include="..\Modules\Opportunities\Opportunities.Application\Opportunities.Application.csproj" />
