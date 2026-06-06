@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
+import { DatePicker, DatePickerModule } from 'primeng/datepicker';
 import { DialogModule } from 'primeng/dialog';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
@@ -35,7 +36,7 @@ import {
 @Component({
     selector: 'app-opportunity-list',
     standalone: true,
-    imports: [ButtonModule, CommonModule, DialogModule, InputNumberModule, InputTextModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, ToastModule],
+    imports: [ButtonModule, CommonModule, DatePickerModule, DialogModule, InputNumberModule, InputTextModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, ToastModule],
     templateUrl: './opportunity-list.html',
     providers: [MessageService]
 })
@@ -447,6 +448,10 @@ export class OpportunityList implements OnInit {
 
     formatDate(value?: string): string {
         return value ? new Date(value).toLocaleDateString() : 'Not set';
+    }
+
+    closeDatePicker(picker: DatePicker): void {
+        setTimeout(() => picker.hideOverlay(), 0);
     }
 
     statusSeverity(status?: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {

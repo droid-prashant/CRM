@@ -126,7 +126,18 @@
                                         <input pInputText type="email" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full" />
                                     }
                                     @case ('date') {
-                                        <input pInputText type="date" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full" />
+                                        <p-datepicker
+                                            #datePicker
+                                            [formControlName]="field.key"
+                                            [placeholder]="field.placeholder ?? ''"
+                                            dateFormat="yy-mm-dd"
+                                            dataType="string"
+                                            appendTo="body"
+                                            styleClass="w-full"
+                                            inputStyleClass="w-full"
+                                            [showIcon]="true"
+                                            (onSelect)="closeDatePicker(datePicker)"
+                                        />
                                     }
                                     @case ('textarea') {
                                         <textarea pTextarea rows="2" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full"></textarea>

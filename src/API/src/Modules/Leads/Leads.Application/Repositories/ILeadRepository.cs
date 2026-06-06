@@ -7,10 +7,10 @@ namespace Leads.Application.Repositories
 {
     public interface ILeadRepository
     {
-        Task<List<LeadListItemViewModel>> GetLeadListAsync(CancellationToken cancellationToken);
+        Task<List<LeadListItemViewModel>> GetLeadListAsync(Guid? assignedToUserId, CancellationToken cancellationToken);
         Task<LeadDetailViewModel?> GetLeadDetailAsync(Guid id, CancellationToken cancellationToken);
         Task<LeadEditViewModel?> GetLeadEditAsync(Guid id, CancellationToken cancellationToken);
-        Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(CancellationToken cancellationToken);
+        Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(Guid? assignedToUserId, CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetLeadSourceLookupsAsync(CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetLeadCategoryLookupsAsync(CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetProductLookupsAsync(CancellationToken cancellationToken);
@@ -19,6 +19,7 @@ namespace Leads.Application.Repositories
         Task<bool> SourceRequiresPartnerAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<string?> GetLeadSourceCodeAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken);
+        Task<bool> UserCanAccessLeadAsync(Guid id, Guid userId, bool hasOverrideAccess, CancellationToken cancellationToken);
         Task<LeadStatus?> GetLeadStatusAsync(Guid id, CancellationToken cancellationToken);
         Task<bool> SourceExistsAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken);
@@ -27,9 +28,8 @@ namespace Leads.Application.Repositories
         Task<List<Guid>> GetActiveProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken);
         Task<List<Guid>> GetActiveInHouseProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken);
         Task<List<Guid>> GetActivePartnerOwnedProductIdsAsync(Guid ownerPartnerId, IEnumerable<Guid> productIds, CancellationToken cancellationToken);
-        Task<bool> ActiveLeadExistsForClientContactAsync(Guid clientId, Guid clientContactId, Guid? excludingId, CancellationToken cancellationToken);
         Task<string> GenerateNextLeadNumberAsync(CancellationToken cancellationToken);
-        Task<LeadDetailViewModel> CreateLeadAsync(CreateLeadRequest request, string leadNumber, bool hasDuplicateWarning, CancellationToken cancellationToken);
+        Task<LeadDetailViewModel> CreateLeadAsync(CreateLeadRequest request, string leadNumber, CancellationToken cancellationToken);
         Task<LeadDetailViewModel?> UpdateLeadAsync(Guid id, UpdateLeadRequest request, CancellationToken cancellationToken);
         Task<LeadQualificationViewModel?> GetLeadQualificationAsync(Guid id, CancellationToken cancellationToken);
         Task<LeadQualificationResultViewModel?> UpdateLeadStatusAsync(Guid id, string status, string? disqualificationReason, string? remarks, CancellationToken cancellationToken);

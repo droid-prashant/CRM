@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
+import { DatePicker, DatePickerModule } from 'primeng/datepicker';
 import { DialogModule } from 'primeng/dialog';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
@@ -25,7 +26,7 @@ import { LeadDetailViewModel } from '../../view-models/lead-detail.view-model';
 @Component({
     selector: 'app-lead-detail',
     standalone: true,
-    imports: [ButtonModule, CommonModule, DialogModule, InputNumberModule, InputTextModule, MultiSelectModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, TextareaModule, ToastModule],
+    imports: [ButtonModule, CommonModule, DatePickerModule, DialogModule, InputNumberModule, InputTextModule, MultiSelectModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, TextareaModule, ToastModule],
     templateUrl: './lead-detail.html',
     providers: [MessageService]
 })
@@ -87,8 +88,8 @@ export class LeadDetail implements OnInit, OnDestroy {
         interactionType: ['Call', Validators.required],
         subject: ['', [Validators.maxLength(250)]],
         notes: ['', [Validators.required, Validators.maxLength(2000)]],
-        interactionDate: [''],
-        nextFollowUpDate: ['']
+        interactionDate: [null as Date | null],
+        nextFollowUpDate: [null as Date | null]
     });
 
     editForm = this.fb.group({
@@ -190,7 +191,7 @@ export class LeadDetail implements OnInit, OnDestroy {
     }
 
     get canShowConvert(): boolean {
-        return this.canApproveLead && this.lead?.status?.toLowerCase() === 'qualified' && !this.lead.convertedOpportunityId;
+        return this.canApproveLead && this.canAccessAssignedLead && this.lead?.status?.toLowerCase() === 'qualified' && !this.lead.convertedOpportunityId;
     }
 
     get canShowQualificationActions(): boolean {
@@ -209,8 +210,22 @@ export class LeadDetail implements OnInit, OnDestroy {
         return this.canEditLead && this.leadStatus !== 'converted';
     }
 
+    get editActionLabel(): string {
+        return this.leadStatus === 'disqualified' ? 'Re-submit' : 'Edit';
+    }
+
     private get leadStatus(): string {
         return this.lead?.status?.toLowerCase() ?? '';
+    }
+
+    private get canAccessAssignedLead(): boolean {
+        if (this.authService.hasAnyRole(['Admin', 'SuperAdmin'])) {
+            return true;
+        }
+
+        const assignedToUserId = this.lead?.assignedToUserId?.toLowerCase();
+        const currentUserId = this.authService.currentUser()?.userId?.toLowerCase();
+        return !!assignedToUserId && assignedToUserId === currentUserId;
     }
 
     get leadInitials(): string {
@@ -350,14 +365,14 @@ export class LeadDetail implements OnInit, OnDestroy {
             interactionType: 'Call',
             subject: '',
             notes: '',
-            interactionDate: this.formatDateTimeInput(new Date()),
-            nextFollowUpDate: ''
+            interactionDate: new Date(),
+            nextFollowUpDate: null
         });
         this.interactionDialog = true;
     }
 
     openConversionDialog(): void {
-        if (!this.lead) {
+        if (!this.lead || !this.canShowConvert) {
             return;
         }
 
@@ -578,6 +593,10 @@ export class LeadDetail implements OnInit, OnDestroy {
         return value ? new Date(value).toLocaleDateString() : 'Not set';
     }
 
+    closeDatePicker(picker: DatePicker): void {
+        setTimeout(() => picker.hideOverlay(), 0);
+    }
+
     get filteredContacts() {
         const clientId = this.conversionForm.controls.clientId.value;
         return this.conversion?.existingContacts.filter((contact) => contact.clientId === clientId) ?? [];
@@ -639,8 +658,8 @@ export class LeadDetail implements OnInit, OnDestroy {
             interactionType: value.interactionType ?? '',
             subject: this.optionalFormString(value.subject) ?? undefined,
             notes: value.notes ?? '',
-            interactionDate: value.interactionDate ? new Date(value.interactionDate).toISOString() : undefined,
-            nextFollowUpDate: value.nextFollowUpDate ? new Date(value.nextFollowUpDate).toISOString() : undefined
+            interactionDate: this.toIsoDateTime(value.interactionDate),
+            nextFollowUpDate: this.toIsoDateTime(value.nextFollowUpDate)
         };
     }
 
@@ -820,13 +839,17 @@ export class LeadDetail implements OnInit, OnDestroy {
             .toUpperCase();
     }
 
-    private formatDateTimeInput(value: Date): string {
-        const offsetMs = value.getTimezoneOffset() * 60_000;
-        return new Date(value.getTime() - offsetMs).toISOString().slice(0, 16);
-    }
-
     private formatDateInput(value?: string): string {
         return value ? new Date(value).toISOString().slice(0, 10) : '';
+    }
+
+    private toIsoDateTime(value?: Date | string | null): string | undefined {
+        if (!value) {
+            return undefined;
+        }
+
+        const date = value instanceof Date ? value : new Date(value);
+        return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
     }
 
     private optionalFormString(value: string | null | undefined): string | null {

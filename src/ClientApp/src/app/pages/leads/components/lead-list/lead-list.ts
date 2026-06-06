@@ -35,6 +35,7 @@ export class LeadList implements OnInit {
     canDelete = false;
     canExport = false;
     canEditLeadRow = (row: Record<string, unknown>): boolean => !['assigned', 'converted'].includes(String(row['status'] ?? '').toLowerCase());
+    editActionLabelResolver = (row: Record<string, unknown>): string => (this.isDisqualified(row['status']) ? 'Re-submit' : 'Edit');
 
     constructor(
         private readonly leadApiService: LeadApiService,
@@ -245,5 +246,9 @@ export class LeadList implements OnInit {
 
     private getRowId(row: Record<string, unknown>): string | null {
         return typeof row['id'] === 'string' && row['id'].trim() ? row['id'] : null;
+    }
+
+    private isDisqualified(status: unknown): boolean {
+        return String(status ?? '').trim().toLowerCase() === 'disqualified';
     }
 }

@@ -47,7 +47,7 @@
                     <p-button label="Assign" icon="pi pi-user-plus" severity="secondary" outlined [loading]="isAssigning" (onClick)="openAssignmentDialog()" />
                 }
                 @if (canShowEditActions) {
-                    <p-button label="Edit" icon="pi pi-pencil" severity="secondary" outlined [loading]="isSavingLead" (onClick)="openEditDialog()" />
+                    <p-button [label]="editActionLabel" icon="pi pi-pencil" severity="secondary" outlined [loading]="isSavingLead" (onClick)="openEditDialog()" />
                 }
             </div>
         </div>
@@ -407,14 +407,14 @@
                                 </div>
                                 <div class="col-span-12 md:col-span-3">
                                     <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Start Date <span class="text-red-500">*</span></label>
-                                    <input pInputText type="date" formControlName="sourceStartDate" class="w-full" />
+                                    <p-datepicker #sourceStartDatePicker formControlName="sourceStartDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(sourceStartDatePicker)" />
                                     @if (editForm.get('sourceStartDate')?.errors && editForm.get('sourceStartDate')?.touched) {
                                         <span class="p-error mt-1 block text-sm text-red-600">Start date is required</span>
                                     }
                                 </div>
                                 <div class="col-span-12 md:col-span-3">
                                     <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">End Date <span class="text-red-500">*</span></label>
-                                    <input pInputText type="date" formControlName="sourceEndDate" class="w-full" />
+                                    <p-datepicker #sourceEndDatePicker formControlName="sourceEndDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(sourceEndDatePicker)" />
                                     @if (editForm.get('sourceEndDate')?.errors && editForm.get('sourceEndDate')?.touched) {
                                         <span class="p-error mt-1 block text-sm text-red-600">End date is required</span>
                                     }
@@ -458,7 +458,7 @@
 
             <div class="col-span-12 md:col-span-6">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Interaction Date</label>
-                <input pInputText type="datetime-local" formControlName="interactionDate" class="w-full" />
+                <p-datepicker #interactionDatePicker formControlName="interactionDate" dateFormat="yy-mm-dd" [showTime]="true" hourFormat="24" [hideOnDateTimeSelect]="false" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(interactionDatePicker)" />
             </div>
 
             <div class="col-span-12">
@@ -476,7 +476,7 @@
 
             <div class="col-span-12">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Next Follow-up Date</label>
-                <input pInputText type="datetime-local" formControlName="nextFollowUpDate" class="w-full" />
+                <p-datepicker #nextFollowUpDatePicker formControlName="nextFollowUpDate" dateFormat="yy-mm-dd" [showTime]="true" hourFormat="24" [hideOnDateTimeSelect]="false" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(nextFollowUpDatePicker)" />
             </div>
         </form>
 
@@ -511,7 +511,7 @@
 
                 <div class="col-span-12 md:col-span-4">
                     <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Expected Close Date</label>
-                    <input pInputText type="date" formControlName="expectedCloseDate" class="w-full" />
+                    <p-datepicker #expectedCloseDatePicker formControlName="expectedCloseDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(expectedCloseDatePicker)" />
                 </div>
 
                 <div class="col-span-12">

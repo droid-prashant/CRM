@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { ConfirmationService, MenuItem } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { DatePicker, DatePickerModule } from 'primeng/datepicker';
 import { DialogModule } from 'primeng/dialog';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
@@ -37,6 +38,7 @@ export interface CrudSaveEvent {
         ReactiveFormsModule,
         ButtonModule,
         ConfirmDialogModule,
+        DatePickerModule,
         DialogModule,
         IconFieldModule,
         InputIconModule,
@@ -74,6 +76,7 @@ export class Crud implements OnChanges, OnDestroy {
     @Input() canBulkAction = true;
     @Input() canExport = true;
     @Input() canEditRowResolver?: (row: Record<string, unknown>) => boolean;
+    @Input() editActionLabelResolver?: (row: Record<string, unknown>) => string;
     @Input() lazy = false;
     @Input() lazyLoadOnInit = false;
     @Input() totalRecords = 0;
@@ -231,6 +234,10 @@ export class Crud implements OnChanges, OnDestroy {
         }
     }
 
+    closeDatePicker(picker: DatePicker): void {
+        setTimeout(() => picker.hideOverlay(), 0);
+    }
+
     toggleRowActions(menu: Menu, row: Record<string, unknown>, event: Event): void {
         this.activeRowActionItems = this.buildRowActionItems(row);
         menu.toggle(event);
@@ -249,7 +256,7 @@ export class Crud implements OnChanges, OnDestroy {
 
         if (this.canEdit && (this.canEditRowResolver?.(row) ?? true)) {
             items.push({
-                label: 'Edit',
+                label: this.editActionLabelResolver?.(row) ?? 'Edit',
                 icon: 'pi pi-pencil',
                 command: () => this.openEdit(row)
             });

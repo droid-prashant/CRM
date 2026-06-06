@@ -224,11 +224,11 @@
             </div>
             <div class="col-span-12 md:col-span-6">
                 <label class="mb-2 block text-sm font-semibold">Activity Date</label>
-                <input pInputText type="date" formControlName="activityDate" class="w-full" />
+                <p-datepicker #activityDatePicker formControlName="activityDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(activityDatePicker)" />
             </div>
             <div class="col-span-12 md:col-span-6">
                 <label class="mb-2 block text-sm font-semibold">Follow-up</label>
-                <input pInputText type="date" formControlName="followUpDate" class="w-full" />
+                <p-datepicker #followUpDatePicker formControlName="followUpDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(followUpDatePicker)" />
             </div>
             <div class="col-span-12 flex justify-end">
                 <p-button label="Add Activity" icon="pi pi-plus" size="small" [loading]="isSaving" (onClick)="addActivity()" />
@@ -288,7 +288,7 @@
         }
         <div class="col-span-12">
             <label class="mb-2 block text-sm font-semibold">Closed Date</label>
-            <input pInputText type="date" formControlName="closedDate" class="w-full" />
+            <p-datepicker #closedDatePicker formControlName="closedDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(closedDatePicker)" />
         </div>
         <div class="col-span-12">
             <label class="mb-2 block text-sm font-semibold">Note</label>
@@ -381,7 +381,7 @@
         </div>
         <div class="col-span-12 md:col-span-4">
             <label class="mb-2 block text-sm font-semibold">Expected Close Date</label>
-            <input pInputText type="date" formControlName="expectedCloseDate" class="w-full" />
+            <p-datepicker #expectedCloseDatePicker formControlName="expectedCloseDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(expectedCloseDatePicker)" />
         </div>
         <div class="col-span-12">
             <label class="mb-2 block text-sm font-semibold">Owner</label>

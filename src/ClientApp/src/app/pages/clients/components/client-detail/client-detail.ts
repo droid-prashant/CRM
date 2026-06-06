@@ -6,6 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
+import { DatePicker, DatePickerModule } from 'primeng/datepicker';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
@@ -27,7 +28,7 @@ import { ClientTimelineResponseViewModel, ClientTimelineViewModel } from '../../
 @Component({
     selector: 'app-client-detail',
     standalone: true,
-    imports: [ButtonModule, CommonModule, DialogModule, FormsModule, InputTextModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, TextareaModule, ToastModule],
+    imports: [ButtonModule, CommonModule, DatePickerModule, DialogModule, FormsModule, InputTextModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, TextareaModule, ToastModule],
     templateUrl: './client-detail.html',
     providers: [MessageService]
 })
@@ -586,6 +587,10 @@ export class ClientDetail implements OnInit {
 
     formatDateOnly(value?: string | null): string {
         return value ? new Date(value).toLocaleDateString() : 'Not set';
+    }
+
+    closeDatePicker(picker: DatePicker): void {
+        setTimeout(() => picker.hideOverlay(), 0);
     }
 
     formatCurrency(value?: number | null): string {

@@ -29,7 +29,7 @@ namespace Leads.Infrastructure.Repositories
             _userManager = userManager;
         }
 
-        public async Task<List<LeadListItemViewModel>> GetLeadListAsync(CancellationToken cancellationToken)
+        public async Task<List<LeadListItemViewModel>> GetLeadListAsync(Guid? assignedToUserId, CancellationToken cancellationToken)
         {
             var leads = await _dbContext.Leads
                 .AsNoTracking()
@@ -37,7 +37,7 @@ namespace Leads.Infrastructure.Repositories
                 .Include(x => x.Category)
                 .Include(x => x.Country)
                 .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
-                .Where(x => x.IsActive)
+                .Where(x => x.IsActive && (!assignedToUserId.HasValue || x.AssignedToUserId == assignedToUserId.Value))
                 .OrderByDescending(x => x.CreatedOn)
                 .ToListAsync(cancellationToken);
 
@@ -117,7 +117,7 @@ namespace Leads.Infrastructure.Repositories
                 return null;
             }
 
-            var detail = MapDetail(lead, false);
+            var detail = MapDetail(lead);
             await PopulateLeadClientFieldsAsync(detail, cancellationToken);
             if (lead.PartnerId.HasValue)
             {
@@ -168,11 +168,11 @@ namespace Leads.Infrastructure.Repositories
             return edit;
         }
 
-        public Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(CancellationToken cancellationToken)
+        public Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(Guid? assignedToUserId, CancellationToken cancellationToken)
         {
             return _dbContext.Leads
                 .AsNoTracking()
-                .Where(x => x.IsActive)
+                .Where(x => x.IsActive && (!assignedToUserId.HasValue || x.AssignedToUserId == assignedToUserId.Value))
                 .OrderBy(x => x.CompanyName)
                 .Select(x => new LeadLookupViewModel
                 {
@@ -221,6 +221,15 @@ namespace Leads.Infrastructure.Repositories
         }
 
         public Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Leads.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
+        public Task<bool> UserCanAccessLeadAsync(Guid id, Guid userId, bool hasOverrideAccess, CancellationToken cancellationToken)
+        {
+            return _dbContext.Leads
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == id
+                    && x.IsActive
+                    && (hasOverrideAccess || x.AssignedToUserId == userId), cancellationToken);
+        }
+
         public Task<LeadStatus?> GetLeadStatusAsync(Guid id, CancellationToken cancellationToken)
         {
             return _dbContext.Leads
@@ -266,16 +275,6 @@ namespace Leads.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public Task<bool> ActiveLeadExistsForClientContactAsync(Guid clientId, Guid clientContactId, Guid? excludingId, CancellationToken cancellationToken)
-        {
-            return _dbContext.Leads.AnyAsync(
-                x => x.IsActive
-                    && x.ClientId == clientId
-                    && x.ClientContactId == clientContactId
-                    && (!excludingId.HasValue || x.Id != excludingId.Value),
-                cancellationToken);
-        }
-
         public async Task<string> GenerateNextLeadNumberAsync(CancellationToken cancellationToken)
         {
             var year = DateTime.UtcNow.Year;
@@ -284,7 +283,7 @@ namespace Leads.Infrastructure.Repositories
             return $"{prefix}{count + 1:000000}";
         }
 
-        public async Task<LeadDetailViewModel> CreateLeadAsync(CreateLeadRequest request, string leadNumber, bool hasDuplicateWarning, CancellationToken cancellationToken)
+        public async Task<LeadDetailViewModel> CreateLeadAsync(CreateLeadRequest request, string leadNumber, CancellationToken cancellationToken)
         {
             var selected = await GetSelectedClientContactAsync(request.ClientId, request.ClientContactId, cancellationToken)
                 ?? throw new InvalidOperationException("Selected client/contact was not found.");
@@ -319,10 +318,7 @@ namespace Leads.Infrastructure.Repositories
             _dbContext.Leads.Add(lead);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            var detail = await GetLeadDetailAsync(lead.Id, cancellationToken);
-            detail!.HasDuplicateWarning = hasDuplicateWarning;
-            detail.DuplicateWarning = hasDuplicateWarning ? "An active lead already exists for the selected client contact." : null;
-            return detail;
+            return (await GetLeadDetailAsync(lead.Id, cancellationToken))!;
         }
 
         public async Task<LeadDetailViewModel?> UpdateLeadAsync(Guid id, UpdateLeadRequest request, CancellationToken cancellationToken)
@@ -809,7 +805,7 @@ namespace Leads.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        private static LeadDetailViewModel MapDetail(Lead lead, bool hasDuplicateWarning)
+        private static LeadDetailViewModel MapDetail(Lead lead)
         {
             return new LeadDetailViewModel
             {
@@ -849,7 +845,6 @@ namespace Leads.Infrastructure.Repositories
                 CreatedBy = lead.CreatedBy,
                 UpdatedAt = lead.UpdatedOn,
                 UpdatedBy = lead.UpdatedBy,
-                HasDuplicateWarning = hasDuplicateWarning,
                 ProductInterests = lead.ProductInterests
                     .Where(x => x.IsActive)
                     .Select(x => new LeadProductInterestViewModel

@@ -579,11 +579,11 @@
 
             <div class="col-span-12 md:col-span-6">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Start Date</label>
-                <input pInputText type="date" formControlName="startDate" class="w-full" />
+                <p-datepicker #startDatePicker formControlName="startDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(startDatePicker)" />
             </div>
             <div class="col-span-12 md:col-span-6">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">End Date</label>
-                <input pInputText type="date" formControlName="endDate" class="w-full" />
+                <p-datepicker #endDatePicker formControlName="endDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(endDatePicker)" />
             </div>
             <div class="col-span-12">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Notes</label>

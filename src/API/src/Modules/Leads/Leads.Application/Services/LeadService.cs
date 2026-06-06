@@ -1,3 +1,5 @@
+using ERP.Identity.Constants;
+using ERP.Identity.Services.Interfaces;
 using Leads.Application.DTOs;
 using Leads.Application.Repositories;
 using Leads.Application.ViewModels;
@@ -12,24 +14,103 @@ namespace Leads.Application.Services
     {
         private readonly ILeadRepository _leadRepository;
         private readonly IPartnerLookupService _partnerLookupService;
+        private readonly IUserContextService _userContextService;
 
-        public LeadService(ILeadRepository leadRepository, IPartnerLookupService partnerLookupService)
+        public LeadService(ILeadRepository leadRepository, IPartnerLookupService partnerLookupService, IUserContextService userContextService)
         {
             _leadRepository = leadRepository;
             _partnerLookupService = partnerLookupService;
+            _userContextService = userContextService;
         }
 
-        public Task<List<LeadListItemViewModel>> GetLeadListAsync(CancellationToken cancellationToken) => _leadRepository.GetLeadListAsync(cancellationToken);
-        public Task<LeadDetailViewModel?> GetLeadDetailAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadDetailAsync(id, cancellationToken);
-        public Task<LeadEditViewModel?> GetLeadEditAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadEditAsync(id, cancellationToken);
-        public Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(CancellationToken cancellationToken) => _leadRepository.GetLeadLookupsAsync(cancellationToken);
-        public Task<LeadQualificationViewModel?> GetLeadQualificationAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadQualificationAsync(id, cancellationToken);
-        public Task<List<LeadStatusHistoryItemViewModel>?> GetLeadStatusHistoryAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadStatusHistoryAsync(id, cancellationToken);
-        public Task<LeadConversionViewModel?> GetLeadConversionAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.GetLeadConversionAsync(id, cancellationToken);
+        public Task<List<LeadListItemViewModel>> GetLeadListAsync(CancellationToken cancellationToken)
+        {
+            if (HasOverrideAccess())
+            {
+                return _leadRepository.GetLeadListAsync(null, cancellationToken);
+            }
+
+            var currentUserId = _userContextService.GetUserId();
+            return currentUserId.HasValue
+                ? _leadRepository.GetLeadListAsync(currentUserId.Value, cancellationToken)
+                : Task.FromResult(new List<LeadListItemViewModel>());
+        }
+
+        public async Task<LeadDetailViewModel?> GetLeadDetailAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _leadRepository.GetLeadDetailAsync(id, cancellationToken);
+        }
+
+        public async Task<LeadEditViewModel?> GetLeadEditAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _leadRepository.GetLeadEditAsync(id, cancellationToken);
+        }
+
+        public Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(CancellationToken cancellationToken)
+        {
+            if (HasOverrideAccess())
+            {
+                return _leadRepository.GetLeadLookupsAsync(null, cancellationToken);
+            }
+
+            var currentUserId = _userContextService.GetUserId();
+            return currentUserId.HasValue
+                ? _leadRepository.GetLeadLookupsAsync(currentUserId.Value, cancellationToken)
+                : Task.FromResult(new List<LeadLookupViewModel>());
+        }
+
+        public async Task<LeadQualificationViewModel?> GetLeadQualificationAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _leadRepository.GetLeadQualificationAsync(id, cancellationToken);
+        }
+
+        public async Task<List<LeadStatusHistoryItemViewModel>?> GetLeadStatusHistoryAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _leadRepository.GetLeadStatusHistoryAsync(id, cancellationToken);
+        }
+
+        public async Task<LeadConversionViewModel?> GetLeadConversionAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _leadRepository.GetLeadConversionAsync(id, cancellationToken);
+        }
+
         public Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken) => _leadRepository.GetClientLookupsAsync(cancellationToken);
         public Task<List<ContactLookupViewModel>> GetAllClientContactsAsync(CancellationToken cancellationToken) => _leadRepository.GetAllClientContactsAsync(cancellationToken);
         public Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken) => _leadRepository.GetClientContactsAsync(clientId, cancellationToken);
-        public Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken) => _leadRepository.DeleteLeadAsync(id, cancellationToken);
+        public async Task<bool> DeleteLeadAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return false;
+            }
+
+            return await _leadRepository.DeleteLeadAsync(id, cancellationToken);
+        }
 
         public async Task<CreateLeadResult> CreateLeadAsync(CreateLeadRequest request, CancellationToken cancellationToken)
         {
@@ -39,20 +120,19 @@ namespace Leads.Application.Services
                 return new CreateLeadResult { Errors = errors };
             }
 
-            var hasDuplicateWarning = await _leadRepository.ActiveLeadExistsForClientContactAsync(
-                request.ClientId,
-                request.ClientContactId,
-                null,
-                cancellationToken);
-
             var leadNumber = await _leadRepository.GenerateNextLeadNumberAsync(cancellationToken);
-            var lead = await _leadRepository.CreateLeadAsync(request, leadNumber, hasDuplicateWarning, cancellationToken);
+            var lead = await _leadRepository.CreateLeadAsync(request, leadNumber, cancellationToken);
 
             return new CreateLeadResult { Lead = lead };
         }
 
         public async Task<CreateLeadResult> UpdateLeadAsync(Guid id, UpdateLeadRequest request, CancellationToken cancellationToken)
         {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return new CreateLeadResult { Errors = new List<string> { "Lead was not found." } };
+            }
+
             var existingLead = await _leadRepository.GetLeadDetailAsync(id, cancellationToken);
             if (existingLead == null)
             {
@@ -100,6 +180,11 @@ namespace Leads.Application.Services
 
         public async Task<LeadQualificationResult> UpdateLeadStatusAsync(Guid id, UpdateLeadStatusRequest request, CancellationToken cancellationToken)
         {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return new LeadQualificationResult { Errors = new List<string> { "Lead was not found." } };
+            }
+
             var errors = ValidateStatusRequest(request);
             if (errors.Count > 0)
             {
@@ -139,6 +224,11 @@ namespace Leads.Application.Services
 
         public async Task<LeadConversionResult> ConvertLeadAsync(Guid id, ConvertLeadRequest request, CancellationToken cancellationToken)
         {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return new LeadConversionResult { Errors = new List<string> { "Lead was not found." } };
+            }
+
             var errors = await ValidateConversionRequestAsync(id, request, cancellationToken);
             if (errors.Count > 0)
             {
@@ -157,6 +247,11 @@ namespace Leads.Application.Services
 
         public async Task<LeadAssignmentResult> AssignLeadAsync(Guid id, AssignLeadRequest request, CancellationToken cancellationToken)
         {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return new LeadAssignmentResult { Errors = new List<string> { "Lead was not found." } };
+            }
+
             var errors = await ValidateAssignmentRequestAsync(id, request, cancellationToken);
             if (errors.Count > 0)
             {
@@ -174,11 +269,16 @@ namespace Leads.Application.Services
 
         public Task<List<LeadInteractionViewModel>?> GetLeadInteractionsAsync(Guid id, CancellationToken cancellationToken)
         {
-            return _leadRepository.GetLeadInteractionsAsync(id, cancellationToken);
+            return GetLeadInteractionsWithAccessAsync(id, cancellationToken);
         }
 
         public async Task<LeadInteractionResult> CreateLeadInteractionAsync(Guid id, CreateLeadInteractionRequest request, CancellationToken cancellationToken)
         {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return new LeadInteractionResult { Errors = new List<string> { "Lead was not found." } };
+            }
+
             var errors = ValidateInteractionRequest(id, request);
             if (errors.Count > 0)
             {
@@ -270,11 +370,6 @@ namespace Leads.Application.Services
             if (!await _leadRepository.ClientExistsAsync(clientId, cancellationToken)) errors.Add("ClientId is invalid.");
             if (!await _leadRepository.ContactBelongsToClientAsync(clientContactId, clientId, cancellationToken)) errors.Add("ClientContactId does not belong to the selected client.");
             if (partnerId.HasValue && !await _partnerLookupService.PartnerExistsAsync(partnerId.Value, cancellationToken)) errors.Add("PartnerId is invalid.");
-            if (await _leadRepository.ActiveLeadExistsForClientContactAsync(clientId, clientContactId, excludingLeadId, cancellationToken))
-            {
-                errors.Add("An active lead already exists for the selected client contact.");
-            }
-
             errors.AddRange(await ValidateSourceDetailsAsync(sourceId, partnerId, campaignName, sourceStartDate, sourceEndDate, address, cancellationToken));
 
             errors.AddRange(await ValidateProductInterestAvailabilityAsync(sourceId, partnerId, productIds, cancellationToken));
@@ -540,6 +635,45 @@ namespace Leads.Application.Services
         {
             await Task.CompletedTask;
             return $"OPP-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
+        }
+
+        private async Task<List<LeadInteractionViewModel>?> GetLeadInteractionsWithAccessAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _leadRepository.GetLeadInteractionsAsync(id, cancellationToken);
+        }
+
+        private async Task<bool> EnsureCanAccessLeadAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await _leadRepository.LeadExistsAsync(id, cancellationToken))
+            {
+                return false;
+            }
+
+            var currentUserId = _userContextService.GetUserId();
+            if (!currentUserId.HasValue)
+            {
+                throw new UnauthorizedAccessException("You are not allowed to access this lead.");
+            }
+
+            if (!await _leadRepository.UserCanAccessLeadAsync(id, currentUserId.Value, HasOverrideAccess(), cancellationToken))
+            {
+                throw new UnauthorizedAccessException("You are not allowed to access this lead.");
+            }
+
+            return true;
+        }
+
+        private bool HasOverrideAccess()
+        {
+            var roles = _userContextService.GetUserRoles();
+            return roles.Any(role =>
+                string.Equals(role, DefaultRoles.SuperAdmin, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, DefaultRoles.Admin, StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsValidEmail(string email)
