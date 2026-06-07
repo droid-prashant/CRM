@@ -35,7 +35,7 @@ namespace Dashboard.Infrastructure.Services
             return new DashboardViewModel
             {
                 Summary = await BuildSummaryAsync(scopedLeads, scopedClients, scopedOpportunities, cancellationToken),
-                LeadAnalytics = await BuildLeadAnalyticsAsync(scopedLeads, cancellationToken),
+                LeadAnalytics = await BuildLeadAnalyticsAsync(scopedLeads, scopedOpportunities, cancellationToken),
                 ClientAnalytics = await BuildClientAnalyticsAsync(scopedClients, scope, cancellationToken),
                 OpportunityAnalytics = await BuildOpportunityAnalyticsAsync(scopedOpportunities, cancellationToken),
                 RecentActivities = await BuildRecentActivitiesAsync(scope, cancellationToken)
@@ -225,7 +225,7 @@ namespace Dashboard.Infrastructure.Services
             };
         }
 
-        private async Task<LeadAnalyticsViewModel> BuildLeadAnalyticsAsync(IQueryable<Lead> leads, CancellationToken cancellationToken)
+        private async Task<LeadAnalyticsViewModel> BuildLeadAnalyticsAsync(IQueryable<Lead> leads, IQueryable<Opportunity> opportunities, CancellationToken cancellationToken)
         {
             var now = DateTime.UtcNow;
             var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -252,6 +252,7 @@ namespace Dashboard.Infrastructure.Services
 
             return new LeadAnalyticsViewModel
             {
+                SalesFunnel = await BuildSalesFunnelAsync(leads, opportunities, cancellationToken),
                 LeadsByStatus = await leads
                     .GroupBy(x => x.Status)
                     .Select(x => new ChartPointViewModel { Label = x.Key.ToString(), Count = x.Count() })
@@ -268,6 +269,138 @@ namespace Dashboard.Infrastructure.Services
                 AssignedLeads = await leads.CountAsync(x => x.AssignedToUserId.HasValue, cancellationToken),
                 UnassignedLeads = await leads.CountAsync(x => !x.AssignedToUserId.HasValue, cancellationToken),
                 LeadConversionRate = total == 0 ? 0 : Math.Round((decimal)converted / total * 100, 2)
+            };
+        }
+
+        private async Task<List<ChartPointViewModel>> BuildSalesFunnelAsync(IQueryable<Lead> leads, IQueryable<Opportunity> opportunities, CancellationToken cancellationToken)
+        {
+            var leadSnapshots = await leads
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Status,
+                    x.AssignedToUserId,
+                    x.ConvertedOpportunityId
+                })
+                .ToListAsync(cancellationToken);
+
+            var leadIds = leadSnapshots.Select(x => x.Id).ToList();
+            var qualifiedLeadIds = leadSnapshots
+                .Where(x => x.Status == LeadStatus.Qualified
+                    || x.Status == LeadStatus.Assigned
+                    || x.Status == LeadStatus.Converted
+                    || x.AssignedToUserId.HasValue
+                    || x.ConvertedOpportunityId.HasValue)
+                .Select(x => x.Id)
+                .ToHashSet();
+            var assignedLeadIds = leadSnapshots
+                .Where(x => x.Status == LeadStatus.Assigned
+                    || x.AssignedToUserId.HasValue
+                    || x.ConvertedOpportunityId.HasValue)
+                .Select(x => x.Id)
+                .ToHashSet();
+            var opportunityLeadIds = leadSnapshots
+                .Where(x => x.Status == LeadStatus.Converted || x.ConvertedOpportunityId.HasValue)
+                .Select(x => x.Id)
+                .ToHashSet();
+
+            if (leadIds.Count > 0)
+            {
+                foreach (var id in await _dbContext.LeadTimelineEntries
+                             .AsNoTracking()
+                             .Where(x => x.IsActive
+                                 && leadIds.Contains(x.LeadId)
+                                 && x.EventType == "LeadStatusChanged"
+                                 && x.Description.Contains("NewStatus=Qualified"))
+                             .Select(x => x.LeadId)
+                             .Distinct()
+                             .ToListAsync(cancellationToken))
+                {
+                    qualifiedLeadIds.Add(id);
+                }
+
+                foreach (var id in await _dbContext.LeadTimelineEntries
+                             .AsNoTracking()
+                             .Where(x => x.IsActive
+                                 && leadIds.Contains(x.LeadId)
+                                 && x.EventType == "LeadAssigned")
+                             .Select(x => x.LeadId)
+                             .Distinct()
+                             .ToListAsync(cancellationToken))
+                {
+                    assignedLeadIds.Add(id);
+                    qualifiedLeadIds.Add(id);
+                }
+
+                foreach (var id in await _dbContext.LeadTimelineEntries
+                             .AsNoTracking()
+                             .Where(x => x.IsActive
+                                 && leadIds.Contains(x.LeadId)
+                                 && x.EventType == "LeadConverted")
+                             .Select(x => x.LeadId)
+                             .Distinct()
+                             .ToListAsync(cancellationToken))
+                {
+                    opportunityLeadIds.Add(id);
+                    assignedLeadIds.Add(id);
+                    qualifiedLeadIds.Add(id);
+                }
+            }
+
+            var convertedOpportunityIds = leadSnapshots
+                .Where(x => x.ConvertedOpportunityId.HasValue)
+                .Select(x => x.ConvertedOpportunityId!.Value)
+                .Distinct()
+                .ToList();
+            var wonOpportunityIds = new HashSet<Guid>();
+
+            if (convertedOpportunityIds.Count > 0)
+            {
+                var visibleConvertedOpportunityIds = await opportunities
+                    .Where(x => convertedOpportunityIds.Contains(x.Id))
+                    .Select(x => x.Id)
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+
+                foreach (var id in await opportunities
+                             .Where(x => visibleConvertedOpportunityIds.Contains(x.Id)
+                                 && (x.Status.ToLower() == "won" || x.Stage.ToLower() == "won"))
+                             .Select(x => x.Id)
+                             .Distinct()
+                             .ToListAsync(cancellationToken))
+                {
+                    wonOpportunityIds.Add(id);
+                }
+
+                var wonStageIds = await _dbContext.OpportunityStages
+                    .AsNoTracking()
+                    .Where(x => x.IsActive && !x.IsDeleted && x.IsWonStage)
+                    .Select(x => x.Id)
+                    .ToListAsync(cancellationToken);
+
+                if (wonStageIds.Count > 0)
+                {
+                    foreach (var id in await _dbContext.OpportunityStageHistories
+                                 .AsNoTracking()
+                                 .Where(x => x.IsActive
+                                     && visibleConvertedOpportunityIds.Contains(x.OpportunityId)
+                                     && wonStageIds.Contains(x.ToStageId))
+                                 .Select(x => x.OpportunityId)
+                                 .Distinct()
+                                 .ToListAsync(cancellationToken))
+                    {
+                        wonOpportunityIds.Add(id);
+                    }
+                }
+            }
+
+            return new List<ChartPointViewModel>
+            {
+                new() { Label = "Lead", Count = leadSnapshots.Count },
+                new() { Label = "Qualified", Count = qualifiedLeadIds.Count },
+                new() { Label = "Assigned", Count = assignedLeadIds.Count },
+                new() { Label = "Opportunity", Count = opportunityLeadIds.Count },
+                new() { Label = "Won", Count = wonOpportunityIds.Count }
             };
         }
 

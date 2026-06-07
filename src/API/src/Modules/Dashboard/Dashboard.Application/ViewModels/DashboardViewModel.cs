@@ -27,6 +27,7 @@ namespace Dashboard.Application.ViewModels
 
     public class LeadAnalyticsViewModel
     {
+        public List<ChartPointViewModel> SalesFunnel { get; set; } = new();
         public List<ChartPointViewModel> LeadsByStatus { get; set; } = new();
         public List<ChartPointViewModel> LeadsBySource { get; set; } = new();
         public List<MonthlyTrendViewModel> MonthlyLeadTrend { get; set; } = new();

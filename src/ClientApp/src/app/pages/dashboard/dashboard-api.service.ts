@@ -50,6 +50,7 @@ export interface DashboardSummaryViewModel {
 }
 
 export interface LeadAnalyticsViewModel {
+    salesFunnel: ChartPointViewModel[];
     leadsByStatus: ChartPointViewModel[];
     leadsBySource: ChartPointViewModel[];
     monthlyLeadTrend: MonthlyTrendViewModel[];

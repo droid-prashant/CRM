@@ -68,7 +68,7 @@ import { DashboardApiService, DashboardViewModel, ChartPointViewModel, MonthlyTr
                     <div class="mb-4 flex items-center justify-between">
                         <div>
                             <h2 class="m-0 text-base font-semibold text-surface-950 dark:text-surface-0">Sales Funnel</h2>
-                            <p class="mt-1 mb-0 text-xs text-surface-500 dark:text-surface-400">Lead progression using current CRM statuses.</p>
+                            <p class="mt-1 mb-0 text-xs text-surface-500 dark:text-surface-400">Cumulative records that reached each stage.</p>
                         </div>
                         <span class="panel-badge">{{ dashboard.summary.totalLeads }} leads</span>
                     </div>
@@ -585,22 +585,17 @@ export class Dashboard implements OnInit {
     }
 
     get salesFunnel() {
-        const summary = this.dashboard?.summary;
-        if (!summary) {
+        const rows = this.dashboard?.leadAnalytics.salesFunnel ?? [];
+        if (rows.length === 0) {
             return [];
         }
 
-        const total = Math.max(summary.totalLeads, 1);
-        const rows = [
-            { label: 'Lead', count: summary.totalLeads, color: '#2563eb' },
-            { label: 'Qualified', count: summary.qualifiedLeads, color: '#3b82f6' },
-            { label: 'Assigned', count: summary.assignedLeads, color: '#14b8a6' },
-            { label: 'Opportunity', count: summary.openOpportunities, color: '#22c55e' },
-            { label: 'Won', count: summary.wonOpportunities, color: '#84cc16' }
-        ];
+        const funnelColors = ['#2563eb', '#3b82f6', '#14b8a6', '#22c55e', '#84cc16'];
+        const total = Math.max(rows[0]?.count ?? 0, 1);
 
         return rows.map((row, index) => ({
             ...row,
+            color: funnelColors[index % funnelColors.length],
             width: Math.max(38, 100 - index * 13),
             rate: `${Math.round((row.count / total) * 100)}%`
         }));
