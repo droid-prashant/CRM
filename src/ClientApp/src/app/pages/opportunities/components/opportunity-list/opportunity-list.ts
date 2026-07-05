@@ -94,7 +94,7 @@ export class OpportunityList implements OnInit {
         clientId: [''],
         stageId: [''],
         ownerUserId: [''],
-        status: ['Open']
+        status: ['']
     });
 
     opportunityForm = this.fb.group({
@@ -485,7 +485,7 @@ export class OpportunityList implements OnInit {
             clientId: '',
             stageId: '',
             ownerUserId: '',
-            status: 'Open'
+            status: ''
         });
         this.applyFilters();
     }
