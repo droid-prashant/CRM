@@ -70,7 +70,7 @@
             <tr>
                 <td><p-tableCheckbox [value]="row" /></td>
                 @for (column of columns; track column.field) {
-                    <td>
+                    <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;" [title]="row[column.field]">
                         @switch (column.type) {
                             @case ('currency') {
                                 <span>{{ row[column.field] | currency: column.format || 'USD' }}</span>
