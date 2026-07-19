@@ -160,6 +160,7 @@ export class OpportunityList implements OnInit {
         const defaultCurrencyId = this.currencies[0]?.id ?? '';
         const defaultOwnerUserId = this.users[0]?.id ?? '';
         this.contacts = [];
+        this.selectedProduct = undefined;
         this.opportunityForm.reset({
             clientId: '',
             contactId: '',
@@ -231,24 +232,21 @@ export class OpportunityList implements OnInit {
         this.contacts = clientId ? this.allContacts.filter((contact) => contact.clientId === clientId) : [];
     }
 
+    selectedProduct: ProductLookupViewModel | undefined;
+
     onProductChange(productId: string): void {
-        const product = this.products.find((p) => p.id === productId);
-        if (!product) {
+        this.selectedProduct = this.products.find((p) => p.id === productId);
+        if (!this.selectedProduct) {
             return;
         }
 
-        if (!product.isLicenseBased) {
+        if (!this.selectedProduct.isLicenseBased) {
             this.opportunityForm.patchValue({ licenseFee: 0, amcFee: 0, implementationFee: 0 });
         }
 
-        if (!product.isSubscriptionBased) {
+        if (!this.selectedProduct.isSubscriptionBased) {
             this.opportunityForm.patchValue({ subscriptionFee: 0 });
         }
-    }
-
-    get selectedProduct(): ProductLookupViewModel | undefined {
-        const productId = this.opportunityForm.get('productId')?.value;
-        return productId ? this.products.find((p) => p.id === productId) : undefined;
     }
 
     onStageChange(opportunity: OpportunityListItemViewModel, event: Event): void {

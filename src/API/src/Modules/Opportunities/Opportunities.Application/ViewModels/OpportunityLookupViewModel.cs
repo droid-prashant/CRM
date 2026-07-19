@@ -4,7 +4,7 @@ namespace Opportunities.Application.ViewModels
     {
         public List<OpportunityClientLookupViewModel> Clients { get; set; } = new();
         public List<OpportunityContactLookupViewModel> Contacts { get; set; } = new();
-        public List<OpportunityLookupItemViewModel> Products { get; set; } = new();
+        public List<OpportunityProductLookupViewModel> Products { get; set; } = new();
         public List<OpportunityLeadLookupViewModel> Leads { get; set; } = new();
         public List<OpportunityCurrencyLookupViewModel> Currencies { get; set; } = new();
         public List<OpportunityUserLookupViewModel> OwnerUsers { get; set; } = new();
@@ -36,6 +36,14 @@ namespace Opportunities.Application.ViewModels
         public bool IsFinal { get; set; }
         public bool IsWonStage { get; set; }
         public bool IsLostStage { get; set; }
+    }
+
+    public class OpportunityProductLookupViewModel
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public bool IsLicenseBased { get; set; }
+        public bool IsSubscriptionBased { get; set; }
     }
 
     public class OpportunityLeadLookupViewModel
