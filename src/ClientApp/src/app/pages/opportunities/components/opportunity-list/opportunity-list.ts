@@ -30,6 +30,7 @@ import {
     OpportunityPipelineStageViewModel,
     OpportunityStageHistoryViewModel,
     OpportunityUserLookupViewModel,
+    ProductLookupViewModel,
     UpdateOpportunityRequest
 } from '../../services/opportunity-api.service';
 
@@ -46,7 +47,7 @@ export class OpportunityList implements OnInit {
     clients: ClientLookupViewModel[] = [];
     allContacts: ContactLookupViewModel[] = [];
     contacts: ContactLookupViewModel[] = [];
-    products: LookupViewModel[] = [];
+    products: ProductLookupViewModel[] = [];
     leads: LeadLookupViewModel[] = [];
     users: OpportunityUserLookupViewModel[] = [];
     currencies: CurrencyLookupViewModel[] = [];
@@ -106,7 +107,11 @@ export class OpportunityList implements OnInit {
         estimatedValue: [0, [Validators.required, Validators.min(0)]],
         currencyId: ['', Validators.required],
         expectedCloseDate: [''],
-        ownerUserId: ['', Validators.required]
+        ownerUserId: ['', Validators.required],
+        licenseFee: [0],
+        amcFee: [0],
+        implementationFee: [0],
+        subscriptionFee: [0]
     });
 
     editForm = this.fb.group({
@@ -164,7 +169,11 @@ export class OpportunityList implements OnInit {
             estimatedValue: 0,
             currencyId: defaultCurrencyId,
             expectedCloseDate: '',
-            ownerUserId: defaultOwnerUserId
+            ownerUserId: defaultOwnerUserId,
+            licenseFee: 0,
+            amcFee: 0,
+            implementationFee: 0,
+            subscriptionFee: 0
         });
         this.createDialog = true;
     }
@@ -220,6 +229,26 @@ export class OpportunityList implements OnInit {
     onClientChange(clientId: string): void {
         this.opportunityForm.patchValue({ contactId: '' });
         this.contacts = clientId ? this.allContacts.filter((contact) => contact.clientId === clientId) : [];
+    }
+
+    onProductChange(productId: string): void {
+        const product = this.products.find((p) => p.id === productId);
+        if (!product) {
+            return;
+        }
+
+        if (!product.isLicenseBased) {
+            this.opportunityForm.patchValue({ licenseFee: 0, amcFee: 0, implementationFee: 0 });
+        }
+
+        if (!product.isSubscriptionBased) {
+            this.opportunityForm.patchValue({ subscriptionFee: 0 });
+        }
+    }
+
+    get selectedProduct(): ProductLookupViewModel | undefined {
+        const productId = this.opportunityForm.get('productId')?.value;
+        return productId ? this.products.find((p) => p.id === productId) : undefined;
     }
 
     onStageChange(opportunity: OpportunityListItemViewModel, event: Event): void {
@@ -582,8 +611,7 @@ export class OpportunityList implements OnInit {
             searchTerm: filters.searchTerm?.trim() || undefined,
             clientId: filters.clientId || undefined,
             stageId: filters.stageId || undefined,
-            ownerUserId: filters.ownerUserId || undefined,
-            status: filters.status || undefined
+            ownerUserId: filters.ownerUserId || undefined
         };
     }
 
@@ -598,7 +626,11 @@ export class OpportunityList implements OnInit {
             estimatedValue: value.estimatedValue ?? 0,
             currencyId: value.currencyId ?? '',
             ownerUserId: value.ownerUserId ?? '',
-            expectedCloseDate: value.expectedCloseDate ? new Date(value.expectedCloseDate).toISOString() : undefined
+            expectedCloseDate: value.expectedCloseDate ? new Date(value.expectedCloseDate).toISOString() : undefined,
+            licenseFee: value.licenseFee || undefined,
+            amcFee: value.amcFee || undefined,
+            implementationFee: value.implementationFee || undefined,
+            subscriptionFee: value.subscriptionFee || undefined
         };
     }
 

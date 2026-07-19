@@ -307,6 +307,46 @@ export class Crud implements OnChanges, OnDestroy {
         return field.required === true || (field.requiredWhen ? field.requiredWhen(this.currentFormValue(), this.mode) : false);
     }
 
+    getFieldError(field: DynamicField): string | null {
+        const control = this.form.get(field.key);
+        if (!control || !control.errors || !(control.touched || this.submitted)) {
+            return null;
+        }
+
+        const messages = field.validationMessages ?? {};
+
+        if (control.errors['required']) {
+            return messages['required'] ?? `${field.label} is required`;
+        }
+
+        if (control.errors['minlength']) {
+            return messages['minlength'] ?? `${field.label} must be at least ${control.errors['minlength'].requiredLength} characters`;
+        }
+
+        if (control.errors['maxlength']) {
+            return messages['maxlength'] ?? `${field.label} must be at most ${control.errors['maxlength'].requiredLength} characters`;
+        }
+
+        if (control.errors['pattern']) {
+            return messages['pattern'] ?? `${field.label} format is invalid`;
+        }
+
+        if (control.errors['email']) {
+            return messages['email'] ?? `${field.label} must be a valid email`;
+        }
+
+        if (control.errors['min']) {
+            return messages['min'] ?? `${field.label} must be at least ${control.errors['min'].min}`;
+        }
+
+        if (control.errors['max']) {
+            return messages['max'] ?? `${field.label} must be at most ${control.errors['max'].max}`;
+        }
+
+        const firstKey = Object.keys(control.errors)[0];
+        return messages[firstKey] ?? `${field.label} is invalid`;
+    }
+
     fieldOptions(field: DynamicField): SelectOption[] {
         const options = field.options ?? [];
         return field.optionFilter ? options.filter((option) => field.optionFilter?.(option, this.currentFormValue(), this.mode) === true) : options;
@@ -316,7 +356,7 @@ export class Crud implements OnChanges, OnDestroy {
         const group: Record<string, unknown[]> = {};
 
         this.fields.forEach((field) => {
-            group[field.key] = [this.getDefaultValue(field), []];
+            group[field.key] = [this.getDefaultValue(field), field.validators ?? []];
         });
 
         const form = this.fb.group(group);
@@ -336,7 +376,11 @@ export class Crud implements OnChanges, OnDestroy {
                 return;
             }
 
-            control.setValidators(this.isFieldRequired(field) ? [Validators.required] : []);
+            const validators = [...(field.validators ?? [])];
+            if (this.isFieldRequired(field)) {
+                validators.unshift(Validators.required);
+            }
+            control.setValidators(validators);
 
             if (!this.isFieldVisible(field) && field.clearWhenHidden !== false) {
                 control.reset(this.getDefaultValue(field), { emitEvent: false });

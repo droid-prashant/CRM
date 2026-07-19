@@ -19,6 +19,7 @@ import { LookupViewModel } from '../../view-models/lookup.view-model';
     standalone: true,
     imports: [Crud, ToastModule],
     templateUrl: './lead-list.html',
+    styleUrls: ['./lead-list.scss'],
     providers: [MessageService]
 })
 export class LeadList implements OnInit {

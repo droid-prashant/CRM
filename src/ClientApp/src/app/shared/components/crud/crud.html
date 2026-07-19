@@ -155,7 +155,7 @@
                                         <p-select [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" class="w-full" />
                                     }
                                     @case ('multiSelect') {
-                                        <p-multiselect [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" display="chip" class="w-full" />
+                                        <p-multiselect [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" display="chip" [panelStyle]="{ 'max-height': '250px', 'overflow-y': 'auto' }" class="w-full" />
                                     }
                                     @case ('radio') {
                                         <div class="grid grid-cols-12 gap-3">
@@ -175,8 +175,8 @@
                                     }
                                 }
 
-                                @if (form.get(field.key)?.errors && (form.get(field.key)?.touched || submitted)) {
-                                    <span class="p-error mt-1 block text-sm text-red-600">{{ field.label }} is required</span>
+                                @if (getFieldError(field); as errorMsg) {
+                                    <span class="p-error mt-1 block text-sm text-red-600">{{ errorMsg }}</span>
                                 }
                             </div>
                         }

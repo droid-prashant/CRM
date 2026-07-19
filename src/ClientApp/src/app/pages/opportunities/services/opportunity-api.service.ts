@@ -62,6 +62,10 @@ export interface CreateOpportunityRequest {
     currencyId: string;
     ownerUserId: string;
     expectedCloseDate?: string;
+    licenseFee?: number;
+    amcFee?: number;
+    implementationFee?: number;
+    subscriptionFee?: number;
 }
 
 export interface UpdateOpportunityRequest {
@@ -134,10 +138,17 @@ export interface CurrencyLookupViewModel {
     name: string;
 }
 
+export interface ProductLookupViewModel {
+    id: string;
+    name: string;
+    isLicenseBased: boolean;
+    isSubscriptionBased: boolean;
+}
+
 export interface OpportunityLookupBundle {
     clients: ClientLookupViewModel[];
     contacts: ContactLookupViewModel[];
-    products: LookupViewModel[];
+    products: ProductLookupViewModel[];
     leads: LeadLookupViewModel[];
     ownerUsers: OpportunityUserLookupViewModel[];
     currencies: CurrencyLookupViewModel[];
