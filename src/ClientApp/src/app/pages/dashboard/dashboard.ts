@@ -3,7 +3,8 @@ import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { ChartModule } from 'primeng/chart';
 import { TagModule } from 'primeng/tag';
-import { DashboardApiService, DashboardViewModel, ChartPointViewModel, MonthlyTrendViewModel, OpportunityHighlightViewModel } from './dashboard-api.service';
+import { DashboardApiService } from './dashboard-api.service';
+import { ChartPointViewModel, CurrencyAmountViewModel, DashboardViewModel, MonthlyTrendViewModel, OpportunityHighlightViewModel } from './view-models/dashboard.view-model';
 
 @Component({
     selector: 'app-dashboard',
@@ -107,13 +108,13 @@ import { DashboardApiService, DashboardViewModel, ChartPointViewModel, MonthlyTr
                     </div>
                     <div class="space-y-4">
                         @for (stage of pipelineStages; track stage.label) {
-                            <div class="grid grid-cols-[7rem_1fr_3rem_4rem] items-center gap-3 text-sm">
+                            <div class="grid grid-cols-[7rem_1fr_3rem_minmax(5.75rem,auto)] items-center gap-3 text-sm">
                                 <span class="truncate text-surface-600 dark:text-surface-300">{{ stage.label }}</span>
                                 <div class="pipeline-track h-4 overflow-hidden rounded bg-surface-100 dark:bg-surface-800">
                                     <div class="h-full rounded" [style.width.%]="stage.width" [style.background]="stage.color"></div>
                                 </div>
                                 <span class="text-right font-semibold text-surface-900 dark:text-surface-100">{{ stage.count }}</span>
-                                <span class="text-right text-xs text-surface-500">{{ compact(stage.value) }}</span>
+                                <span class="text-right text-xs text-surface-500">{{ formatCurrencyAmounts(stage.amounts, stage.value) }}</span>
                             </div>
                         } @empty {
                             <div class="text-sm text-surface-500">No opportunity stages found.</div>
@@ -122,11 +123,11 @@ import { DashboardApiService, DashboardViewModel, ChartPointViewModel, MonthlyTr
                     <div class="mt-5 grid grid-cols-2 gap-3 border-t border-surface-100 pt-4 dark:border-surface-800">
                         <div>
                             <div class="text-xs text-surface-500">Open Pipeline</div>
-                            <div class="mt-1 text-lg font-semibold text-surface-950 dark:text-surface-0">{{ compact(dashboard.opportunityAnalytics.openPipelineValue) }}</div>
+                            <div class="mt-1 text-lg font-semibold text-surface-950 dark:text-surface-0">{{ formatCurrencyAmounts(dashboard.opportunityAnalytics.openPipelineValues, dashboard.opportunityAnalytics.openPipelineValue) }}</div>
                         </div>
                         <div>
                             <div class="text-xs text-surface-500">Expected Revenue</div>
-                            <div class="mt-1 text-lg font-semibold text-surface-950 dark:text-surface-0">{{ compact(dashboard.opportunityAnalytics.expectedRevenue) }}</div>
+                            <div class="mt-1 text-lg font-semibold text-surface-950 dark:text-surface-0">{{ formatCurrencyAmounts(dashboard.opportunityAnalytics.expectedRevenues, dashboard.opportunityAnalytics.expectedRevenue) }}</div>
                         </div>
                     </div>
                 </div>
@@ -189,13 +190,13 @@ import { DashboardApiService, DashboardViewModel, ChartPointViewModel, MonthlyTr
                         <button type="button" class="text-sm font-semibold text-blue-600" (click)="navigate('/pages/opportunities')">View All</button>
                     </div>
                     @for (item of dashboard.opportunityAnalytics.topOpportunitiesByValue; track item.id; let index = $index) {
-                        <button type="button" class="list-row mb-4 grid w-full grid-cols-[1.5rem_1fr_4.5rem_3rem] items-center gap-3 rounded-md p-2 text-left last:mb-0" (click)="navigate('/pages/opportunities')">
+                        <button type="button" class="list-row mb-4 grid w-full grid-cols-[1.5rem_1fr_5.75rem_3rem] items-center gap-3 rounded-md p-2 text-left last:mb-0" (click)="navigate('/pages/opportunities')">
                             <span class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-200">{{ index + 1 }}</span>
                             <span class="min-w-0">
                                 <span class="block truncate text-sm font-semibold text-surface-950 dark:text-surface-0">{{ item.title }}</span>
                                 <span class="block truncate text-xs text-surface-500">{{ item.opportunityNumber }} - {{ item.stage }}</span>
                             </span>
-                            <span class="text-right text-sm font-semibold text-surface-900 dark:text-surface-100">{{ compact(item.estimatedValue) }}</span>
+                            <span class="text-right text-sm font-semibold text-surface-900 dark:text-surface-100">{{ moneyCompact(item.estimatedValue, item.currencyCode) }}</span>
                             <span class="h-2 rounded bg-blue-600" [style.width.%]="opportunityBarWidth(item)"></span>
                         </button>
                     } @empty {
@@ -265,7 +266,7 @@ import { DashboardApiService, DashboardViewModel, ChartPointViewModel, MonthlyTr
                                     <tr class="transition">
                                         <td class="border-b border-surface-100 py-3 pr-4 font-semibold text-surface-950 dark:border-surface-800 dark:text-surface-0">{{ item.title }}</td>
                                         <td class="border-b border-surface-100 py-3 pr-4 dark:border-surface-800"><p-tag [value]="item.stage" severity="info" /></td>
-                                        <td class="border-b border-surface-100 py-3 text-right dark:border-surface-800">{{ compact(item.estimatedValue) }}</td>
+                                        <td class="border-b border-surface-100 py-3 text-right dark:border-surface-800">{{ moneyCompact(item.estimatedValue, item.currencyCode) }}</td>
                                         <td class="border-b border-surface-100 py-3 text-right text-surface-500 dark:border-surface-800">{{ formatDate(item.expectedCloseDate) }}</td>
                                     </tr>
                                 } @empty {
@@ -544,7 +545,7 @@ export class Dashboard implements OnInit {
                 tint: 'rgba(245, 158, 11, 0.14)',
                 metrics: [
                     { label: 'Opportunities', value: this.number(summary.totalOpportunities), context: `${summary.openOpportunities} open`, trendIcon: 'pi-arrow-up', color: '#f59e0b', route: '/pages/opportunities', query: {} },
-                    { label: 'Expected Revenue', value: this.moneyCompact(opportunity.expectedRevenue), context: `${this.moneyCompact(opportunity.openPipelineValue)} open`, trendIcon: 'pi-arrow-up', color: '#2563eb', route: '/pages/opportunities', query: {} }
+                    { label: 'Expected Revenue', value: this.formatCurrencyAmounts(opportunity.expectedRevenues, opportunity.expectedRevenue), context: `${this.formatCurrencyAmounts(opportunity.openPipelineValues, opportunity.openPipelineValue)} open`, trendIcon: 'pi-arrow-up', color: '#2563eb', route: '/pages/opportunities', query: {} }
                 ]
             },
             {
@@ -555,7 +556,7 @@ export class Dashboard implements OnInit {
                 tint: 'rgba(34, 197, 94, 0.14)',
                 metrics: [
                     { label: 'Won Deals', value: this.number(summary.wonOpportunities), context: compactPercent(opportunity.opportunityConversionRate), trendIcon: 'pi-arrow-up', color: '#22c55e', route: '/pages/opportunities', query: { status: 'Won' } },
-                    { label: 'Lost Deals', value: this.number(summary.lostOpportunities), context: `${this.moneyCompact(opportunity.lostDealValue)} value`, trendIcon: 'pi-arrow-down', color: '#e11d48', route: '/pages/opportunities', query: { status: 'Lost' } }
+                    { label: 'Lost Deals', value: this.number(summary.lostOpportunities), context: `${this.formatCurrencyAmounts(opportunity.lostDealValues, opportunity.lostDealValue)} value`, trendIcon: 'pi-arrow-down', color: '#e11d48', route: '/pages/opportunities', query: { status: 'Lost' } }
                 ]
             }
         ];
@@ -715,8 +716,22 @@ export class Dashboard implements OnInit {
         return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value ?? 0);
     }
 
-    moneyCompact(value: number): string {
-        return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1, style: 'currency', currency: 'USD' }).format(value ?? 0);
+    formatCurrencyAmounts(amounts: CurrencyAmountViewModel[] | undefined, fallbackValue: number): string {
+        const currencyAmounts = (amounts ?? []).filter((amount) => amount.currencyCode);
+        if (currencyAmounts.length === 0) {
+            return this.moneyCompact(fallbackValue, 'NPR');
+        }
+
+        return currencyAmounts.map((amount) => this.moneyCompact(amount.amount, amount.currencyCode)).join(', ');
+    }
+
+    moneyCompact(value: number, currencyCode = 'NPR'): string {
+        const currency = currencyCode || 'NPR';
+        try {
+            return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1, style: 'currency', currency, currencyDisplay: 'code' }).format(value ?? 0);
+        } catch {
+            return `${currency} ${this.compact(value)}`;
+        }
     }
 
     formatDate(value?: string): string {

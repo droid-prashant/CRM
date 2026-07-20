@@ -14,9 +14,10 @@ import { DynamicField, SelectOption } from '@/shared/dynamic-form/models/dynamic
 import { LookupViewModel } from '../../../leads/view-models/lookup.view-model';
 import { ClientColumns } from '../../config/client-columns.config';
 import { buildClientFields } from '../../config/client-fields.config';
+import { ClientListQuery } from '../../dtos/client-query.dto';
 import { CreateClientRequest } from '../../dtos/create-client.request';
 import { UpdateClientRequest } from '../../dtos/update-client.request';
-import { ClientApiService, ClientListQuery } from '../../services/client-api.service';
+import { ClientApiService } from '../../services/client-api.service';
 import { ClientListItemViewModel } from '../../view-models/client-list-item.view-model';
 import { ClientUserLookupViewModel } from '../../view-models/client-user-lookup.view-model';
 

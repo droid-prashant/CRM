@@ -479,8 +479,8 @@ namespace Dashboard.Infrastructure.Services
         private async Task<OpportunityAnalyticsViewModel> BuildOpportunityAnalyticsAsync(IQueryable<Opportunity> opportunities, CancellationToken cancellationToken)
         {
             var stageRows = await opportunities
-                .GroupBy(x => new { x.StageId, x.Stage })
-                .Select(x => new { x.Key.StageId, x.Key.Stage, Count = x.Count(), Value = x.Sum(o => o.EstimatedValue) })
+                .GroupBy(x => new { x.StageId, x.Stage, x.CurrencyId })
+                .Select(x => new { x.Key.StageId, x.Key.Stage, x.Key.CurrencyId, Count = x.Count(), Value = x.Sum(o => o.EstimatedValue) })
                 .OrderByDescending(x => x.Count)
                 .ToListAsync(cancellationToken);
             var stageIds = stageRows.Select(x => x.StageId).ToList();
@@ -495,17 +495,33 @@ namespace Dashboard.Infrastructure.Services
             return new OpportunityAnalyticsViewModel
             {
                 OpportunitiesByStage = stageRows
+                    .GroupBy(x => new { x.StageId, x.Stage })
                     .Select(x => new ChartPointViewModel
                     {
-                        Label = stages.GetValueOrDefault(x.StageId) ?? x.Stage,
-                        Count = x.Count,
-                        Value = x.Value
+                        Label = stages.GetValueOrDefault(x.Key.StageId) ?? x.Key.Stage,
+                        Count = x.Sum(row => row.Count),
+                        Value = x.Sum(row => row.Value),
+                        Amounts = x
+                            .GroupBy(row => row.CurrencyId)
+                            .Select(row => new CurrencyAmountViewModel
+                            {
+                                CurrencyCode = GetCurrencyCode(row.Key),
+                                Amount = row.Sum(item => item.Value)
+                            })
+                            .Where(row => !string.IsNullOrWhiteSpace(row.CurrencyCode))
+                            .OrderBy(row => row.CurrencyCode)
+                            .ToList()
                     })
+                    .OrderByDescending(x => x.Count)
                     .ToList(),
                 OpenPipelineValue = await opportunities.Where(x => x.Status.ToLower() == "open").SumAsync(x => x.EstimatedValue, cancellationToken),
+                OpenPipelineValues = await BuildCurrencyAmountsAsync(opportunities.Where(x => x.Status.ToLower() == "open"), false, cancellationToken),
                 WonDealValue = await opportunities.Where(x => x.Status.ToLower() == "won" || x.Stage.ToLower() == "won").SumAsync(x => x.FinalAmount ?? x.EstimatedValue, cancellationToken),
+                WonDealValues = await BuildCurrencyAmountsAsync(opportunities.Where(x => x.Status.ToLower() == "won" || x.Stage.ToLower() == "won"), true, cancellationToken),
                 LostDealValue = await opportunities.Where(x => x.Status.ToLower() == "lost" || x.Stage.ToLower() == "lost").SumAsync(x => x.FinalAmount ?? x.EstimatedValue, cancellationToken),
+                LostDealValues = await BuildCurrencyAmountsAsync(opportunities.Where(x => x.Status.ToLower() == "lost" || x.Stage.ToLower() == "lost"), true, cancellationToken),
                 ExpectedRevenue = await opportunities.Where(x => x.Status.ToLower() == "open").SumAsync(x => x.EstimatedValue, cancellationToken),
+                ExpectedRevenues = await BuildCurrencyAmountsAsync(opportunities.Where(x => x.Status.ToLower() == "open"), false, cancellationToken),
                 OpportunityConversionRate = total == 0 ? 0 : Math.Round((decimal)won / total * 100, 2),
                 TopOpportunitiesByValue = await opportunities
                     .OrderByDescending(x => x.EstimatedValue)
@@ -517,6 +533,7 @@ namespace Dashboard.Infrastructure.Services
                         Title = x.Title,
                         Stage = x.Stage,
                         EstimatedValue = x.EstimatedValue,
+                        CurrencyCode = GetCurrencyCode(x.CurrencyId),
                         ExpectedCloseDate = x.ExpectedCloseDate
                     })
                     .ToListAsync(cancellationToken),
@@ -531,6 +548,7 @@ namespace Dashboard.Infrastructure.Services
                         Title = x.Title,
                         Stage = x.Stage,
                         EstimatedValue = x.EstimatedValue,
+                        CurrencyCode = GetCurrencyCode(x.CurrencyId),
                         ExpectedCloseDate = x.ExpectedCloseDate
                     })
                     .ToListAsync(cancellationToken),
@@ -540,6 +558,38 @@ namespace Dashboard.Infrastructure.Services
                     new() { Label = "Lost", Count = await opportunities.CountAsync(x => x.Status.ToLower() == "lost" || x.Stage.ToLower() == "lost", cancellationToken) }
                 }
             };
+        }
+
+        private static async Task<List<CurrencyAmountViewModel>> BuildCurrencyAmountsAsync(IQueryable<Opportunity> opportunities, bool useFinalAmount, CancellationToken cancellationToken)
+        {
+            var rows = useFinalAmount
+                ? await opportunities
+                    .GroupBy(x => x.CurrencyId)
+                    .Select(x => new { CurrencyId = x.Key, Amount = x.Sum(o => o.FinalAmount ?? o.EstimatedValue) })
+                    .ToListAsync(cancellationToken)
+                : await opportunities
+                    .GroupBy(x => x.CurrencyId)
+                    .Select(x => new { CurrencyId = x.Key, Amount = x.Sum(o => o.EstimatedValue) })
+                    .ToListAsync(cancellationToken);
+
+            return rows
+                .Select(x => new CurrencyAmountViewModel
+                {
+                    CurrencyCode = GetCurrencyCode(x.CurrencyId),
+                    Amount = x.Amount
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.CurrencyCode))
+                .OrderBy(x => x.CurrencyCode)
+                .ToList();
+        }
+
+        private static string GetCurrencyCode(Guid currencyId)
+        {
+            if (currencyId == Guid.Parse("70000000-0000-0000-0000-000000000001")) return "NPR";
+            if (currencyId == Guid.Parse("70000000-0000-0000-0000-000000000002")) return "USD";
+            if (currencyId == Guid.Parse("70000000-0000-0000-0000-000000000003")) return "INR";
+
+            return string.Empty;
         }
 
         private async Task<RecentActivitiesViewModel> BuildRecentActivitiesAsync(DashboardScope scope, CancellationToken cancellationToken)
