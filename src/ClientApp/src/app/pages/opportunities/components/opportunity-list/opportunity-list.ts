@@ -14,24 +14,21 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/core/auth/auth.service';
 import { Permissions } from '@/core/auth/permissions';
+import { CreateOpportunityActivityRequest, CreateOpportunityRequest, OpportunityListQuery, UpdateOpportunityRequest } from '../../dtos/opportunity.dto';
 import {
     ClientLookupViewModel,
     ContactLookupViewModel,
-    CreateOpportunityActivityRequest,
-    CreateOpportunityRequest,
     CurrencyLookupViewModel,
     LeadLookupViewModel,
     LookupViewModel,
     OpportunityActivityViewModel,
-    OpportunityApiService,
     OpportunityListItemViewModel,
-    OpportunityListQuery,
     OpportunityLookupBundle,
     OpportunityPipelineStageViewModel,
     OpportunityStageHistoryViewModel,
-    OpportunityUserLookupViewModel,
-    UpdateOpportunityRequest
-} from '../../services/opportunity-api.service';
+    OpportunityUserLookupViewModel
+} from '../../view-models/opportunity.view-model';
+import { OpportunityApiService } from '../../services/opportunity-api.service';
 
 @Component({
     selector: 'app-opportunity-list',
@@ -441,7 +438,8 @@ export class OpportunityList implements OnInit {
     formatCurrency(value: number, currencyCode?: string): string {
         return new Intl.NumberFormat(undefined, {
             style: 'currency',
-            currency: currencyCode || 'USD',
+            currency: currencyCode || 'NPR',
+            currencyDisplay: 'code',
             maximumFractionDigits: 2
         }).format(value ?? 0);
     }

@@ -19,8 +19,10 @@ import { AuthService } from '@/core/auth/auth.service';
 import { Permissions } from '@/core/auth/permissions';
 import { UserApiService } from '@/pages/users/services/user-api.service';
 import { UserListItemViewModel } from '@/pages/users/view-models/user-list-item.view-model';
+import { ConvertLeadRequest, CreateLeadInteractionRequest } from '../../dtos/lead-action.dto';
 import { UpdateLeadRequest } from '../../dtos/update-lead.request';
-import { ClientLookupViewModel, ContactLookupViewModel, ConvertLeadRequest, CreateLeadInteractionRequest, LeadApiService, LeadConversionViewModel, LeadInteractionViewModel, LeadLookupBundle } from '../../services/lead.api-service';
+import { LeadApiService } from '../../services/lead.api-service';
+import { ClientLookupViewModel, ContactLookupViewModel, LeadConversionViewModel, LeadInteractionViewModel, LeadLookupBundle } from '../../view-models/lead-action.view-model';
 import { LeadDetailViewModel } from '../../view-models/lead-detail.view-model';
 
 @Component({

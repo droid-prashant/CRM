@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { apiUrl } from '@/core/http/api-url';
+import { ClientListQuery, ClientTimelineQuery } from '../dtos/client-query.dto';
 import { CreateClientRequest } from '../dtos/create-client.request';
 import { CreateClientContactRequest } from '../dtos/create-client-contact.request';
 import { CreateClientProductRequest } from '../dtos/create-client-product.request';
@@ -20,24 +21,6 @@ import { ClientRelatedRecordsSummaryViewModel } from '../view-models/client-rela
 import { ClientTimelineResponseViewModel } from '../view-models/client-timeline.view-model';
 import { ClientUpdatedViewModel } from '../view-models/client-updated.view-model';
 import { PrimaryContactViewModel } from '../view-models/primary-contact.view-model';
-
-export interface ClientListQuery {
-    pageNumber?: number;
-    pageSize?: number;
-    searchTerm?: string;
-    countryId?: string;
-    industryId?: string;
-    status?: number;
-    accountOwnerUserId?: string;
-    sortBy?: string;
-    sortDirection?: 'asc' | 'desc';
-}
-
-export interface ClientTimelineQuery {
-    activityType?: string | null;
-    pageNumber?: number;
-    pageSize?: number;
-}
 
 @Injectable({ providedIn: 'root' })
 export class ClientApiService {
