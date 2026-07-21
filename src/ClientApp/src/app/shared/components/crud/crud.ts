@@ -54,6 +54,7 @@ export interface CrudSaveEvent {
         ToolbarModule
     ],
     templateUrl: './crud.html',
+    styleUrls: ['./crud.scss'],
     providers: [ConfirmationService]
 })
 export class Crud implements OnChanges, OnDestroy {

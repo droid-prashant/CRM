@@ -51,7 +51,7 @@
 
         <ng-template #header>
             <tr>
-                <th style="width: 3rem"><p-tableHeaderCheckbox /></th>
+                <th class="crud-selection-column"><p-tableHeaderCheckbox /></th>
                 @for (column of columns; track column.field) {
                     <th [pSortableColumn]="column.sortable ? column.field : undefined" [style.width]="column.width">
                         {{ column.header }}
@@ -61,7 +61,7 @@
                     </th>
                 }
                 @if (enableViewAction || canEdit || canRowAction) {
-                    <th style="width: 4rem" class="text-center"></th>
+                    <th class="crud-actions-column text-center"></th>
                 }
             </tr>
         </ng-template>
@@ -70,13 +70,13 @@
             <tr>
                 <td><p-tableCheckbox [value]="row" /></td>
                 @for (column of columns; track column.field) {
-                    <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;" [title]="row[column.field]">
+                    <td class="crud-truncate-cell" [title]="row[column.field]">
                         @switch (column.type) {
                             @case ('currency') {
                                 <span>{{ row[column.field] | currency: column.format || 'USD' }}</span>
                             }
                             @case ('image') {
-                                <img [src]="row[column.field]" alt="" style="height: 48px; width: auto; border-radius: 6px" />
+                                <img [src]="row[column.field]" alt="" class="crud-table-image" />
                             }
                             @case ('checkbox') {
                                 <span>{{ row[column.field] ? 'Yes' : 'No' }}</span>

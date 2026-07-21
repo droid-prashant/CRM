@@ -1,0 +1,20 @@
+.crud-selection-column {
+    width: 3rem;
+}
+
+.crud-actions-column {
+    width: 4rem;
+}
+
+.crud-truncate-cell {
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.crud-table-image {
+    height: 48px;
+    width: auto;
+    border-radius: 6px;
+}
