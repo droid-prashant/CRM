@@ -29,6 +29,7 @@ namespace Opportunities.Infrastructure.Persistence.Data
         public DbSet<OpportunityStage> OpportunityStages { get; set; }
         public DbSet<OpportunityStageHistory> OpportunityStageHistories { get; set; }
         public DbSet<OpportunityActivity> OpportunityActivities { get; set; }
+        public DbSet<OpportunityDocument> OpportunityDocuments { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -85,6 +86,18 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Property(x => x.Notes).HasMaxLength(2000).IsRequired();
                 entity.HasOne(x => x.Opportunity).WithMany(x => x.Activities).HasForeignKey(x => x.OpportunityId);
                 entity.HasIndex(x => new { x.OpportunityId, x.ActivityDate });
+            });
+
+            modelBuilder.Entity<OpportunityDocument>(entity =>
+            {
+                entity.ToTable("OpportunityDocuments", "leads");
+                entity.Property(x => x.DocumentType).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.FileName).HasMaxLength(255).IsRequired();
+                entity.Property(x => x.StoredFileName).HasMaxLength(255).IsRequired();
+                entity.Property(x => x.FilePath).HasMaxLength(500).IsRequired();
+                entity.Property(x => x.ContentType).HasMaxLength(150).IsRequired();
+                entity.HasOne(x => x.Opportunity).WithMany(x => x.Documents).HasForeignKey(x => x.OpportunityId);
+                entity.HasIndex(x => new { x.OpportunityId, x.DocumentType, x.IsActive });
             });
 
             modelBuilder.Entity<Lead>(entity =>

@@ -13,6 +13,7 @@ namespace Opportunities.Application.Repositories
         Task<OpportunityListItemViewModel?> ChangeStageAsync(Guid id, ChangeOpportunityStageRequest request, CancellationToken cancellationToken);
         Task<OpportunityListItemViewModel?> CloseAsWonAsync(Guid id, CloseOpportunityRequest request, CancellationToken cancellationToken);
         Task<OpportunityListItemViewModel?> CloseAsLostAsync(Guid id, CloseOpportunityRequest request, CancellationToken cancellationToken);
+        Task<OpportunityDocumentViewModel?> GetProposalDocumentAsync(Guid id, CancellationToken cancellationToken);
         Task<List<OpportunityStageHistoryViewModel>?> GetStageHistoryAsync(Guid id, CancellationToken cancellationToken);
         Task<List<OpportunityActivityViewModel>?> GetActivitiesAsync(Guid id, CancellationToken cancellationToken);
         Task<OpportunityActivityViewModel?> CreateActivityAsync(Guid id, CreateOpportunityActivityRequest request, CancellationToken cancellationToken);
@@ -24,5 +25,7 @@ namespace Opportunities.Application.Repositories
         Task<bool> ContactBelongsToClientAsync(Guid contactId, Guid clientId, CancellationToken cancellationToken);
         Task<bool> UserExistsAsync(Guid userId);
         Task<bool> StageExistsAsync(Guid stageId, CancellationToken cancellationToken);
+        Task<bool> StageIsProposalSentAsync(Guid stageId, CancellationToken cancellationToken);
+        Task<bool> OpportunityHasProposalDocumentAsync(Guid id, CancellationToken cancellationToken);
     }
 }

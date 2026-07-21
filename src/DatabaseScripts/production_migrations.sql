@@ -1116,6 +1116,46 @@ END
 $migration$;
 
 -- -------------------------------------------------------------------------
+-- 20260721103000_OpportunityProposalDocuments
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260721103000_OpportunityProposalDocuments') THEN
+        RETURN;
+    END IF;
+
+    CREATE TABLE IF NOT EXISTS "leads"."OpportunityDocuments" (
+        "Id" uuid NOT NULL,
+        "OpportunityId" uuid NOT NULL,
+        "DocumentType" character varying(50) NOT NULL,
+        "FileName" character varying(255) NOT NULL,
+        "StoredFileName" character varying(255) NOT NULL,
+        "FilePath" character varying(500) NOT NULL,
+        "ContentType" character varying(150) NOT NULL,
+        "FileSize" bigint NOT NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL,
+        CONSTRAINT "PK_OpportunityDocuments" PRIMARY KEY ("Id")
+    );
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_OpportunityDocuments_Opportunities_OpportunityId') THEN
+        ALTER TABLE "leads"."OpportunityDocuments" ADD CONSTRAINT "FK_OpportunityDocuments_Opportunities_OpportunityId"
+        FOREIGN KEY ("OpportunityId") REFERENCES "leads"."Opportunities" ("Id") ON DELETE CASCADE;
+    END IF;
+
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityDocuments_OpportunityId_DocumentType_IsActive"
+        ON "leads"."OpportunityDocuments" ("OpportunityId", "DocumentType", "IsActive");
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260721103000_OpportunityProposalDocuments', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
 -- 20260528140000_ClientProductMappings
 -- -------------------------------------------------------------------------
 DO $migration$

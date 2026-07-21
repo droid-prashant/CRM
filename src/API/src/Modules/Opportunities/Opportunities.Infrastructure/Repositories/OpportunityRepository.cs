@@ -12,6 +12,8 @@ namespace Opportunities.Infrastructure.Repositories
 {
     public class OpportunityRepository : IOpportunityRepository
     {
+        private const string ProposalDocumentType = "Proposal";
+
         private readonly OpportunitiesDbContext _dbContext;
         private readonly UserManager<ApplicationUser> _userManager;
 
@@ -234,6 +236,21 @@ namespace Opportunities.Infrastructure.Repositories
                 Remarks = Clean(request.Remarks)
             });
 
+            if (!string.IsNullOrWhiteSpace(request.ProposalDocumentPath))
+            {
+                DeactivateExistingProposalDocuments(opportunity.Id);
+                _dbContext.OpportunityDocuments.Add(new OpportunityDocument
+                {
+                    OpportunityId = opportunity.Id,
+                    DocumentType = ProposalDocumentType,
+                    FileName = request.ProposalDocumentFileName?.Trim() ?? string.Empty,
+                    StoredFileName = request.ProposalDocumentStoredFileName?.Trim() ?? string.Empty,
+                    FilePath = request.ProposalDocumentPath.Trim(),
+                    ContentType = request.ProposalDocumentContentType?.Trim() ?? string.Empty,
+                    FileSize = request.ProposalDocumentSize ?? 0
+                });
+            }
+
             await _dbContext.SaveChangesAsync(cancellationToken);
             return await MapOpportunityAsync(opportunity, cancellationToken);
         }
@@ -280,6 +297,19 @@ namespace Opportunities.Infrastructure.Repositories
             }
 
             return viewModels;
+        }
+
+        public async Task<OpportunityDocumentViewModel?> GetProposalDocumentAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await _dbContext.Opportunities.AsNoTracking().AnyAsync(x => x.Id == id && x.IsActive, cancellationToken))
+            {
+                return null;
+            }
+
+            var document = await GetLatestProposalDocumentQuery(id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return document == null ? null : await MapDocumentAsync(document);
         }
 
         public async Task<List<OpportunityActivityViewModel>?> GetActivitiesAsync(Guid id, CancellationToken cancellationToken)
@@ -376,6 +406,18 @@ namespace Opportunities.Infrastructure.Repositories
             return GetActiveStagesQuery().AnyAsync(x => x.Id == stageId, cancellationToken);
         }
 
+        public Task<bool> StageIsProposalSentAsync(Guid stageId, CancellationToken cancellationToken)
+        {
+            return GetActiveStagesQuery().AnyAsync(
+                x => x.Id == stageId && x.Name.ToLower() == "proposal sent",
+                cancellationToken);
+        }
+
+        public Task<bool> OpportunityHasProposalDocumentAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return GetLatestProposalDocumentQuery(id).AnyAsync(cancellationToken);
+        }
+
         private async Task<OpportunityListItemViewModel?> CloseOpportunityAsync(Guid id, bool won, CloseOpportunityRequest request, CancellationToken cancellationToken)
         {
             var opportunity = await BaseOpportunityQuery()
@@ -466,6 +508,7 @@ namespace Opportunities.Infrastructure.Repositories
                 : null;
 
             var stage = opportunity.CurrentStage ?? await _dbContext.OpportunityStages.AsNoTracking().FirstOrDefaultAsync(x => x.Id == opportunity.StageId, cancellationToken);
+            var proposalDocument = await GetLatestProposalDocumentQuery(opportunity.Id).FirstOrDefaultAsync(cancellationToken);
 
             return new OpportunityListItemViewModel
             {
@@ -494,7 +537,11 @@ namespace Opportunities.Infrastructure.Repositories
                 FinalAmount = opportunity.FinalAmount,
                 ClosedDate = opportunity.ClosedDate,
                 ClosingNote = opportunity.ClosingNote,
-                LostReason = opportunity.LostReason
+                LostReason = opportunity.LostReason,
+                HasProposalDocument = proposalDocument != null,
+                ProposalDocumentId = proposalDocument?.Id,
+                ProposalDocumentFileName = proposalDocument?.FileName,
+                ProposalDocumentUploadedOn = proposalDocument?.CreatedOn
             };
         }
 
@@ -603,6 +650,43 @@ namespace Opportunities.Infrastructure.Repositories
                 CreatedByUserId = activity.CreatedBy,
                 CreatedByUserName = await GetUserFullNameAsync(activity.CreatedBy)
             };
+        }
+
+        private async Task<OpportunityDocumentViewModel> MapDocumentAsync(OpportunityDocument document)
+        {
+            return new OpportunityDocumentViewModel
+            {
+                Id = document.Id,
+                OpportunityId = document.OpportunityId,
+                DocumentType = document.DocumentType,
+                FileName = document.FileName,
+                StoredFileName = document.StoredFileName,
+                FilePath = document.FilePath,
+                ContentType = document.ContentType,
+                FileSize = document.FileSize,
+                UploadedByUserId = document.CreatedBy,
+                UploadedByUserName = await GetUserFullNameAsync(document.CreatedBy),
+                UploadedOn = document.CreatedOn
+            };
+        }
+
+        private IQueryable<OpportunityDocument> GetLatestProposalDocumentQuery(Guid opportunityId)
+        {
+            return _dbContext.OpportunityDocuments
+                .AsNoTracking()
+                .Where(x => x.OpportunityId == opportunityId && x.IsActive && x.DocumentType == ProposalDocumentType)
+                .OrderByDescending(x => x.CreatedOn);
+        }
+
+        private void DeactivateExistingProposalDocuments(Guid opportunityId)
+        {
+            var documents = _dbContext.OpportunityDocuments
+                .Where(x => x.OpportunityId == opportunityId && x.IsActive && x.DocumentType == ProposalDocumentType);
+
+            foreach (var document in documents)
+            {
+                document.IsActive = false;
+            }
         }
 
         private static string GetCurrencyCode(Guid currencyId)
