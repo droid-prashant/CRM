@@ -28,6 +28,10 @@ export function buildPartnerFields(options: PartnerFieldOptions): DynamicField[]
         const code = normalizePartnerTypeCode(partnerType?.code ?? partnerType?.label);
         return partnerType?.canOwnProducts === true || partnerTypeCapabilities[code]?.canOwnProducts === true;
     };
+    const countryDialingCode = (formValue: Record<string, unknown>): string => {
+        const country = options.countries.find((item) => item.value === formValue['countryId']);
+        return country?.dialingCode ?? '';
+    };
 
     return [
         { key: 'name', label: 'Partner Name', type: 'text', required: true, colSpan: 4, section: 'Partner', placeholder: 'Partner organization or individual' },
@@ -35,7 +39,7 @@ export function buildPartnerFields(options: PartnerFieldOptions): DynamicField[]
         { key: 'countryId', label: 'Country', type: 'select', required: true, options: options.countries, colSpan: 4, section: 'Partner', placeholder: 'Select country' },
         { key: 'productIds', label: 'Owned Products', type: 'multiSelect', options: options.products, colSpan: 12, section: 'Products', placeholder: 'Select partner-owned products', visibleWhen: canOwnProducts, clearWhenHidden: true },
         { key: 'contactPerson', label: 'Contact Person', type: 'text', colSpan: 4, section: 'Contact', placeholder: 'Primary contact' },
-        { key: 'phoneNumber', label: 'Phone Number', type: 'text', colSpan: 4, section: 'Contact', placeholder: 'Phone number' },
+        { key: 'phoneNumber', label: 'Phone Number', type: 'text', colSpan: 4, section: 'Contact', placeholder: 'Phone number', inputPrefix: countryDialingCode },
         { key: 'email', label: 'Email', type: 'email', colSpan: 4, section: 'Contact', placeholder: 'name@example.com' },
         { key: 'address', label: 'Address', type: 'textarea', colSpan: 6, section: 'Additional Details' },
         { key: 'remarks', label: 'Remarks', type: 'textarea', colSpan: 6, section: 'Additional Details' },
