@@ -33,6 +33,7 @@ secrets.json
 /Angular/dist/
 /Angular/.angular/
 /Angular/.env
+/src/ClientApp/dist/
 
 # Angular IDE files
 .AngularCache/

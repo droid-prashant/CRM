@@ -10,7 +10,8 @@ import { buildLeadFields } from '../../config/lead-fields.config';
 import { LeadColumns } from '../../config/lead-columns.config';
 import { CreateLeadRequest } from '../../dtos/create-lead.request';
 import { UpdateLeadRequest } from '../../dtos/update-lead.request';
-import { LeadApiService, LeadLookupBundle } from '../../services/lead.api-service';
+import { LeadApiService } from '../../services/lead.api-service';
+import { LeadLookupBundle } from '../../view-models/lead-action.view-model';
 import { LeadListItemViewModel } from '../../view-models/lead-list-item.view-model';
 import { LookupViewModel } from '../../view-models/lookup.view-model';
 

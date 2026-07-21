@@ -55,9 +55,13 @@ namespace Dashboard.Application.ViewModels
     {
         public List<ChartPointViewModel> OpportunitiesByStage { get; set; } = new();
         public decimal OpenPipelineValue { get; set; }
+        public List<CurrencyAmountViewModel> OpenPipelineValues { get; set; } = new();
         public decimal WonDealValue { get; set; }
+        public List<CurrencyAmountViewModel> WonDealValues { get; set; } = new();
         public decimal LostDealValue { get; set; }
+        public List<CurrencyAmountViewModel> LostDealValues { get; set; } = new();
         public decimal ExpectedRevenue { get; set; }
+        public List<CurrencyAmountViewModel> ExpectedRevenues { get; set; } = new();
         public decimal OpportunityConversionRate { get; set; }
         public List<OpportunityHighlightViewModel> TopOpportunitiesByValue { get; set; } = new();
         public List<OpportunityHighlightViewModel> OpportunitiesClosingSoon { get; set; } = new();
@@ -75,6 +79,13 @@ namespace Dashboard.Application.ViewModels
         public string Label { get; set; } = string.Empty;
         public int Count { get; set; }
         public decimal Value { get; set; }
+        public List<CurrencyAmountViewModel> Amounts { get; set; } = new();
+    }
+
+    public class CurrencyAmountViewModel
+    {
+        public string CurrencyCode { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
     }
 
     public class MonthlyTrendViewModel
@@ -98,6 +109,7 @@ namespace Dashboard.Application.ViewModels
         public string Title { get; set; } = string.Empty;
         public string Stage { get; set; } = string.Empty;
         public decimal EstimatedValue { get; set; }
+        public string CurrencyCode { get; set; } = string.Empty;
         public DateTime? ExpectedCloseDate { get; set; }
     }
 
