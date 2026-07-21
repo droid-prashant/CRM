@@ -28,5 +28,9 @@ namespace Opportunities.Application.ViewModels
         public DateTime? ClosedDate { get; set; }
         public string? ClosingNote { get; set; }
         public string? LostReason { get; set; }
+        public bool HasProposalDocument { get; set; }
+        public Guid? ProposalDocumentId { get; set; }
+        public string? ProposalDocumentFileName { get; set; }
+        public DateTime? ProposalDocumentUploadedOn { get; set; }
     }
 }

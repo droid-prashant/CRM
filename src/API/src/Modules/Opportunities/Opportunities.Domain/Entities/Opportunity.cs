@@ -25,5 +25,6 @@ namespace Opportunities.Domain.Entities
         public OpportunityStage? CurrentStage { get; set; }
         public ICollection<OpportunityStageHistory> StageHistories { get; set; } = new List<OpportunityStageHistory>();
         public ICollection<OpportunityActivity> Activities { get; set; } = new List<OpportunityActivity>();
+        public ICollection<OpportunityDocument> Documents { get; set; } = new List<OpportunityDocument>();
     }
 }

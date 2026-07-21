@@ -8,12 +8,21 @@ namespace Opportunities.Application.Services
 {
     public class OpportunityService : IOpportunityService
     {
+        private const long MaxProposalDocumentBytes = 10 * 1024 * 1024;
+
         private static readonly HashSet<Guid> SupportedCurrencyIds =
         [
             Guid.Parse("70000000-0000-0000-0000-000000000001"),
             Guid.Parse("70000000-0000-0000-0000-000000000002"),
             Guid.Parse("70000000-0000-0000-0000-000000000003")
         ];
+        private static readonly HashSet<string> AllowedProposalDocumentExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx" };
+        private static readonly HashSet<string> AllowedProposalDocumentContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        };
 
         private readonly IOpportunityRepository _opportunityRepository;
         private readonly IUserContextService _userContextService;
@@ -92,7 +101,7 @@ namespace Opportunities.Application.Services
                 return new OpportunityResult { Forbidden = true };
             }
 
-            var errors = await ValidateStageChangeRequestAsync(request, cancellationToken);
+            var errors = await ValidateStageChangeRequestAsync(id, request, cancellationToken);
             if (errors.Count > 0)
             {
                 return new OpportunityResult { Errors = errors };
@@ -122,6 +131,16 @@ namespace Opportunities.Application.Services
             }
 
             return await _opportunityRepository.GetStageHistoryAsync(id, cancellationToken);
+        }
+
+        public async Task<OpportunityDocumentViewModel?> GetProposalDocumentAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await CanAccessOpportunityAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _opportunityRepository.GetProposalDocumentAsync(id, cancellationToken);
         }
 
         public async Task<List<OpportunityActivityViewModel>?> GetActivitiesAsync(Guid id, CancellationToken cancellationToken)
@@ -231,7 +250,7 @@ namespace Opportunities.Application.Services
             return errors;
         }
 
-        private async Task<List<string>> ValidateStageChangeRequestAsync(ChangeOpportunityStageRequest request, CancellationToken cancellationToken)
+        private async Task<List<string>> ValidateStageChangeRequestAsync(Guid opportunityId, ChangeOpportunityStageRequest request, CancellationToken cancellationToken)
         {
             var errors = new List<string>();
 
@@ -248,6 +267,59 @@ namespace Opportunities.Application.Services
             if (errors.Count == 0 && !await _opportunityRepository.StageExistsAsync(request.StageId, cancellationToken))
             {
                 errors.Add("StageId is invalid.");
+            }
+
+            if (HasProposalDocument(request))
+            {
+                errors.AddRange(ValidateProposalDocument(request));
+            }
+
+            if (errors.Count == 0
+                && await _opportunityRepository.StageIsProposalSentAsync(request.StageId, cancellationToken)
+                && !HasProposalDocument(request)
+                && !await _opportunityRepository.OpportunityHasProposalDocumentAsync(opportunityId, cancellationToken))
+            {
+                errors.Add("Final proposal document is required when moving an opportunity to Proposal Sent.");
+            }
+
+            return errors;
+        }
+
+        private static bool HasProposalDocument(ChangeOpportunityStageRequest request)
+        {
+            return !string.IsNullOrWhiteSpace(request.ProposalDocumentPath);
+        }
+
+        private static List<string> ValidateProposalDocument(ChangeOpportunityStageRequest request)
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(request.ProposalDocumentFileName))
+            {
+                errors.Add("Proposal document file name is required.");
+                return errors;
+            }
+
+            var extension = Path.GetExtension(request.ProposalDocumentFileName);
+            if (!AllowedProposalDocumentExtensions.Contains(extension))
+            {
+                errors.Add("Proposal document must be a PDF, DOC, or DOCX file.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ProposalDocumentContentType)
+                && !AllowedProposalDocumentContentTypes.Contains(request.ProposalDocumentContentType)
+                && !string.Equals(request.ProposalDocumentContentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Proposal document content type is invalid.");
+            }
+
+            if (!request.ProposalDocumentSize.HasValue || request.ProposalDocumentSize <= 0)
+            {
+                errors.Add("Proposal document is required.");
+            }
+            else if (request.ProposalDocumentSize > MaxProposalDocumentBytes)
+            {
+                errors.Add("Proposal document must be 10 MB or smaller.");
             }
 
             return errors;

@@ -13,6 +13,7 @@ namespace Opportunities.Application.Services
         Task<OpportunityResult> ChangeStageAsync(Guid id, ChangeOpportunityStageRequest request, CancellationToken cancellationToken);
         Task<OpportunityResult> CloseAsWonAsync(Guid id, CloseOpportunityRequest request, CancellationToken cancellationToken);
         Task<OpportunityResult> CloseAsLostAsync(Guid id, CloseOpportunityRequest request, CancellationToken cancellationToken);
+        Task<OpportunityDocumentViewModel?> GetProposalDocumentAsync(Guid id, CancellationToken cancellationToken);
         Task<List<OpportunityStageHistoryViewModel>?> GetStageHistoryAsync(Guid id, CancellationToken cancellationToken);
         Task<List<OpportunityActivityViewModel>?> GetActivitiesAsync(Guid id, CancellationToken cancellationToken);
         Task<OpportunityActivityResult> CreateActivityAsync(Guid id, CreateOpportunityActivityRequest request, CancellationToken cancellationToken);

@@ -38,6 +38,10 @@ import { OpportunityApiService } from '../../services/opportunity-api.service';
     providers: [MessageService]
 })
 export class OpportunityList implements OnInit {
+    private readonly proposalSentStageName = 'proposal sent';
+    private readonly maxProposalDocumentBytes = 10 * 1024 * 1024;
+    private readonly allowedProposalDocumentExtensions = new Set(['.pdf', '.doc', '.docx']);
+
     opportunities: OpportunityListItemViewModel[] = [];
     pipelineStages: OpportunityPipelineStageViewModel[] = [];
     clients: ClientLookupViewModel[] = [];
@@ -73,6 +77,8 @@ export class OpportunityList implements OnInit {
     pendingStageOpportunity?: OpportunityListItemViewModel;
     pendingStageId = '';
     pendingStageName = '';
+    selectedProposalDocument?: File;
+    proposalDocumentError = '';
     draggedOpportunity?: OpportunityListItemViewModel;
     dragOverStageId = '';
     stageHistory: OpportunityStageHistoryViewModel[] = [];
@@ -281,6 +287,14 @@ export class OpportunityList implements OnInit {
         this.prepareStageChange(this.draggedOpportunity, stage.stageId);
     }
 
+    get isProposalSentTarget(): boolean {
+        return this.normalizeStageName(this.pendingStageName) === this.proposalSentStageName;
+    }
+
+    get isProposalDocumentRequired(): boolean {
+        return this.isProposalSentTarget && this.pendingStageOpportunity?.hasProposalDocument !== true;
+    }
+
     canMoveOpportunity(opportunity: OpportunityListItemViewModel): boolean {
         return this.canEdit && !opportunity.isFinalStage && opportunity.status === 'Open';
     }
@@ -298,6 +312,8 @@ export class OpportunityList implements OnInit {
         this.pendingStageOpportunity = opportunity;
         this.pendingStageId = stageId;
         this.pendingStageName = targetStage?.name ?? 'selected stage';
+        this.selectedProposalDocument = undefined;
+        this.proposalDocumentError = '';
         this.stageChangeForm.reset({ remarks: '' });
         this.stageChangeDialog = true;
     }
@@ -308,10 +324,19 @@ export class OpportunityList implements OnInit {
             return;
         }
 
+        if (this.isProposalDocumentRequired && !this.selectedProposalDocument) {
+            this.proposalDocumentError = 'Final proposal document is required when moving an opportunity to Proposal Sent.';
+            return;
+        }
+
+        if (this.selectedProposalDocument && !this.isValidProposalDocument(this.selectedProposalDocument)) {
+            return;
+        }
+
         const opportunity = this.pendingStageOpportunity;
         const value = this.stageChangeForm.getRawValue();
         this.isSaving = true;
-        this.opportunityApiService.changeStage(opportunity.id, { stageId: this.pendingStageId, remarks: value.remarks?.trim() || undefined }).subscribe({
+        this.opportunityApiService.changeStage(opportunity.id, { stageId: this.pendingStageId, remarks: value.remarks?.trim() || undefined, proposalDocument: this.selectedProposalDocument }).subscribe({
             next: () => {
                 this.stageChangeDialog = false;
                 this.clearPendingStageChange();
@@ -329,6 +354,17 @@ export class OpportunityList implements OnInit {
     cancelStageChange(): void {
         this.stageChangeDialog = false;
         this.clearPendingStageChange();
+    }
+
+    onProposalDocumentSelected(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.item(0) ?? undefined;
+        this.selectedProposalDocument = file;
+        this.proposalDocumentError = '';
+
+        if (file) {
+            this.isValidProposalDocument(file);
+        }
     }
 
     createOpportunity(): void {
@@ -450,6 +486,26 @@ export class OpportunityList implements OnInit {
 
     closeDatePicker(picker: DatePicker): void {
         setTimeout(() => picker.hideOverlay(), 0);
+    }
+
+    downloadProposalDocument(opportunity: OpportunityListItemViewModel): void {
+        if (!opportunity.hasProposalDocument) {
+            return;
+        }
+
+        this.opportunityApiService.downloadProposalDocument(opportunity.id).subscribe({
+            next: (blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = opportunity.proposalDocumentFileName || `${opportunity.opportunityNumber}-proposal`;
+                link.click();
+                URL.revokeObjectURL(url);
+            },
+            error: () => {
+                this.messageService.add({ severity: 'error', summary: 'Download failed', detail: 'Proposal document could not be downloaded.', life: 5000 });
+            }
+        });
     }
 
     statusSeverity(status?: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
@@ -625,5 +681,32 @@ export class OpportunityList implements OnInit {
         this.pendingStageOpportunity = undefined;
         this.pendingStageId = '';
         this.pendingStageName = '';
+        this.selectedProposalDocument = undefined;
+        this.proposalDocumentError = '';
+    }
+
+    private isValidProposalDocument(file: File): boolean {
+        const extension = this.fileExtension(file.name);
+        if (!this.allowedProposalDocumentExtensions.has(extension)) {
+            this.proposalDocumentError = 'Proposal document must be a PDF, DOC, or DOCX file.';
+            return false;
+        }
+
+        if (file.size > this.maxProposalDocumentBytes) {
+            this.proposalDocumentError = 'Proposal document must be 10 MB or smaller.';
+            return false;
+        }
+
+        this.proposalDocumentError = '';
+        return true;
+    }
+
+    private fileExtension(fileName: string): string {
+        const index = fileName.lastIndexOf('.');
+        return index >= 0 ? fileName.slice(index).toLowerCase() : '';
+    }
+
+    private normalizeStageName(value?: string): string {
+        return (value ?? '').trim().toLowerCase();
     }
 }
