@@ -43,7 +43,7 @@ export class OpportunityList implements OnInit {
     clients: ClientLookupViewModel[] = [];
     allContacts: ContactLookupViewModel[] = [];
     contacts: ContactLookupViewModel[] = [];
-    products: LookupViewModel[] = [];
+    products: ProductLookupViewModel[] = [];
     leads: LeadLookupViewModel[] = [];
     users: OpportunityUserLookupViewModel[] = [];
     currencies: CurrencyLookupViewModel[] = [];
@@ -103,7 +103,11 @@ export class OpportunityList implements OnInit {
         estimatedValue: [0, [Validators.required, Validators.min(0)]],
         currencyId: ['', Validators.required],
         expectedCloseDate: [''],
-        ownerUserId: ['', Validators.required]
+        ownerUserId: ['', Validators.required],
+        licenseFee: [0],
+        amcFee: [0],
+        implementationFee: [0],
+        subscriptionFee: [0]
     });
 
     editForm = this.fb.group({
@@ -152,6 +156,7 @@ export class OpportunityList implements OnInit {
         const defaultCurrencyId = this.currencies[0]?.id ?? '';
         const defaultOwnerUserId = this.users[0]?.id ?? '';
         this.contacts = [];
+        this.selectedProduct = undefined;
         this.opportunityForm.reset({
             clientId: '',
             contactId: '',
@@ -161,7 +166,11 @@ export class OpportunityList implements OnInit {
             estimatedValue: 0,
             currencyId: defaultCurrencyId,
             expectedCloseDate: '',
-            ownerUserId: defaultOwnerUserId
+            ownerUserId: defaultOwnerUserId,
+            licenseFee: 0,
+            amcFee: 0,
+            implementationFee: 0,
+            subscriptionFee: 0
         });
         this.createDialog = true;
     }
@@ -217,6 +226,23 @@ export class OpportunityList implements OnInit {
     onClientChange(clientId: string): void {
         this.opportunityForm.patchValue({ contactId: '' });
         this.contacts = clientId ? this.allContacts.filter((contact) => contact.clientId === clientId) : [];
+    }
+
+    selectedProduct: ProductLookupViewModel | undefined;
+
+    onProductChange(productId: string): void {
+        this.selectedProduct = this.products.find((p) => p.id === productId);
+        if (!this.selectedProduct) {
+            return;
+        }
+
+        if (!this.selectedProduct.isLicenseBased) {
+            this.opportunityForm.patchValue({ licenseFee: 0, amcFee: 0, implementationFee: 0 });
+        }
+
+        if (!this.selectedProduct.isSubscriptionBased) {
+            this.opportunityForm.patchValue({ subscriptionFee: 0 });
+        }
     }
 
     onStageChange(opportunity: OpportunityListItemViewModel, event: Event): void {
@@ -580,8 +606,7 @@ export class OpportunityList implements OnInit {
             searchTerm: filters.searchTerm?.trim() || undefined,
             clientId: filters.clientId || undefined,
             stageId: filters.stageId || undefined,
-            ownerUserId: filters.ownerUserId || undefined,
-            status: filters.status || undefined
+            ownerUserId: filters.ownerUserId || undefined
         };
     }
 
@@ -596,7 +621,11 @@ export class OpportunityList implements OnInit {
             estimatedValue: value.estimatedValue ?? 0,
             currencyId: value.currencyId ?? '',
             ownerUserId: value.ownerUserId ?? '',
-            expectedCloseDate: value.expectedCloseDate ? new Date(value.expectedCloseDate).toISOString() : undefined
+            expectedCloseDate: value.expectedCloseDate ? new Date(value.expectedCloseDate).toISOString() : undefined,
+            licenseFee: value.licenseFee || undefined,
+            amcFee: value.amcFee || undefined,
+            implementationFee: value.implementationFee || undefined,
+            subscriptionFee: value.subscriptionFee || undefined
         };
     }
 

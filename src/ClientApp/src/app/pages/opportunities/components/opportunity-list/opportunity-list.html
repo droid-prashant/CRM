@@ -361,7 +361,7 @@
         </div>
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Product</label>
-            <p-select [options]="products" optionLabel="name" optionValue="id" appendTo="body" formControlName="productId" class="w-full" />
+            <p-select [options]="products" optionLabel="name" optionValue="id" appendTo="body" formControlName="productId" class="w-full" (onChange)="onProductChange($event.value)" />
         </div>
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Related Lead</label>
@@ -387,6 +387,38 @@
             <label class="mb-2 block text-sm font-semibold">Owner</label>
             <p-select [options]="users" optionLabel="fullName" optionValue="id" appendTo="body" formControlName="ownerUserId" class="w-full" />
         </div>
+
+        @if (selectedProduct?.isLicenseBased) {
+            <div class="col-span-12 mt-2 border-t border-surface-200 pt-4 dark:border-surface-700">
+                <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400">License Fees</div>
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="mb-2 block text-sm font-semibold">License Fee</label>
+                        <p-inputnumber formControlName="licenseFee" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                    </div>
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="mb-2 block text-sm font-semibold">AMC Fee</label>
+                        <p-inputnumber formControlName="amcFee" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                    </div>
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="mb-2 block text-sm font-semibold">Implementation Fee</label>
+                        <p-inputnumber formControlName="implementationFee" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (selectedProduct?.isSubscriptionBased) {
+            <div class="col-span-12 mt-2 border-t border-surface-200 pt-4 dark:border-surface-700">
+                <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400">Subscription Fees</div>
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="mb-2 block text-sm font-semibold">Subscription Fee</label>
+                        <p-inputnumber formControlName="subscriptionFee" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                    </div>
+                </div>
+            </div>
+        }
     </form>
 
     <ng-template #footer>

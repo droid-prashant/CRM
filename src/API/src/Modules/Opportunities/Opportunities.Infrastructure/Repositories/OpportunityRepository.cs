@@ -98,11 +98,12 @@ namespace Opportunities.Infrastructure.Repositories
                     .AsNoTracking()
                     .Where(x => x.IsActive && !x.IsDeleted)
                     .OrderBy(x => x.Name)
-                    .Select(x => new OpportunityLookupItemViewModel
+                    .Select(x => new OpportunityProductLookupViewModel
                     {
                         Id = x.Id,
                         Name = x.Name,
-                        Code = x.Code
+                        IsLicenseBased = x.IsLicenseBased,
+                        IsSubscriptionBased = x.IsSubscriptionBased
                     })
                     .ToListAsync(cancellationToken),
                 Leads = await _dbContext.Leads
