@@ -57,8 +57,10 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.Property(x => x.Email).HasMaxLength(250);
                 entity.Property(x => x.Phone).HasMaxLength(50);
                 entity.Property(x => x.Status).HasConversion<int>();
+                entity.Property(x => x.IsDeleted).HasDefaultValue(false);
                 entity.HasIndex(x => x.ClientId);
                 entity.HasIndex(x => x.ClientContactId);
+                entity.HasIndex(x => new { x.IsDeleted, x.DeletedOn });
                 entity.HasOne<CrmClient>().WithMany().HasForeignKey(x => x.ClientId);
                 entity.HasOne<CrmClientContact>().WithMany().HasForeignKey(x => x.ClientContactId);
                 entity.HasOne<Opportunity>().WithMany().HasForeignKey(x => x.ConvertedOpportunityId);
@@ -183,6 +185,22 @@ namespace Leads.Infrastructure.Persistence.Data
             ConfigureProduct(modelBuilder);
             ConfigureLookup<Country>(modelBuilder);
             ConfigureLookup<Industry>(modelBuilder);
+            ConfigureDeleteAuditColumns(modelBuilder, typeof(Lead));
+        }
+
+        private static void ConfigureDeleteAuditColumns(ModelBuilder modelBuilder, params Type[] mappedEntityTypes)
+        {
+            var mappedTypes = mappedEntityTypes.ToHashSet();
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (!typeof(BaseEntity).IsAssignableFrom(entityType.ClrType) || mappedTypes.Contains(entityType.ClrType))
+                {
+                    continue;
+                }
+
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedBy));
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedOn));
+            }
         }
 
         private static void ConfigureProduct(ModelBuilder modelBuilder)

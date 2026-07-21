@@ -4,7 +4,7 @@ import { forkJoin, Observable } from 'rxjs';
 import { AssignLeadRequest, ConvertLeadRequest, CreateLeadInteractionRequest, DisqualifyLeadRequest, QualifyLeadRequest } from '../dtos/lead-action.dto';
 import { CreateLeadRequest } from '../dtos/create-lead.request';
 import { UpdateLeadRequest } from '../dtos/update-lead.request';
-import { ClientLookupViewModel, ContactLookupViewModel, LeadAssignmentResultViewModel, LeadConversionViewModel, LeadInteractionViewModel, LeadLookupBundle, LeadQualificationResultViewModel, OpportunityCreatedViewModel } from '../view-models/lead-action.view-model';
+import { ClientLookupViewModel, ContactLookupViewModel, DeletedLeadLogViewModel, LeadAssignmentResultViewModel, LeadConversionViewModel, LeadInteractionViewModel, LeadLookupBundle, LeadQualificationResultViewModel, OpportunityCreatedViewModel } from '../view-models/lead-action.view-model';
 import { LeadDetailViewModel } from '../view-models/lead-detail.view-model';
 import { LeadEditViewModel } from '../view-models/lead-edit.view-model';
 import { LeadListItemViewModel } from '../view-models/lead-list-item.view-model';
@@ -20,6 +20,10 @@ export class LeadApiService {
 
     getLeads(): Observable<LeadListItemViewModel[]> {
         return this.http.get<LeadListItemViewModel[]>(this.endpoints.leads);
+    }
+
+    getDeletedLeadLogs(): Observable<DeletedLeadLogViewModel[]> {
+        return this.http.get<DeletedLeadLogViewModel[]>(`${this.endpoints.leads}/deleted`);
     }
 
     getLead(id: string): Observable<LeadDetailViewModel> {
