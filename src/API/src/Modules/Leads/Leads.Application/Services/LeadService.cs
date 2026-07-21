@@ -7,11 +7,14 @@ using Leads.Domain.Enums;
 using Partners.Application.Services;
 using Partners.Domain.Constants;
 using System.Net.Mail;
+using System.Text.RegularExpressions;
 
 namespace Leads.Application.Services
 {
     public class LeadService : ILeadService
     {
+        private const string NepalContactNumberPattern = @"^\d{10}$";
+
         private readonly ILeadRepository _leadRepository;
         private readonly IPartnerLookupService _partnerLookupService;
         private readonly IUserContextService _userContextService;
@@ -314,6 +317,8 @@ namespace Leads.Application.Services
                 request.ClientId,
                 request.ClientContactId,
                 request.ProductIds,
+                request.Phone,
+                request.AlternatePhone,
                 null,
                 cancellationToken));
 
@@ -333,6 +338,8 @@ namespace Leads.Application.Services
                 request.ClientId,
                 request.ClientContactId,
                 request.ProductIds,
+                request.Phone,
+                request.AlternatePhone,
                 id,
                 cancellationToken);
         }
@@ -348,6 +355,8 @@ namespace Leads.Application.Services
             Guid clientId,
             Guid clientContactId,
             List<Guid> productIds,
+            string? phone,
+            string? alternatePhone,
             Guid? excludingLeadId,
             CancellationToken cancellationToken)
         {
@@ -359,6 +368,8 @@ namespace Leads.Application.Services
             if (clientContactId == Guid.Empty) errors.Add("ClientContactId is required.");
             if (productIds.Count == 0) errors.Add("At least one product interest is required.");
             if (productIds.Count != productIds.Distinct().Count()) errors.Add("ProductIds must be unique.");
+            ValidateContactNumber(errors, phone, "Phone");
+            ValidateContactNumber(errors, alternatePhone, "Alternate phone");
 
             if (errors.Count > 0)
             {
@@ -538,6 +549,8 @@ namespace Leads.Application.Services
                 errors.Add("CurrencyId is required.");
             }
 
+            ValidateContactNumber(errors, request.NewContact?.Phone, "New contact phone");
+
             if (!conversion.DefaultOwnerUserId.HasValue)
             {
                 errors.Add("Lead must be assigned before conversion.");
@@ -686,6 +699,14 @@ namespace Leads.Application.Services
             catch
             {
                 return false;
+            }
+        }
+
+        private static void ValidateContactNumber(List<string> errors, string? value, string fieldName)
+        {
+            if (!string.IsNullOrWhiteSpace(value) && !Regex.IsMatch(value.Trim(), NepalContactNumberPattern))
+            {
+                errors.Add($"{fieldName} must contain exactly 10 digits.");
             }
         }
     }

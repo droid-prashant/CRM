@@ -16,6 +16,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/core/auth/auth.service';
 import { Permissions } from '@/core/auth/permissions';
+import { NEPAL_CONTACT_NUMBER_MESSAGE, NEPAL_CONTACT_NUMBER_PATTERN } from '@/shared/validation/nepal-contact-number.validation';
 import { ClientApiService } from '../../services/client-api.service';
 import { ClientContactViewModel } from '../../view-models/client-contact.view-model';
 import { ClientDetailViewModel, ClientTimelineEntryViewModel } from '../../view-models/client-detail.view-model';
@@ -64,6 +65,7 @@ export class ClientDetail implements OnInit {
         { label: 'Active', value: 1 },
         { label: 'Inactive', value: 2 }
     ];
+    readonly contactNumberValidationMessage = NEPAL_CONTACT_NUMBER_MESSAGE;
 
     private readonly fb = inject(FormBuilder);
 
@@ -90,8 +92,8 @@ export class ClientDetail implements OnInit {
         designation: [''],
         department: [''],
         email: ['', Validators.email],
-        phone: [''],
-        mobile: [''],
+        phone: ['', Validators.pattern(NEPAL_CONTACT_NUMBER_PATTERN)],
+        mobile: ['', Validators.pattern(NEPAL_CONTACT_NUMBER_PATTERN)],
         isPrimary: [false],
         status: [1, Validators.required],
         notes: ['']
@@ -591,6 +593,17 @@ export class ClientDetail implements OnInit {
 
     closeDatePicker(picker: DatePicker): void {
         setTimeout(() => picker.hideOverlay(), 0);
+    }
+
+    normalizeContactNumber(controlName: 'phone' | 'mobile', event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const value = input.value.replace(/\D/g, '').slice(0, 10);
+        if (input.value === value) {
+            return;
+        }
+
+        input.value = value;
+        this.contactForm.controls[controlName].setValue(value);
     }
 
     formatCurrency(value?: number | null): string {

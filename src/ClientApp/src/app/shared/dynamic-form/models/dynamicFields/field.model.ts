@@ -21,6 +21,11 @@ export interface DynamicField {
     label: string;
     type: FieldType;
     required?: boolean;
+    pattern?: string | RegExp;
+    patternMessage?: string;
+    digitsOnly?: boolean;
+    maxLength?: number;
+    inputMode?: string;
     options?: SelectOption[];
     colSpan?: number;
     section?: string;

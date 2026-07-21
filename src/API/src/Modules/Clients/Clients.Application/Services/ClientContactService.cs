@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using System.Text.RegularExpressions;
 using Clients.Application.DTOs;
 using Clients.Application.Repositories;
 using Clients.Application.ViewModels;
@@ -8,6 +9,8 @@ namespace Clients.Application.Services
 {
     public class ClientContactService : IClientContactService
     {
+        private const string NepalContactNumberPattern = @"^\d{10}$";
+
         private readonly IClientContactRepository _contactRepository;
 
         public ClientContactService(IClientContactRepository contactRepository)
@@ -152,6 +155,9 @@ namespace Clients.Application.Services
                 errors.Add("Email must be a valid email address.");
             }
 
+            ValidateContactNumber(errors, phone, "Phone");
+            ValidateContactNumber(errors, mobile, "Mobile");
+
             if (errors.Count > 0)
             {
                 return errors;
@@ -220,6 +226,14 @@ namespace Clients.Application.Services
             catch
             {
                 return false;
+            }
+        }
+
+        private static void ValidateContactNumber(List<string> errors, string? value, string fieldName)
+        {
+            if (!string.IsNullOrWhiteSpace(value) && !Regex.IsMatch(value.Trim(), NepalContactNumberPattern))
+            {
+                errors.Add($"{fieldName} must contain exactly 10 digits.");
             }
         }
 
