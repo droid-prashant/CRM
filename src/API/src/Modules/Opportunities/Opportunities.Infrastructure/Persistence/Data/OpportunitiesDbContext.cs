@@ -154,6 +154,23 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Property(x => x.Status).HasConversion<int>();
                 entity.Ignore(x => x.Client);
             });
+
+            ConfigureDeleteAuditColumns(modelBuilder, typeof(Lead));
+        }
+
+        private static void ConfigureDeleteAuditColumns(ModelBuilder modelBuilder, params Type[] mappedEntityTypes)
+        {
+            var mappedTypes = mappedEntityTypes.ToHashSet();
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (!typeof(BaseEntity).IsAssignableFrom(entityType.ClrType) || mappedTypes.Contains(entityType.ClrType))
+                {
+                    continue;
+                }
+
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedBy));
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedOn));
+            }
         }
 
         private static void ConfigureLookup<T>(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<T> entity, string tableName) where T : BaseEntity

@@ -1,4 +1,5 @@
 using Clients.Domain.Enums;
+using ERP.Core.Entities;
 using ERP.Identity.Entities;
 using Leads.Domain.Entities;
 using Leads.Domain.Enums;
@@ -131,6 +132,23 @@ namespace Dashboard.Infrastructure.Persistence
             {
                 entity.ToTable("AspNetUsers", "public");
             });
+
+            ConfigureDeleteAuditColumns(modelBuilder, typeof(Lead));
+        }
+
+        private static void ConfigureDeleteAuditColumns(ModelBuilder modelBuilder, params Type[] mappedEntityTypes)
+        {
+            var mappedTypes = mappedEntityTypes.ToHashSet();
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (!typeof(BaseEntity).IsAssignableFrom(entityType.ClrType) || mappedTypes.Contains(entityType.ClrType))
+                {
+                    continue;
+                }
+
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedBy));
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedOn));
+            }
         }
     }
 }

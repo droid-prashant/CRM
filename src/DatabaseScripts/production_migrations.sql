@@ -1403,4 +1403,32 @@ BEGIN
 END
 $migration$;
 
+-- -------------------------------------------------------------------------
+-- 20260721090000_LeadSoftDeleteAudit
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260721090000_LeadSoftDeleteAudit') THEN
+        RETURN;
+    END IF;
+
+    ALTER TABLE "leads"."Leads"
+        ADD COLUMN IF NOT EXISTS "IsDeleted" boolean NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS "DeletedBy" uuid NULL,
+        ADD COLUMN IF NOT EXISTS "DeletedOn" timestamp with time zone NULL;
+
+    UPDATE "leads"."Leads"
+    SET "IsDeleted" = true
+    WHERE "IsActive" = false
+        AND "IsDeleted" = false;
+
+    CREATE INDEX IF NOT EXISTS "IX_Leads_IsDeleted_DeletedOn"
+        ON "leads"."Leads" ("IsDeleted", "DeletedOn");
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260721090000_LeadSoftDeleteAudit', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
 COMMIT;
