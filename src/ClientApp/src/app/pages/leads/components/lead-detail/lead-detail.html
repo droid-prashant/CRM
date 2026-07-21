@@ -570,7 +570,10 @@
                                 </div>
                                 <div class="col-span-12 md:col-span-6">
                                     <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Phone</label>
-                                    <input pInputText formControlName="newContactPhone" class="w-full" />
+                                    <input pInputText formControlName="newContactPhone" inputmode="numeric" maxlength="10" class="w-full" (input)="normalizeNewContactPhone($event)" />
+                                    @if (conversionForm.get('newContactPhone')?.hasError('pattern') && conversionForm.get('newContactPhone')?.touched) {
+                                        <span class="p-error mt-1 block text-sm text-red-600">{{ contactNumberValidationMessage }}</span>
+                                    }
                                 </div>
                             </div>
                         }

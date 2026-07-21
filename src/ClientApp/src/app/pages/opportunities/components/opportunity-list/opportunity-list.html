@@ -102,6 +102,11 @@
                                         <div class="font-semibold">{{ formatCurrency(opportunity.estimatedValue, opportunity.currencyCode) }}</div>
                                         <div>Close: {{ formatDate(opportunity.expectedCloseDate) }}</div>
                                         <div>Owner: {{ opportunity.ownerUserName || 'Not set' }}</div>
+                                        @if (opportunity.hasProposalDocument) {
+                                            <button type="button" class="text-left text-xs font-semibold text-primary hover:underline" (click)="downloadProposalDocument(opportunity)">
+                                                {{ opportunity.proposalDocumentFileName || 'Proposal document' }}
+                                            </button>
+                                        }
                                     </div>
 
                                     @if (canEdit && !opportunity.isFinalStage && opportunity.status === 'Open') {
@@ -166,6 +171,7 @@
                         <th>Owner</th>
                         <th pSortableColumn="stageName">Stage <p-sortIcon field="stageName" /></th>
                         <th>Status</th>
+                        <th>Proposal</th>
                         <th class="w-28 text-right">Actions</th>
                     </tr>
                 </ng-template>
@@ -185,6 +191,13 @@
                         <td class="whitespace-nowrap">{{ opportunity.ownerUserName || 'Not set' }}</td>
                         <td><p-tag severity="info" [value]="opportunity.stageName" /></td>
                         <td><p-tag [severity]="statusSeverity(opportunity.status)" [value]="opportunity.status" /></td>
+                        <td>
+                            @if (opportunity.hasProposalDocument) {
+                                <p-button icon="pi pi-download" label="Proposal" severity="secondary" text size="small" (onClick)="downloadProposalDocument(opportunity)" />
+                            } @else {
+                                <span class="text-sm text-surface-500">Not set</span>
+                            }
+                        </td>
                         <td class="text-right">
                             <p-button icon="pi pi-history" severity="secondary" text rounded size="small" ariaLabel="Activity" (onClick)="openActivityDialog(opportunity)" />
                             @if (canEdit && opportunity.status === 'Open') {
@@ -196,7 +209,7 @@
 
                 <ng-template #emptymessage>
                     <tr>
-                        <td colspan="9" class="py-8 text-center text-sm text-surface-500">No opportunities found.</td>
+                        <td colspan="10" class="py-8 text-center text-sm text-surface-500">No opportunities found.</td>
                     </tr>
                 </ng-template>
             </p-table>
@@ -315,6 +328,26 @@
                 <span class="mt-1 block text-sm text-red-600">Remarks must be 1000 characters or fewer.</span>
             }
         </div>
+        @if (isProposalSentTarget) {
+            <div class="col-span-12">
+                <label class="mb-2 block text-sm font-semibold">
+                    Final Proposal Document
+                    @if (isProposalDocumentRequired) {
+                        <span class="text-red-500">*</span>
+                    }
+                </label>
+                @if (pendingStageOpportunity?.hasProposalDocument) {
+                    <div class="mb-2 flex items-center justify-between gap-3 rounded-md border border-surface-200 bg-surface-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-950/40">
+                        <span class="truncate">{{ pendingStageOpportunity?.proposalDocumentFileName || 'Proposal document' }}</span>
+                        <p-button icon="pi pi-download" severity="secondary" text rounded size="small" ariaLabel="Download proposal" (onClick)="downloadProposalDocument(pendingStageOpportunity!)" />
+                    </div>
+                }
+                <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="w-full rounded-md border border-surface-300 bg-surface-0 p-2 text-sm dark:border-surface-600 dark:bg-surface-900" (change)="onProposalDocumentSelected($event)" />
+                @if (proposalDocumentError) {
+                    <span class="mt-1 block text-sm text-red-600">{{ proposalDocumentError }}</span>
+                }
+            </div>
+        }
     </form>
 
     <ng-template #footer>
@@ -354,14 +387,23 @@
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Client</label>
             <p-select [options]="clients" optionLabel="name" optionValue="id" appendTo="body" formControlName="clientId" class="w-full" (onChange)="onClientChange($event.value)" />
+            @if (showCreateError('clientId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Client is required.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Contact</label>
             <p-select [options]="contacts" optionLabel="fullName" optionValue="id" appendTo="body" formControlName="contactId" class="w-full" />
+            @if (showCreateError('contactId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Contact is required.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Product</label>
             <p-select [options]="products" optionLabel="name" optionValue="id" appendTo="body" formControlName="productId" class="w-full" />
+            @if (showCreateError('productId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Product is required.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Related Lead</label>
@@ -370,14 +412,27 @@
         <div class="col-span-12">
             <label class="mb-2 block text-sm font-semibold">Title</label>
             <input pInputText formControlName="title" class="w-full" placeholder="Client product opportunity" />
+            @if (showCreateError('title', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Title is required.</span>
+            } @else if (showCreateError('title', 'maxlength')) {
+                <span class="mt-1 block text-sm text-red-600">Title must be 250 characters or fewer.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-4">
             <label class="mb-2 block text-sm font-semibold">Estimated Value</label>
             <p-inputnumber formControlName="estimatedValue" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+            @if (showCreateError('estimatedValue', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Estimated value is required.</span>
+            } @else if (showCreateError('estimatedValue', 'min')) {
+                <span class="mt-1 block text-sm text-red-600">Estimated value must be 0 or greater.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-4">
             <label class="mb-2 block text-sm font-semibold">Currency</label>
             <p-select [options]="currencies" optionLabel="code" optionValue="id" appendTo="body" formControlName="currencyId" class="w-full" />
+            @if (showCreateError('currencyId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Currency is required.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-4">
             <label class="mb-2 block text-sm font-semibold">Expected Close Date</label>
@@ -386,7 +441,42 @@
         <div class="col-span-12">
             <label class="mb-2 block text-sm font-semibold">Owner</label>
             <p-select [options]="users" optionLabel="fullName" optionValue="id" appendTo="body" formControlName="ownerUserId" class="w-full" />
+            @if (showCreateError('ownerUserId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Owner is required.</span>
+            }
         </div>
+
+        @if (selectedProduct?.isLicenseBased) {
+            <div class="col-span-12 mt-2 border-t border-surface-200 pt-4 dark:border-surface-700">
+                <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400">License Fees</div>
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="mb-2 block text-sm font-semibold">License Fee</label>
+                        <p-inputnumber formControlName="licenseFee" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                    </div>
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="mb-2 block text-sm font-semibold">AMC Fee</label>
+                        <p-inputnumber formControlName="amcFee" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                    </div>
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="mb-2 block text-sm font-semibold">Implementation Fee</label>
+                        <p-inputnumber formControlName="implementationFee" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (selectedProduct?.isSubscriptionBased) {
+            <div class="col-span-12 mt-2 border-t border-surface-200 pt-4 dark:border-surface-700">
+                <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400">Subscription Fees</div>
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="mb-2 block text-sm font-semibold">Subscription Fee</label>
+                        <p-inputnumber formControlName="subscriptionFee" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                    </div>
+                </div>
+            </div>
+        }
     </form>
 
     <ng-template #footer>

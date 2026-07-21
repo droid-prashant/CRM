@@ -25,6 +25,10 @@ export interface OpportunityListItemViewModel {
     closedDate?: string;
     closingNote?: string;
     lostReason?: string;
+    hasProposalDocument: boolean;
+    proposalDocumentId?: string;
+    proposalDocumentFileName?: string;
+    proposalDocumentUploadedOn?: string;
 }
 
 export interface PagedResult<T> {

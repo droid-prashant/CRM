@@ -44,7 +44,15 @@ export class OpportunityApiService {
     }
 
     changeStage(id: string, request: ChangeOpportunityStageRequest): Observable<OpportunityListItemViewModel> {
-        return this.http.patch<OpportunityListItemViewModel>(`${this.opportunitiesUrl}/${id}/stage`, request);
+        const formData = new FormData();
+        formData.append('stageId', request.stageId);
+        formData.append('remarks', request.remarks ?? '');
+
+        if (request.proposalDocument) {
+            formData.append('proposalDocument', request.proposalDocument);
+        }
+
+        return this.http.patch<OpportunityListItemViewModel>(`${this.opportunitiesUrl}/${id}/stage`, formData);
     }
 
     closeAsWon(id: string, request: CloseOpportunityRequest): Observable<OpportunityListItemViewModel> {
@@ -65,6 +73,10 @@ export class OpportunityApiService {
 
     createActivity(id: string, request: CreateOpportunityActivityRequest): Observable<OpportunityActivityViewModel> {
         return this.http.post<OpportunityActivityViewModel>(`${this.opportunitiesUrl}/${id}/activities`, request);
+    }
+
+    downloadProposalDocument(id: string): Observable<Blob> {
+        return this.http.get(`${this.opportunitiesUrl}/${id}/proposal-document`, { responseType: 'blob' });
     }
 
     getLookupBundle(): Observable<OpportunityLookupBundle> {

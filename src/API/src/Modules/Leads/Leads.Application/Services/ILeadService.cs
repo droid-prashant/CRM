@@ -6,6 +6,7 @@ namespace Leads.Application.Services
     public interface ILeadService
     {
         Task<List<LeadListItemViewModel>> GetLeadListAsync(CancellationToken cancellationToken);
+        Task<List<DeletedLeadLogViewModel>> GetDeletedLeadLogsAsync(CancellationToken cancellationToken);
         Task<LeadDetailViewModel?> GetLeadDetailAsync(Guid id, CancellationToken cancellationToken);
         Task<LeadEditViewModel?> GetLeadEditAsync(Guid id, CancellationToken cancellationToken);
         Task<List<LeadLookupViewModel>> GetLeadLookupsAsync(CancellationToken cancellationToken);

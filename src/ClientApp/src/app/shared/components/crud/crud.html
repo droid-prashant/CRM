@@ -51,7 +51,7 @@
 
         <ng-template #header>
             <tr>
-                <th style="width: 3rem"><p-tableHeaderCheckbox /></th>
+                <th class="crud-selection-column"><p-tableHeaderCheckbox /></th>
                 @for (column of columns; track column.field) {
                     <th [pSortableColumn]="column.sortable ? column.field : undefined" [style.width]="column.width">
                         {{ column.header }}
@@ -61,7 +61,7 @@
                     </th>
                 }
                 @if (enableViewAction || canEdit || canRowAction) {
-                    <th style="width: 4rem" class="text-center"></th>
+                    <th class="crud-actions-column text-center"></th>
                 }
             </tr>
         </ng-template>
@@ -70,13 +70,13 @@
             <tr>
                 <td><p-tableCheckbox [value]="row" /></td>
                 @for (column of columns; track column.field) {
-                    <td>
+                    <td class="crud-truncate-cell" [title]="row[column.field]">
                         @switch (column.type) {
                             @case ('currency') {
                                 <span>{{ row[column.field] | currency: column.format || 'USD' }}</span>
                             }
                             @case ('image') {
-                                <img [src]="row[column.field]" alt="" style="height: 48px; width: auto; border-radius: 6px" />
+                                <img [src]="row[column.field]" alt="" class="crud-table-image" />
                             }
                             @case ('checkbox') {
                                 <span>{{ row[column.field] ? 'Yes' : 'No' }}</span>
@@ -162,7 +162,7 @@
                                         <p-select [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" class="w-full" />
                                     }
                                     @case ('multiSelect') {
-                                        <p-multiselect [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" display="chip" class="w-full" />
+                                        <p-multiselect [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" display="chip" [panelStyle]="{ 'max-height': '250px', 'overflow-y': 'auto' }" class="w-full" />
                                     }
                                     @case ('radio') {
                                         <div class="grid grid-cols-12 gap-3">
@@ -182,8 +182,8 @@
                                     }
                                 }
 
-                                @if (form.get(field.key)?.errors && (form.get(field.key)?.touched || submitted)) {
-                                    <span class="p-error mt-1 block text-sm text-red-600">{{ field.label }} is required</span>
+                                @if (fieldErrorMessage(field); as errorMessage) {
+                                    <span class="p-error mt-1 block text-sm text-red-600">{{ errorMessage }}</span>
                                 }
                             </div>
                         }

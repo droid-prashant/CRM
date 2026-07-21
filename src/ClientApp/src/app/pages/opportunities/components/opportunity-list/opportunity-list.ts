@@ -38,12 +38,16 @@ import { OpportunityApiService } from '../../services/opportunity-api.service';
     providers: [MessageService]
 })
 export class OpportunityList implements OnInit {
+    private readonly proposalSentStageName = 'proposal sent';
+    private readonly maxProposalDocumentBytes = 10 * 1024 * 1024;
+    private readonly allowedProposalDocumentExtensions = new Set(['.pdf', '.doc', '.docx']);
+
     opportunities: OpportunityListItemViewModel[] = [];
     pipelineStages: OpportunityPipelineStageViewModel[] = [];
     clients: ClientLookupViewModel[] = [];
     allContacts: ContactLookupViewModel[] = [];
     contacts: ContactLookupViewModel[] = [];
-    products: LookupViewModel[] = [];
+    products: ProductLookupViewModel[] = [];
     leads: LeadLookupViewModel[] = [];
     users: OpportunityUserLookupViewModel[] = [];
     currencies: CurrencyLookupViewModel[] = [];
@@ -73,6 +77,8 @@ export class OpportunityList implements OnInit {
     pendingStageOpportunity?: OpportunityListItemViewModel;
     pendingStageId = '';
     pendingStageName = '';
+    selectedProposalDocument?: File;
+    proposalDocumentError = '';
     draggedOpportunity?: OpportunityListItemViewModel;
     dragOverStageId = '';
     stageHistory: OpportunityStageHistoryViewModel[] = [];
@@ -103,7 +109,11 @@ export class OpportunityList implements OnInit {
         estimatedValue: [0, [Validators.required, Validators.min(0)]],
         currencyId: ['', Validators.required],
         expectedCloseDate: [''],
-        ownerUserId: ['', Validators.required]
+        ownerUserId: ['', Validators.required],
+        licenseFee: [0],
+        amcFee: [0],
+        implementationFee: [0],
+        subscriptionFee: [0]
     });
 
     editForm = this.fb.group({
@@ -152,6 +162,7 @@ export class OpportunityList implements OnInit {
         const defaultCurrencyId = this.currencies[0]?.id ?? '';
         const defaultOwnerUserId = this.users[0]?.id ?? '';
         this.contacts = [];
+        this.selectedProduct = undefined;
         this.opportunityForm.reset({
             clientId: '',
             contactId: '',
@@ -161,7 +172,11 @@ export class OpportunityList implements OnInit {
             estimatedValue: 0,
             currencyId: defaultCurrencyId,
             expectedCloseDate: '',
-            ownerUserId: defaultOwnerUserId
+            ownerUserId: defaultOwnerUserId,
+            licenseFee: 0,
+            amcFee: 0,
+            implementationFee: 0,
+            subscriptionFee: 0
         });
         this.createDialog = true;
     }
@@ -217,6 +232,23 @@ export class OpportunityList implements OnInit {
     onClientChange(clientId: string): void {
         this.opportunityForm.patchValue({ contactId: '' });
         this.contacts = clientId ? this.allContacts.filter((contact) => contact.clientId === clientId) : [];
+    }
+
+    selectedProduct: ProductLookupViewModel | undefined;
+
+    onProductChange(productId: string): void {
+        this.selectedProduct = this.products.find((p) => p.id === productId);
+        if (!this.selectedProduct) {
+            return;
+        }
+
+        if (!this.selectedProduct.isLicenseBased) {
+            this.opportunityForm.patchValue({ licenseFee: 0, amcFee: 0, implementationFee: 0 });
+        }
+
+        if (!this.selectedProduct.isSubscriptionBased) {
+            this.opportunityForm.patchValue({ subscriptionFee: 0 });
+        }
     }
 
     onStageChange(opportunity: OpportunityListItemViewModel, event: Event): void {
@@ -281,6 +313,14 @@ export class OpportunityList implements OnInit {
         this.prepareStageChange(this.draggedOpportunity, stage.stageId);
     }
 
+    get isProposalSentTarget(): boolean {
+        return this.normalizeStageName(this.pendingStageName) === this.proposalSentStageName;
+    }
+
+    get isProposalDocumentRequired(): boolean {
+        return this.isProposalSentTarget && this.pendingStageOpportunity?.hasProposalDocument !== true;
+    }
+
     canMoveOpportunity(opportunity: OpportunityListItemViewModel): boolean {
         return this.canEdit && !opportunity.isFinalStage && opportunity.status === 'Open';
     }
@@ -298,6 +338,8 @@ export class OpportunityList implements OnInit {
         this.pendingStageOpportunity = opportunity;
         this.pendingStageId = stageId;
         this.pendingStageName = targetStage?.name ?? 'selected stage';
+        this.selectedProposalDocument = undefined;
+        this.proposalDocumentError = '';
         this.stageChangeForm.reset({ remarks: '' });
         this.stageChangeDialog = true;
     }
@@ -308,10 +350,19 @@ export class OpportunityList implements OnInit {
             return;
         }
 
+        if (this.isProposalDocumentRequired && !this.selectedProposalDocument) {
+            this.proposalDocumentError = 'Final proposal document is required when moving an opportunity to Proposal Sent.';
+            return;
+        }
+
+        if (this.selectedProposalDocument && !this.isValidProposalDocument(this.selectedProposalDocument)) {
+            return;
+        }
+
         const opportunity = this.pendingStageOpportunity;
         const value = this.stageChangeForm.getRawValue();
         this.isSaving = true;
-        this.opportunityApiService.changeStage(opportunity.id, { stageId: this.pendingStageId, remarks: value.remarks?.trim() || undefined }).subscribe({
+        this.opportunityApiService.changeStage(opportunity.id, { stageId: this.pendingStageId, remarks: value.remarks?.trim() || undefined, proposalDocument: this.selectedProposalDocument }).subscribe({
             next: () => {
                 this.stageChangeDialog = false;
                 this.clearPendingStageChange();
@@ -329,6 +380,17 @@ export class OpportunityList implements OnInit {
     cancelStageChange(): void {
         this.stageChangeDialog = false;
         this.clearPendingStageChange();
+    }
+
+    onProposalDocumentSelected(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.item(0) ?? undefined;
+        this.selectedProposalDocument = file;
+        this.proposalDocumentError = '';
+
+        if (file) {
+            this.isValidProposalDocument(file);
+        }
     }
 
     createOpportunity(): void {
@@ -452,6 +514,26 @@ export class OpportunityList implements OnInit {
         setTimeout(() => picker.hideOverlay(), 0);
     }
 
+    downloadProposalDocument(opportunity: OpportunityListItemViewModel): void {
+        if (!opportunity.hasProposalDocument) {
+            return;
+        }
+
+        this.opportunityApiService.downloadProposalDocument(opportunity.id).subscribe({
+            next: (blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = opportunity.proposalDocumentFileName || `${opportunity.opportunityNumber}-proposal`;
+                link.click();
+                URL.revokeObjectURL(url);
+            },
+            error: () => {
+                this.messageService.add({ severity: 'error', summary: 'Download failed', detail: 'Proposal document could not be downloaded.', life: 5000 });
+            }
+        });
+    }
+
     statusSeverity(status?: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
         const normalized = status?.toLowerCase();
         if (normalized === 'won') return 'success';
@@ -469,6 +551,15 @@ export class OpportunityList implements OnInit {
 
     get pipelineMinWidth(): string {
         return `${Math.max(this.pipelineStages.length, 1) * 16}rem`;
+    }
+
+    showCreateError(controlName: string, errorName?: string): boolean {
+        const control = this.opportunityForm.get(controlName);
+        if (!control || !(control.touched || control.dirty)) {
+            return false;
+        }
+
+        return errorName ? control.hasError(errorName) : control.invalid;
     }
 
     applyFilters(): void {
@@ -580,8 +671,7 @@ export class OpportunityList implements OnInit {
             searchTerm: filters.searchTerm?.trim() || undefined,
             clientId: filters.clientId || undefined,
             stageId: filters.stageId || undefined,
-            ownerUserId: filters.ownerUserId || undefined,
-            status: filters.status || undefined
+            ownerUserId: filters.ownerUserId || undefined
         };
     }
 
@@ -596,7 +686,11 @@ export class OpportunityList implements OnInit {
             estimatedValue: value.estimatedValue ?? 0,
             currencyId: value.currencyId ?? '',
             ownerUserId: value.ownerUserId ?? '',
-            expectedCloseDate: value.expectedCloseDate ? new Date(value.expectedCloseDate).toISOString() : undefined
+            expectedCloseDate: value.expectedCloseDate ? new Date(value.expectedCloseDate).toISOString() : undefined,
+            licenseFee: value.licenseFee || undefined,
+            amcFee: value.amcFee || undefined,
+            implementationFee: value.implementationFee || undefined,
+            subscriptionFee: value.subscriptionFee || undefined
         };
     }
 
@@ -625,5 +719,32 @@ export class OpportunityList implements OnInit {
         this.pendingStageOpportunity = undefined;
         this.pendingStageId = '';
         this.pendingStageName = '';
+        this.selectedProposalDocument = undefined;
+        this.proposalDocumentError = '';
+    }
+
+    private isValidProposalDocument(file: File): boolean {
+        const extension = this.fileExtension(file.name);
+        if (!this.allowedProposalDocumentExtensions.has(extension)) {
+            this.proposalDocumentError = 'Proposal document must be a PDF, DOC, or DOCX file.';
+            return false;
+        }
+
+        if (file.size > this.maxProposalDocumentBytes) {
+            this.proposalDocumentError = 'Proposal document must be 10 MB or smaller.';
+            return false;
+        }
+
+        this.proposalDocumentError = '';
+        return true;
+    }
+
+    private fileExtension(fileName: string): string {
+        const index = fileName.lastIndexOf('.');
+        return index >= 0 ? fileName.slice(index).toLowerCase() : '';
+    }
+
+    private normalizeStageName(value?: string): string {
+        return (value ?? '').trim().toLowerCase();
     }
 }

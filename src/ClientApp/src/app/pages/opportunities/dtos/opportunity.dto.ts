@@ -32,6 +32,7 @@ export interface UpdateOpportunityRequest {
 export interface ChangeOpportunityStageRequest {
     stageId: string;
     remarks?: string;
+    proposalDocument?: File;
 }
 
 export interface CloseOpportunityRequest {

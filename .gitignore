@@ -15,6 +15,10 @@ obj/
 .vscode/
 .vsconfig
 
+# JetBrains IDE files
+.idea/
+*.iml
+
 # EF Migrations snapshot files
 Migrations/*Snapshot.cs
 

@@ -201,6 +201,23 @@ namespace Clients.Infrastructure.Persistence.Data
                 entity.Property(x => x.EventType).HasMaxLength(100).IsRequired();
                 entity.Ignore(x => x.Lead);
             });
+
+            ConfigureDeleteAuditColumns(modelBuilder, typeof(Lead));
+        }
+
+        private static void ConfigureDeleteAuditColumns(ModelBuilder modelBuilder, params Type[] mappedEntityTypes)
+        {
+            var mappedTypes = mappedEntityTypes.ToHashSet();
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (!typeof(BaseEntity).IsAssignableFrom(entityType.ClrType) || mappedTypes.Contains(entityType.ClrType))
+                {
+                    continue;
+                }
+
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedBy));
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedOn));
+            }
         }
 
         private static void ConfigureLookup<T>(ModelBuilder modelBuilder, string tableName, string schema) where T : BaseEntity

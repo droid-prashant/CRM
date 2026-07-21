@@ -1,4 +1,5 @@
 import { DynamicField, SelectOption } from '@/shared/dynamic-form/models/dynamicFields/field.model';
+import { NEPAL_CONTACT_NUMBER_MESSAGE, NEPAL_CONTACT_NUMBER_PATTERN } from '@/shared/validation/nepal-contact-number.validation';
 
 export interface PartnerFieldOptions {
     partnerTypes: SelectOption[];

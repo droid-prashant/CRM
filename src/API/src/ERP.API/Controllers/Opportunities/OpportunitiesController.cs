@@ -9,11 +9,15 @@ namespace ERP.API.Controllers.Opportunities
 {
     public class OpportunitiesController : BaseApiController
     {
-        private readonly IOpportunityService _opportunityService;
+        private const long MaxProposalDocumentBytes = 10 * 1024 * 1024;
 
-        public OpportunitiesController(IOpportunityService opportunityService)
+        private readonly IOpportunityService _opportunityService;
+        private readonly IWebHostEnvironment _environment;
+
+        public OpportunitiesController(IOpportunityService opportunityService, IWebHostEnvironment environment)
         {
             _opportunityService = opportunityService;
+            _environment = environment;
         }
 
         [HttpGet]
@@ -79,10 +83,36 @@ namespace ERP.API.Controllers.Opportunities
         }
 
         [HttpPatch("{id:guid}/stage")]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(MaxProposalDocumentBytes + 1024 * 1024)]
         [Authorize(Policy = PermissionPolicyNames.OpportunitiesEdit)]
-        public async Task<ActionResult<OpportunityListItemViewModel>> ChangeStage(Guid id, [FromBody] ChangeOpportunityStageRequest request, CancellationToken cancellationToken)
+        public async Task<ActionResult<OpportunityListItemViewModel>> ChangeStage(Guid id, [FromForm] ChangeOpportunityStageFormRequest form, CancellationToken cancellationToken)
         {
-            return ToOpportunityActionResult(await _opportunityService.ChangeStageAsync(id, request, cancellationToken));
+            var savedFilePath = string.Empty;
+            var request = new ChangeOpportunityStageRequest
+            {
+                StageId = form.StageId,
+                Remarks = form.Remarks
+            };
+
+            if (form.ProposalDocument != null)
+            {
+                var savedFile = await SaveProposalDocumentAsync(id, form.ProposalDocument, cancellationToken);
+                savedFilePath = savedFile.FilePath;
+                request.ProposalDocumentFileName = form.ProposalDocument.FileName;
+                request.ProposalDocumentStoredFileName = savedFile.StoredFileName;
+                request.ProposalDocumentPath = savedFile.FilePath;
+                request.ProposalDocumentContentType = form.ProposalDocument.ContentType;
+                request.ProposalDocumentSize = form.ProposalDocument.Length;
+            }
+
+            var result = await _opportunityService.ChangeStageAsync(id, request, cancellationToken);
+            if (!result.Succeeded && !string.IsNullOrWhiteSpace(savedFilePath))
+            {
+                DeleteSavedFile(savedFilePath);
+            }
+
+            return ToOpportunityActionResult(result);
         }
 
         [HttpPatch("{id:guid}/won")]
@@ -105,6 +135,25 @@ namespace ERP.API.Controllers.Opportunities
         {
             var history = await _opportunityService.GetStageHistoryAsync(id, cancellationToken);
             return history == null ? NotFound() : history;
+        }
+
+        [HttpGet("{id:guid}/proposal-document")]
+        [Authorize(Policy = PermissionPolicyNames.OpportunitiesView)]
+        public async Task<IActionResult> DownloadProposalDocument(Guid id, CancellationToken cancellationToken)
+        {
+            var document = await _opportunityService.GetProposalDocumentAsync(id, cancellationToken);
+            if (document == null)
+            {
+                return NotFound();
+            }
+
+            var path = ResolveUploadPath(document.FilePath);
+            if (!System.IO.File.Exists(path))
+            {
+                return NotFound();
+            }
+
+            return PhysicalFile(path, document.ContentType, document.FileName);
         }
 
         [HttpGet("{id:guid}/activities")]
@@ -157,5 +206,51 @@ namespace ERP.API.Controllers.Opportunities
 
             return BadRequest(new { errors = result.Errors });
         }
+
+        private async Task<(string StoredFileName, string FilePath)> SaveProposalDocumentAsync(Guid opportunityId, IFormFile file, CancellationToken cancellationToken)
+        {
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var storedFileName = $"{opportunityId:N}-{Guid.NewGuid():N}{extension}";
+            var relativePath = Path.Combine("uploads", "opportunity-proposals", storedFileName).Replace('\\', '/');
+            var fullPath = ResolveUploadPath(relativePath);
+            var directory = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            await using var stream = System.IO.File.Create(fullPath);
+            await file.CopyToAsync(stream, cancellationToken);
+            return (storedFileName, relativePath);
+        }
+
+        private string ResolveUploadPath(string relativePath)
+        {
+            var root = Path.GetFullPath(_environment.ContentRootPath);
+            var fullPath = Path.GetFullPath(Path.Combine(root, relativePath));
+            var normalizedRoot = Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar;
+            if (!fullPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Invalid proposal document path.");
+            }
+
+            return fullPath;
+        }
+
+        private void DeleteSavedFile(string relativePath)
+        {
+            var path = ResolveUploadPath(relativePath);
+            if (System.IO.File.Exists(path))
+            {
+                System.IO.File.Delete(path);
+            }
+        }
+    }
+
+    public class ChangeOpportunityStageFormRequest
+    {
+        public Guid StageId { get; set; }
+        public string? Remarks { get; set; }
+        public IFormFile? ProposalDocument { get; set; }
     }
 }
