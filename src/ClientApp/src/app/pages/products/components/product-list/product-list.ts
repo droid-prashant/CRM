@@ -39,6 +39,8 @@ export class ProductList implements OnInit {
     rowActionLabelResolver = (row: Record<string, unknown>) => (row['isActive'] === true ? 'Deactivate' : 'Activate');
     rowActionIconResolver = (row: Record<string, unknown>) => (row['isActive'] === true ? 'pi pi-ban' : 'pi pi-check-circle');
 
+    private readonly subscriptionBusinessModel = 'subscription';
+    private readonly licenseBusinessModel = 'license';
     private productTypeNames = new Map<number, string>();
     private deploymentTypeNames = new Map<number, string>();
     private ownershipTypeNames = new Map<number, string>();
@@ -168,6 +170,7 @@ export class ProductList implements OnInit {
             deploymentTypeName: this.deploymentTypeNames.get(product.deploymentType) ?? product.deploymentType,
             ownershipTypeName: product.ownershipTypeName || this.ownershipTypeNames.get(product.ownershipType) || product.ownershipType,
             ownerPartnerName: product.ownerPartnerName ?? '',
+            businessModel: this.toBusinessModel(product.isSubscriptionBased, product.isLicenseBased),
             isActive: product.isActive === true
         };
     }
@@ -181,8 +184,8 @@ export class ProductList implements OnInit {
             ownershipType: this.toNumber(value['ownershipType']) || 1,
             ownerPartnerId: this.toNumber(value['ownershipType']) === 2 ? this.optionalString(value['ownerPartnerId']) : null,
             description: this.optionalString(value['description']),
-            isSubscriptionBased: value['isSubscriptionBased'] === true,
-            isLicenseBased: value['isLicenseBased'] === true,
+            isSubscriptionBased: value['businessModel'] === this.subscriptionBusinessModel,
+            isLicenseBased: value['businessModel'] === this.licenseBusinessModel,
             isActive: true
         };
     }
@@ -196,8 +199,8 @@ export class ProductList implements OnInit {
             ownershipType: this.toNumber(value['ownershipType']) || 1,
             ownerPartnerId: this.toNumber(value['ownershipType']) === 2 ? this.optionalString(value['ownerPartnerId']) : null,
             description: this.optionalString(value['description']),
-            isSubscriptionBased: value['isSubscriptionBased'] === true,
-            isLicenseBased: value['isLicenseBased'] === true,
+            isSubscriptionBased: value['businessModel'] === this.subscriptionBusinessModel,
+            isLicenseBased: value['businessModel'] === this.licenseBusinessModel,
             isActive: value['isActive'] === true
         };
     }
@@ -221,6 +224,18 @@ export class ProductList implements OnInit {
     private toNumber(value: unknown): number {
         const parsed = Number(value);
         return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    private toBusinessModel(isSubscriptionBased: boolean, isLicenseBased: boolean): string {
+        if (isSubscriptionBased === true && isLicenseBased !== true) {
+            return this.subscriptionBusinessModel;
+        }
+
+        if (isLicenseBased === true && isSubscriptionBased !== true) {
+            return this.licenseBusinessModel;
+        }
+
+        return '';
     }
 
     private showError(error: { error?: { detail?: string; title?: string; errors?: string[] } }, summary: string): void {

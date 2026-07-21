@@ -29,7 +29,8 @@ namespace Products.Infrastructure.Persistence.Data
 
             modelBuilder.Entity<Product>(entity =>
             {
-                entity.ToTable("Products", "products");
+                entity.ToTable("Products", "products", table =>
+                    table.HasCheckConstraint("CK_Products_ExactlyOneBusinessModel", "\"IsSubscriptionBased\" <> \"IsLicenseBased\""));
                 entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
                 entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
                 entity.Property(x => x.Description).HasColumnType("text");

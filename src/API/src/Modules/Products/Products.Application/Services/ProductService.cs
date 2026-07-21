@@ -75,7 +75,18 @@ namespace Products.Application.Services
         public async Task<ProductResult> CreateProductAsync(CreateProductRequest request, CancellationToken cancellationToken)
         {
             Clean(request);
-            var errors = await ValidateProductAsync(request.Code, request.Name, request.ProductType, request.DeploymentType, request.OwnershipType, request.OwnerPartnerId, request.Description, null, cancellationToken);
+            var errors = await ValidateProductAsync(
+                request.Code,
+                request.Name,
+                request.ProductType,
+                request.DeploymentType,
+                request.OwnershipType,
+                request.OwnerPartnerId,
+                request.Description,
+                request.IsSubscriptionBased,
+                request.IsLicenseBased,
+                null,
+                cancellationToken);
             if (errors.Count > 0)
             {
                 return new ProductResult { Errors = errors };
@@ -94,7 +105,18 @@ namespace Products.Application.Services
             }
 
             Clean(request);
-            var errors = await ValidateProductAsync(request.Code, request.Name, request.ProductType, request.DeploymentType, request.OwnershipType, request.OwnerPartnerId, request.Description, id, cancellationToken);
+            var errors = await ValidateProductAsync(
+                request.Code,
+                request.Name,
+                request.ProductType,
+                request.DeploymentType,
+                request.OwnershipType,
+                request.OwnerPartnerId,
+                request.Description,
+                request.IsSubscriptionBased,
+                request.IsLicenseBased,
+                id,
+                cancellationToken);
             if (errors.Count > 0)
             {
                 return new ProductResult { Errors = errors };
@@ -110,7 +132,18 @@ namespace Products.Application.Services
             return new ProductResult { Product = product };
         }
 
-        private async Task<List<string>> ValidateProductAsync(string code, string name, ProductType productType, DeploymentType deploymentType, ProductOwnershipType ownershipType, Guid? ownerPartnerId, string? description, Guid? excludingId, CancellationToken cancellationToken)
+        private async Task<List<string>> ValidateProductAsync(
+            string code,
+            string name,
+            ProductType productType,
+            DeploymentType deploymentType,
+            ProductOwnershipType ownershipType,
+            Guid? ownerPartnerId,
+            string? description,
+            bool isSubscriptionBased,
+            bool isLicenseBased,
+            Guid? excludingId,
+            CancellationToken cancellationToken)
         {
             var errors = new List<string>();
             var cleanCode = code ?? string.Empty;
@@ -120,6 +153,7 @@ namespace Products.Application.Services
             if (cleanCode.Length > 50) errors.Add("Product code must be 50 characters or fewer.");
             if (name?.Length > 200) errors.Add("Product name must be 200 characters or fewer.");
             if (description?.Length > 1000) errors.Add("Description must be 1000 characters or fewer.");
+            if (isSubscriptionBased == isLicenseBased) errors.Add("Product must be either subscription-based or license-based.");
 
             if (!Enum.IsDefined(productType) || productType == 0)
             {

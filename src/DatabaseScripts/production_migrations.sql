@@ -710,6 +710,31 @@ END
 $migration$;
 
 -- -------------------------------------------------------------------------
+-- 20260721100000_ProductBusinessModelConstraint
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260721100000_ProductBusinessModelConstraint') THEN
+        RETURN;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'CK_Products_ExactlyOneBusinessModel'
+    ) THEN
+        ALTER TABLE "products"."Products"
+            ADD CONSTRAINT "CK_Products_ExactlyOneBusinessModel"
+            CHECK ("IsSubscriptionBased" <> "IsLicenseBased") NOT VALID;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260721100000_ProductBusinessModelConstraint', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
 -- 20260524100000_PartnerManagement
 -- -------------------------------------------------------------------------
 DO $migration$
