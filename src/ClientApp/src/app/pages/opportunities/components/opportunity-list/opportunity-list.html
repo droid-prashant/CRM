@@ -387,14 +387,23 @@
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Client</label>
             <p-select [options]="clients" optionLabel="name" optionValue="id" appendTo="body" formControlName="clientId" class="w-full" (onChange)="onClientChange($event.value)" />
+            @if (showCreateError('clientId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Client is required.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Contact</label>
             <p-select [options]="contacts" optionLabel="fullName" optionValue="id" appendTo="body" formControlName="contactId" class="w-full" />
+            @if (showCreateError('contactId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Contact is required.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Product</label>
-            <p-select [options]="products" optionLabel="name" optionValue="id" appendTo="body" formControlName="productId" class="w-full" (onChange)="onProductChange($event.value)" />
+            <p-select [options]="products" optionLabel="name" optionValue="id" appendTo="body" formControlName="productId" class="w-full" />
+            @if (showCreateError('productId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Product is required.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Related Lead</label>
@@ -403,14 +412,27 @@
         <div class="col-span-12">
             <label class="mb-2 block text-sm font-semibold">Title</label>
             <input pInputText formControlName="title" class="w-full" placeholder="Client product opportunity" />
+            @if (showCreateError('title', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Title is required.</span>
+            } @else if (showCreateError('title', 'maxlength')) {
+                <span class="mt-1 block text-sm text-red-600">Title must be 250 characters or fewer.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-4">
             <label class="mb-2 block text-sm font-semibold">Estimated Value</label>
             <p-inputnumber formControlName="estimatedValue" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+            @if (showCreateError('estimatedValue', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Estimated value is required.</span>
+            } @else if (showCreateError('estimatedValue', 'min')) {
+                <span class="mt-1 block text-sm text-red-600">Estimated value must be 0 or greater.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-4">
             <label class="mb-2 block text-sm font-semibold">Currency</label>
             <p-select [options]="currencies" optionLabel="code" optionValue="id" appendTo="body" formControlName="currencyId" class="w-full" />
+            @if (showCreateError('currencyId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Currency is required.</span>
+            }
         </div>
         <div class="col-span-12 md:col-span-4">
             <label class="mb-2 block text-sm font-semibold">Expected Close Date</label>
@@ -419,6 +441,9 @@
         <div class="col-span-12">
             <label class="mb-2 block text-sm font-semibold">Owner</label>
             <p-select [options]="users" optionLabel="fullName" optionValue="id" appendTo="body" formControlName="ownerUserId" class="w-full" />
+            @if (showCreateError('ownerUserId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Owner is required.</span>
+            }
         </div>
 
         @if (selectedProduct?.isLicenseBased) {
