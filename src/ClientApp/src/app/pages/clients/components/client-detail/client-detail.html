@@ -517,11 +517,17 @@
             </div>
             <div class="col-span-12 md:col-span-4">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Phone</label>
-                <input pInputText formControlName="phone" class="w-full" />
+                <input pInputText formControlName="phone" inputmode="numeric" maxlength="10" class="w-full" (input)="normalizeContactNumber('phone', $event)" />
+                @if (contactForm.get('phone')?.hasError('pattern') && contactForm.get('phone')?.touched) {
+                    <span class="p-error mt-1 block text-sm text-red-600">{{ contactNumberValidationMessage }}</span>
+                }
             </div>
             <div class="col-span-12 md:col-span-4">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Mobile</label>
-                <input pInputText formControlName="mobile" class="w-full" />
+                <input pInputText formControlName="mobile" inputmode="numeric" maxlength="10" class="w-full" (input)="normalizeContactNumber('mobile', $event)" />
+                @if (contactForm.get('mobile')?.hasError('pattern') && contactForm.get('mobile')?.touched) {
+                    <span class="p-error mt-1 block text-sm text-red-600">{{ contactNumberValidationMessage }}</span>
+                }
             </div>
             <div class="col-span-12 md:col-span-4">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Status</label>

@@ -120,7 +120,16 @@
 
                                 @switch (field.type) {
                                     @case ('text') {
-                                        <input pInputText type="text" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full" />
+                                        <input
+                                            pInputText
+                                            type="text"
+                                            [formControlName]="field.key"
+                                            [placeholder]="field.placeholder ?? ''"
+                                            [attr.inputmode]="field.inputMode ?? (field.digitsOnly ? 'numeric' : null)"
+                                            [attr.maxlength]="field.maxLength ?? null"
+                                            class="w-full"
+                                            (input)="onTextInput(field, $event)"
+                                        />
                                     }
                                     @case ('email') {
                                         <input pInputText type="email" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full" />
@@ -175,8 +184,8 @@
                                     }
                                 }
 
-                                @if (getFieldError(field); as errorMsg) {
-                                    <span class="p-error mt-1 block text-sm text-red-600">{{ errorMsg }}</span>
+                                @if (fieldErrorMessage(field); as errorMessage) {
+                                    <span class="p-error mt-1 block text-sm text-red-600">{{ errorMessage }}</span>
                                 }
                             </div>
                         }

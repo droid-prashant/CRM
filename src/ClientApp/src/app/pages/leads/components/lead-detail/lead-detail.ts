@@ -19,6 +19,7 @@ import { AuthService } from '@/core/auth/auth.service';
 import { Permissions } from '@/core/auth/permissions';
 import { UserApiService } from '@/pages/users/services/user-api.service';
 import { UserListItemViewModel } from '@/pages/users/view-models/user-list-item.view-model';
+import { NEPAL_CONTACT_NUMBER_MESSAGE, NEPAL_CONTACT_NUMBER_PATTERN } from '@/shared/validation/nepal-contact-number.validation';
 import { ConvertLeadRequest, CreateLeadInteractionRequest } from '../../dtos/lead-action.dto';
 import { UpdateLeadRequest } from '../../dtos/update-lead.request';
 import { LeadApiService } from '../../services/lead.api-service';
@@ -65,12 +66,14 @@ export class LeadDetail implements OnInit, OnDestroy {
         { label: 'Create New', value: 'new' },
         { label: 'Use Existing', value: 'existing' }
     ];
+    readonly contactNumberValidationMessage = NEPAL_CONTACT_NUMBER_MESSAGE;
 
     private readonly fb = inject(FormBuilder);
     private readonly messageService = inject(MessageService);
     private sourceSubscription?: Subscription;
     private partnerSubscription?: Subscription;
     private clientSubscription?: Subscription;
+    private contactModeSubscription?: Subscription;
 
     qualificationForm = this.fb.group({
         qualificationRemarks: ['', [Validators.maxLength(1000)]]
@@ -121,7 +124,7 @@ export class LeadDetail implements OnInit, OnDestroy {
         newContactFirstName: [''],
         newContactLastName: [''],
         newContactEmail: [''],
-        newContactPhone: [''],
+        newContactPhone: ['', Validators.pattern(NEPAL_CONTACT_NUMBER_PATTERN)],
         opportunityTitle: ['', Validators.required],
         estimatedValue: [0, [Validators.required, Validators.min(0)]],
         currencyId: ['', Validators.required],
@@ -143,6 +146,7 @@ export class LeadDetail implements OnInit, OnDestroy {
         this.sourceSubscription = this.editForm.controls.sourceId.valueChanges.subscribe(() => this.applyEditSourceRules());
         this.partnerSubscription = this.editForm.controls.partnerId.valueChanges.subscribe(() => this.clearUnavailableEditProducts());
         this.clientSubscription = this.editForm.controls.clientId.valueChanges.subscribe(() => this.clearUnavailableEditContact());
+        this.contactModeSubscription = this.conversionForm.controls.contactMode.valueChanges.subscribe(() => this.applyConversionContactRules());
         this.loadLead();
     }
 
@@ -150,6 +154,7 @@ export class LeadDetail implements OnInit, OnDestroy {
         this.sourceSubscription?.unsubscribe();
         this.partnerSubscription?.unsubscribe();
         this.clientSubscription?.unsubscribe();
+        this.contactModeSubscription?.unsubscribe();
     }
 
     loadLead(): void {
@@ -406,6 +411,7 @@ export class LeadDetail implements OnInit, OnDestroy {
                     expectedCloseDate: '',
                     ownerUserId: defaultOwnerUserId
                 });
+                this.applyConversionContactRules();
                 this.conversionDialog = true;
                 this.isConverting = false;
             },
@@ -599,6 +605,17 @@ export class LeadDetail implements OnInit, OnDestroy {
         setTimeout(() => picker.hideOverlay(), 0);
     }
 
+    normalizeNewContactPhone(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const value = input.value.replace(/\D/g, '').slice(0, 10);
+        if (input.value === value) {
+            return;
+        }
+
+        input.value = value;
+        this.conversionForm.controls.newContactPhone.setValue(value);
+    }
+
     get filteredContacts() {
         const clientId = this.conversionForm.controls.clientId.value;
         return this.conversion?.existingContacts.filter((contact) => contact.clientId === clientId) ?? [];
@@ -748,6 +765,12 @@ export class LeadDetail implements OnInit, OnDestroy {
         }
 
         this.editForm.controls.clientContactId.reset('', { emitEvent: false });
+    }
+
+    private applyConversionContactRules(): void {
+        const control = this.conversionForm.controls.newContactPhone;
+        control.setValidators(this.useExistingContact ? [] : [Validators.pattern(NEPAL_CONTACT_NUMBER_PATTERN)]);
+        control.updateValueAndValidity({ emitEvent: false });
     }
 
     private buildConversionRequest(): ConvertLeadRequest {

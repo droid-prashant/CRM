@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges, ViewChild } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { ConfirmationService, MenuItem } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
@@ -235,6 +235,21 @@ export class Crud implements OnChanges, OnDestroy {
         }
     }
 
+    onTextInput(field: DynamicField, event: Event): void {
+        if (!field.digitsOnly) {
+            return;
+        }
+
+        const input = event.target as HTMLInputElement;
+        const value = input.value.replace(/\D/g, '').slice(0, field.maxLength ?? undefined);
+        if (input.value === value) {
+            return;
+        }
+
+        input.value = value;
+        this.form.get(field.key)?.setValue(value);
+    }
+
     closeDatePicker(picker: DatePicker): void {
         setTimeout(() => picker.hideOverlay(), 0);
     }
@@ -353,6 +368,23 @@ export class Crud implements OnChanges, OnDestroy {
         return field.optionFilter ? options.filter((option) => field.optionFilter?.(option, this.currentFormValue(), this.mode) === true) : options;
     }
 
+    fieldErrorMessage(field: DynamicField): string {
+        const control = this.form.get(field.key);
+        if (!control?.errors || (!control.touched && !this.submitted)) {
+            return '';
+        }
+
+        if (control.hasError('required')) {
+            return `${field.label} is required`;
+        }
+
+        if (control.hasError('pattern')) {
+            return field.patternMessage ?? `${field.label} format is invalid`;
+        }
+
+        return `${field.label} is invalid`;
+    }
+
     private buildForm(): FormGroup {
         const group: Record<string, unknown[]> = {};
 
@@ -377,11 +409,7 @@ export class Crud implements OnChanges, OnDestroy {
                 return;
             }
 
-            const validators = [...(field.validators ?? [])];
-            if (this.isFieldRequired(field)) {
-                validators.unshift(Validators.required);
-            }
-            control.setValidators(validators);
+            control.setValidators(this.fieldValidators(field));
 
             if (!this.isFieldVisible(field) && field.clearWhenHidden !== false) {
                 control.reset(this.getDefaultValue(field), { emitEvent: false });
@@ -391,6 +419,19 @@ export class Crud implements OnChanges, OnDestroy {
 
             control.updateValueAndValidity({ emitEvent: false });
         });
+    }
+
+    private fieldValidators(field: DynamicField): ValidatorFn[] {
+        const validators: ValidatorFn[] = [];
+        if (this.isFieldRequired(field)) {
+            validators.push(Validators.required);
+        }
+
+        if (field.pattern) {
+            validators.push(Validators.pattern(field.pattern));
+        }
+
+        return validators;
     }
 
     private clearUnavailableOptions(field: DynamicField, control: { value: unknown; reset: (value?: unknown, options?: { emitEvent?: boolean }) => void }): void {
