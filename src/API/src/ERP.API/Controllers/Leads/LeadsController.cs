@@ -23,6 +23,13 @@ namespace ERP.API.Controllers.Leads
             return await _leadService.GetLeadListAsync(cancellationToken);
         }
 
+        [HttpGet("deleted")]
+        [Authorize(Policy = "AdminOnly")]
+        public async Task<ActionResult<List<DeletedLeadLogViewModel>>> GetDeletedLeadLogs(CancellationToken cancellationToken)
+        {
+            return await _leadService.GetDeletedLeadLogsAsync(cancellationToken);
+        }
+
         [HttpGet("{id:guid}")]
         [Authorize(Policy = PermissionPolicyNames.LeadsView)]
         public async Task<ActionResult<LeadDetailViewModel>> GetLead(Guid id, CancellationToken cancellationToken)

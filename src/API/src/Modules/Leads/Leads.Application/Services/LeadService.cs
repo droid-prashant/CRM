@@ -39,6 +39,16 @@ namespace Leads.Application.Services
                 : Task.FromResult(new List<LeadListItemViewModel>());
         }
 
+        public Task<List<DeletedLeadLogViewModel>> GetDeletedLeadLogsAsync(CancellationToken cancellationToken)
+        {
+            if (!HasOverrideAccess())
+            {
+                throw new UnauthorizedAccessException("Only Admin and SuperAdmin users can view deleted lead logs.");
+            }
+
+            return _leadRepository.GetDeletedLeadLogsAsync(cancellationToken);
+        }
+
         public async Task<LeadDetailViewModel?> GetLeadDetailAsync(Guid id, CancellationToken cancellationToken)
         {
             if (!await EnsureCanAccessLeadAsync(id, cancellationToken))

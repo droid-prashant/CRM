@@ -1,3 +1,5 @@
+import { ValidatorFn } from '@angular/forms';
+
 export type FieldType = 'text' | 'number' | 'decimalNumber' | 'textarea' | 'checkbox' | 'select' | 'multiSelect' | 'image' | 'currency' | 'radio' | 'email' | 'date';
 
 export interface SelectOption {
@@ -36,4 +38,6 @@ export interface DynamicField {
     requiredWhen?: DynamicFieldRule;
     optionFilter?: DynamicFieldOptionFilter;
     clearWhenHidden?: boolean;
+    validators?: ValidatorFn[];
+    validationMessages?: Record<string, string>;
 }

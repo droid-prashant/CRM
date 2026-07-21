@@ -70,6 +70,22 @@ namespace Partners.Infrastructure.Persistence.Data
                 entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
                 entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
             });
+
+            ConfigureDeleteAuditColumns(modelBuilder);
+        }
+
+        private static void ConfigureDeleteAuditColumns(ModelBuilder modelBuilder)
+        {
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (!typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+                {
+                    continue;
+                }
+
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedBy));
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedOn));
+            }
         }
 
         private void ApplyAuditInformation()

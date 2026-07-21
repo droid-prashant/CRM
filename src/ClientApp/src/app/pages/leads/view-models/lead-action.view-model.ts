@@ -96,3 +96,22 @@ export interface LeadInteractionViewModel {
     nextFollowUpDate?: string;
     createdByUserName?: string;
 }
+
+export interface DeletedLeadLogViewModel {
+    id: string;
+    leadNumber: string;
+    companyName: string;
+    contactPersonName: string;
+    email?: string;
+    phone?: string;
+    sourceName: string;
+    categoryName: string;
+    countryName: string;
+    status: string;
+    productNames: string;
+    createdAt: string;
+    createdBy: string;
+    deletedBy?: string;
+    deletedByUserName?: string;
+    deletedOn?: string;
+}
