@@ -26,7 +26,8 @@ import {
     OpportunityLookupBundle,
     OpportunityPipelineStageViewModel,
     OpportunityStageHistoryViewModel,
-    OpportunityUserLookupViewModel
+    OpportunityUserLookupViewModel,
+    ProductLookupViewModel
 } from '../../view-models/opportunity.view-model';
 import { OpportunityApiService } from '../../services/opportunity-api.service';
 
@@ -686,11 +687,7 @@ export class OpportunityList implements OnInit {
             estimatedValue: value.estimatedValue ?? 0,
             currencyId: value.currencyId ?? '',
             ownerUserId: value.ownerUserId ?? '',
-            expectedCloseDate: value.expectedCloseDate ? new Date(value.expectedCloseDate).toISOString() : undefined,
-            licenseFee: value.licenseFee || undefined,
-            amcFee: value.amcFee || undefined,
-            implementationFee: value.implementationFee || undefined,
-            subscriptionFee: value.subscriptionFee || undefined
+            expectedCloseDate: value.expectedCloseDate ? new Date(value.expectedCloseDate).toISOString() : undefined
         };
     }
 

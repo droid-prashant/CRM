@@ -62,6 +62,13 @@ export interface LookupViewModel {
     isLostStage?: boolean;
 }
 
+export interface ProductLookupViewModel {
+    id: string;
+    name: string;
+    isLicenseBased: boolean;
+    isSubscriptionBased: boolean;
+}
+
 export interface LeadLookupViewModel {
     id: string;
     leadNumber: string;
@@ -85,7 +92,7 @@ export interface CurrencyLookupViewModel {
 export interface OpportunityLookupBundle {
     clients: ClientLookupViewModel[];
     contacts: ContactLookupViewModel[];
-    products: LookupViewModel[];
+    products: ProductLookupViewModel[];
     leads: LeadLookupViewModel[];
     ownerUsers: OpportunityUserLookupViewModel[];
     currencies: CurrencyLookupViewModel[];
