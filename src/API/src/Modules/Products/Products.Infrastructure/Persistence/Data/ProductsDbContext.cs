@@ -29,7 +29,8 @@ namespace Products.Infrastructure.Persistence.Data
 
             modelBuilder.Entity<Product>(entity =>
             {
-                entity.ToTable("Products", "products");
+                entity.ToTable("Products", "products", table =>
+                    table.HasCheckConstraint("CK_Products_ExactlyOneBusinessModel", "\"IsSubscriptionBased\" <> \"IsLicenseBased\""));
                 entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
                 entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
                 entity.Property(x => x.Description).HasColumnType("text");
@@ -44,6 +45,22 @@ namespace Products.Infrastructure.Persistence.Data
                 entity.HasIndex(x => new { x.Name, x.ProductType, x.DeploymentType });
                 entity.HasIndex(x => x.OwnerPartnerId);
             });
+
+            ConfigureDeleteAuditColumns(modelBuilder);
+        }
+
+        private static void ConfigureDeleteAuditColumns(ModelBuilder modelBuilder)
+        {
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (!typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+                {
+                    continue;
+                }
+
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedBy));
+                modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedOn));
+            }
         }
 
         private void ApplyAuditInformation()

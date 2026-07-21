@@ -32,6 +32,7 @@ namespace Leads.Domain.Entities
         public DateTime? QualificationDate { get; set; }
         public string? DisqualificationReason { get; set; }
         public Guid? ConvertedOpportunityId { get; set; }
+        public bool IsDeleted { get; set; }
 
         public LeadSource? Source { get; set; }
         public LeadCategory? Category { get; set; }

@@ -1,4 +1,5 @@
 import { DynamicField, SelectOption } from '@/shared/dynamic-form/models/dynamicFields/field.model';
+import { NEPAL_CONTACT_NUMBER_MESSAGE, NEPAL_CONTACT_NUMBER_PATTERN } from '@/shared/validation/nepal-contact-number.validation';
 
 export interface PartnerFieldOptions {
     partnerTypes: SelectOption[];
@@ -35,7 +36,19 @@ export function buildPartnerFields(options: PartnerFieldOptions): DynamicField[]
         { key: 'countryId', label: 'Country', type: 'select', required: true, options: options.countries, colSpan: 4, section: 'Partner', placeholder: 'Select country' },
         { key: 'productIds', label: 'Owned Products', type: 'multiSelect', options: options.products, colSpan: 12, section: 'Products', placeholder: 'Select partner-owned products', visibleWhen: canOwnProducts, clearWhenHidden: true },
         { key: 'contactPerson', label: 'Contact Person', type: 'text', colSpan: 4, section: 'Contact', placeholder: 'Primary contact' },
-        { key: 'phoneNumber', label: 'Phone Number', type: 'text', colSpan: 4, section: 'Contact', placeholder: 'Phone number' },
+        {
+            key: 'phoneNumber',
+            label: 'Phone Number',
+            type: 'text',
+            colSpan: 4,
+            section: 'Contact',
+            placeholder: '10 digit contact number',
+            pattern: NEPAL_CONTACT_NUMBER_PATTERN,
+            patternMessage: NEPAL_CONTACT_NUMBER_MESSAGE,
+            digitsOnly: true,
+            maxLength: 10,
+            inputMode: 'numeric'
+        },
         { key: 'email', label: 'Email', type: 'email', colSpan: 4, section: 'Contact', placeholder: 'name@example.com' },
         { key: 'address', label: 'Address', type: 'textarea', colSpan: 6, section: 'Additional Details' },
         { key: 'remarks', label: 'Remarks', type: 'textarea', colSpan: 6, section: 'Additional Details' },

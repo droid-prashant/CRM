@@ -1,0 +1,11 @@
+:host ::ng-deep {
+  .partner-column {
+    font-weight: 500;
+    color: var(--primary-color);
+  }
+
+  .partner-header {
+    background-color: var(--surface-50);
+    font-weight: 600;
+  }
+}

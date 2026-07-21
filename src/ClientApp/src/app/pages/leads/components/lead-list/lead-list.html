@@ -1,24 +1,82 @@
 <p-toast position="bottom-right"></p-toast>
 
 @if (!isLoading) {
-    <app-crud
-        [columns]="columns"
-        [data]="data"
-        [fields]="fields"
-        [title]="title"
-        [dataNotFound]="dataNotFound"
-        [errorMessage]="errorMessage"
-        [canCreate]="canCreate"
-        [canEdit]="canEdit"
-        [canEditRowResolver]="canEditLeadRow"
-        [editActionLabelResolver]="editActionLabelResolver"
-        [canRowAction]="canDelete"
-        [canBulkAction]="canDelete"
-        [canExport]="canExport"
-        [enableViewAction]="true"
-        (save)="saveLead($event)"
-        (delete)="deleteLead($event)"
-        (bulkDelete)="deleteLeads($event)"
-        (view)="viewLead($event)"
-    />
+    @if (canViewDeletedLogs) {
+        <div class="mb-3 flex justify-end gap-2">
+            @if (showDeletedLogs) {
+                <p-button icon="pi pi-refresh" severity="secondary" [outlined]="true" [loading]="isDeletedLogsLoading" (onClick)="refreshDeletedLogs()"></p-button>
+            }
+            <p-button [icon]="showDeletedLogs ? 'pi pi-list' : 'pi pi-history'" [label]="showDeletedLogs ? 'Active Leads' : 'Deleted Leads'" severity="secondary" [outlined]="true" (onClick)="toggleDeletedLogs()"></p-button>
+        </div>
+    }
+
+    @if (showDeletedLogs) {
+        <p-table
+            [value]="deletedLeadLogs"
+            dataKey="id"
+            [loading]="isDeletedLogsLoading"
+            [paginator]="true"
+            [rows]="10"
+            [rowsPerPageOptions]="[10, 20, 30]"
+            [globalFilterFields]="['leadNumber', 'companyName', 'contactPersonName', 'email', 'deletedByUserName']"
+            responsiveLayout="scroll"
+            styleClass="p-datatable-sm"
+        >
+            <ng-template pTemplate="header">
+                <tr>
+                    <th pSortableColumn="leadNumber">Lead # <p-sortIcon field="leadNumber"></p-sortIcon></th>
+                    <th pSortableColumn="companyName">Company <p-sortIcon field="companyName"></p-sortIcon></th>
+                    <th>Contact</th>
+                    <th>Source</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Products</th>
+                    <th pSortableColumn="deletedByUserName">Deleted By <p-sortIcon field="deletedByUserName"></p-sortIcon></th>
+                    <th pSortableColumn="deletedOn">Deleted On <p-sortIcon field="deletedOn"></p-sortIcon></th>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-log>
+                <tr>
+                    <td class="font-medium">{{ log.leadNumber }}</td>
+                    <td>{{ log.companyName }}</td>
+                    <td>
+                        <div>{{ log.contactPersonName }}</div>
+                        <div class="text-sm text-color-secondary">{{ log.email || log.phone || 'Not set' }}</div>
+                    </td>
+                    <td>{{ log.sourceName || 'Not set' }}</td>
+                    <td>{{ log.categoryName || 'Not set' }}</td>
+                    <td><p-tag [value]="log.status" severity="secondary"></p-tag></td>
+                    <td>{{ log.productNames || 'Not set' }}</td>
+                    <td>{{ log.deletedByUserName || log.deletedBy || 'Not set' }}</td>
+                    <td>{{ formatDate(log.deletedOn) }}</td>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+                <tr>
+                    <td colspan="9" class="py-6 text-center text-color-secondary">No deleted lead logs found.</td>
+                </tr>
+            </ng-template>
+        </p-table>
+    } @else {
+        <app-crud
+            [columns]="columns"
+            [data]="data"
+            [fields]="fields"
+            [title]="title"
+            [dataNotFound]="dataNotFound"
+            [errorMessage]="errorMessage"
+            [canCreate]="canCreate"
+            [canEdit]="canEdit"
+            [canEditRowResolver]="canEditLeadRow"
+            [editActionLabelResolver]="editActionLabelResolver"
+            [canRowAction]="canDelete"
+            [canBulkAction]="canDelete"
+            [canExport]="canExport"
+            [enableViewAction]="true"
+            (save)="saveLead($event)"
+            (delete)="deleteLead($event)"
+            (bulkDelete)="deleteLeads($event)"
+            (view)="viewLead($event)"
+        />
+    }
 }

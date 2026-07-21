@@ -18,8 +18,18 @@ export function buildProductFields(options: ProductFieldOptions): DynamicField[]
         { key: 'ownershipType', label: 'Ownership', type: 'select', required: true, options: options.ownershipTypes, colSpan: 4, section: 'Ownership', placeholder: 'Select ownership', defaultValue: 1 },
         { key: 'ownerPartnerId', label: 'Owner Partner', type: 'select', options: options.ownerPartners, colSpan: 4, section: 'Ownership', placeholder: 'Select owner partner', visibleWhen: isPartnerOwned, requiredWhen: isPartnerOwned },
         { key: 'description', label: 'Description', type: 'textarea', colSpan: 8, section: 'Delivery', placeholder: 'Short product description' },
-        { key: 'isSubscriptionBased', label: 'Subscription Based', type: 'checkbox', colSpan: 6, section: 'Business Model', defaultValue: false },
-        { key: 'isLicenseBased', label: 'License Based', type: 'checkbox', colSpan: 6, section: 'Business Model', defaultValue: false },
+        {
+            key: 'businessModel',
+            label: 'Business Model',
+            type: 'radio',
+            required: true,
+            colSpan: 12,
+            section: 'Business Model',
+            options: [
+                { label: 'Subscription-based', value: 'subscription' },
+                { label: 'License-based', value: 'license' }
+            ]
+        },
         { key: 'isActive', label: 'Active', type: 'checkbox', colSpan: 12, section: 'Status', defaultValue: true, visibleOn: 'update' }
     ];
 }

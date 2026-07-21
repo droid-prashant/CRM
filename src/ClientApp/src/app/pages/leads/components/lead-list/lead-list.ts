@@ -1,6 +1,10 @@
+import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
+import { ButtonModule } from 'primeng/button';
+import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/core/auth/auth.service';
 import { Permissions } from '@/core/auth/permissions';
@@ -11,15 +15,16 @@ import { LeadColumns } from '../../config/lead-columns.config';
 import { CreateLeadRequest } from '../../dtos/create-lead.request';
 import { UpdateLeadRequest } from '../../dtos/update-lead.request';
 import { LeadApiService } from '../../services/lead.api-service';
-import { LeadLookupBundle } from '../../view-models/lead-action.view-model';
+import { DeletedLeadLogViewModel, LeadLookupBundle } from '../../view-models/lead-action.view-model';
 import { LeadListItemViewModel } from '../../view-models/lead-list-item.view-model';
 import { LookupViewModel } from '../../view-models/lookup.view-model';
 
 @Component({
     selector: 'app-lead-list',
     standalone: true,
-    imports: [Crud, ToastModule],
+    imports: [ButtonModule, CommonModule, Crud, TableModule, TagModule, ToastModule],
     templateUrl: './lead-list.html',
+    styleUrls: ['./lead-list.scss'],
     providers: [MessageService]
 })
 export class LeadList implements OnInit {
@@ -35,6 +40,10 @@ export class LeadList implements OnInit {
     canEdit = false;
     canDelete = false;
     canExport = false;
+    canViewDeletedLogs = false;
+    showDeletedLogs = false;
+    deletedLeadLogs: DeletedLeadLogViewModel[] = [];
+    isDeletedLogsLoading = false;
     canEditLeadRow = (row: Record<string, unknown>): boolean => !['assigned', 'converted'].includes(String(row['status'] ?? '').toLowerCase());
     editActionLabelResolver = (row: Record<string, unknown>): string => (this.isDisqualified(row['status']) ? 'Re-submit' : 'Edit');
 
@@ -50,7 +59,20 @@ export class LeadList implements OnInit {
         this.canEdit = this.authService.hasPermission(Permissions.leads.edit);
         this.canDelete = this.authService.hasPermission(Permissions.leads.delete);
         this.canExport = this.authService.hasPermission(Permissions.leads.export);
+        this.canViewDeletedLogs = this.authService.hasAnyRole(['Admin', 'SuperAdmin']);
         this.loadPage();
+    }
+
+    toggleDeletedLogs(): void {
+        this.showDeletedLogs = !this.showDeletedLogs;
+
+        if (this.showDeletedLogs && !this.deletedLeadLogs.length) {
+            this.loadDeletedLeadLogs();
+        }
+    }
+
+    refreshDeletedLogs(): void {
+        this.loadDeletedLeadLogs();
     }
 
     saveLead(event: CrudSaveEvent): void {
@@ -112,6 +134,9 @@ export class LeadList implements OnInit {
             next: () => {
                 this.messageService.add({ severity: 'success', summary: 'Lead deleted', detail: 'The lead was removed from the active list.', life: 3000 });
                 this.loadLeads();
+                if (this.deletedLeadLogs.length) {
+                    this.loadDeletedLeadLogs();
+                }
             },
             error: () => {
                 this.messageService.add({ severity: 'error', summary: 'Delete failed', detail: 'Unable to delete the selected lead.', life: 5000 });
@@ -131,6 +156,9 @@ export class LeadList implements OnInit {
             next: () => {
                 this.messageService.add({ severity: 'success', summary: 'Leads deleted', detail: `${ids.length} lead(s) were removed from the active list.`, life: 3000 });
                 this.loadLeads();
+                if (this.deletedLeadLogs.length) {
+                    this.loadDeletedLeadLogs();
+                }
             },
             error: () => {
                 this.messageService.add({ severity: 'error', summary: 'Delete failed', detail: 'Unable to delete the selected leads.', life: 5000 });
@@ -177,6 +205,25 @@ export class LeadList implements OnInit {
                 this.isLoading = false;
             }
         });
+    }
+
+    private loadDeletedLeadLogs(): void {
+        this.isDeletedLogsLoading = true;
+        this.leadApiService.getDeletedLeadLogs().subscribe({
+            next: (logs) => {
+                this.deletedLeadLogs = logs;
+                this.isDeletedLogsLoading = false;
+            },
+            error: (error) => {
+                this.isDeletedLogsLoading = false;
+                const detail = error.status === 401 || error.status === 403 ? 'You are not allowed to view deleted lead logs.' : 'Unable to load deleted lead logs.';
+                this.messageService.add({ severity: 'error', summary: 'Deleted logs unavailable', detail, life: 5000 });
+            }
+        });
+    }
+
+    formatDate(value?: string): string {
+        return value ? new Date(value).toLocaleString() : 'Not set';
     }
 
     private toLeadRequest(value: Record<string, unknown>): CreateLeadRequest | UpdateLeadRequest {

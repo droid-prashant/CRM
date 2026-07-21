@@ -1,4 +1,5 @@
 using ERP.Identity.Entities;
+using ERP.Identity.Services.Interfaces;
 using Leads.Application.DTOs;
 using Leads.Application.Interfaces;
 using Leads.Application.Repositories;
@@ -21,12 +22,14 @@ namespace Leads.Infrastructure.Repositories
         private readonly LeadsDbContext _dbContext;
         private readonly IPartnerLookupService _partnerLookupService;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IUserContextService _userContextService;
 
-        public LeadRepository(LeadsDbContext dbContext, IPartnerLookupService partnerLookupService, UserManager<ApplicationUser> userManager)
+        public LeadRepository(LeadsDbContext dbContext, IPartnerLookupService partnerLookupService, UserManager<ApplicationUser> userManager, IUserContextService userContextService)
         {
             _dbContext = dbContext;
             _partnerLookupService = partnerLookupService;
             _userManager = userManager;
+            _userContextService = userContextService;
         }
 
         public async Task<List<LeadListItemViewModel>> GetLeadListAsync(Guid? assignedToUserId, CancellationToken cancellationToken)
@@ -37,7 +40,7 @@ namespace Leads.Infrastructure.Repositories
                 .Include(x => x.Category)
                 .Include(x => x.Country)
                 .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
-                .Where(x => x.IsActive && (!assignedToUserId.HasValue || x.AssignedToUserId == assignedToUserId.Value))
+                .Where(x => x.IsActive && !x.IsDeleted && (!assignedToUserId.HasValue || x.AssignedToUserId == assignedToUserId.Value))
                 .OrderByDescending(x => x.CreatedOn)
                 .ToListAsync(cancellationToken);
 
@@ -100,6 +103,51 @@ namespace Leads.Infrastructure.Repositories
             }).ToList();
         }
 
+        public async Task<List<DeletedLeadLogViewModel>> GetDeletedLeadLogsAsync(CancellationToken cancellationToken)
+        {
+            var leads = await _dbContext.Leads
+                .AsNoTracking()
+                .Include(x => x.Source)
+                .Include(x => x.Category)
+                .Include(x => x.Country)
+                .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
+                .Where(x => x.IsDeleted)
+                .OrderByDescending(x => x.DeletedOn ?? x.UpdatedOn ?? x.CreatedOn)
+                .ToListAsync(cancellationToken);
+
+            var deletedByIds = leads
+                .Select(x => x.DeletedBy)
+                .Where(x => x.HasValue && x.Value != Guid.Empty)
+                .Select(x => x!.Value)
+                .Distinct()
+                .ToList();
+
+            var deletedByUsers = await _userManager.Users
+                .AsNoTracking()
+                .Where(x => deletedByIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.FullName, cancellationToken);
+
+            return leads.Select(x => new DeletedLeadLogViewModel
+            {
+                Id = x.Id,
+                LeadNumber = x.LeadNumber,
+                CompanyName = x.CompanyName,
+                ContactPersonName = x.ContactPersonName,
+                Email = x.Email,
+                Phone = x.Phone,
+                SourceName = x.Source?.Name ?? string.Empty,
+                CategoryName = x.Category?.Name ?? string.Empty,
+                CountryName = x.Country?.Name ?? string.Empty,
+                Status = x.Status.ToString(),
+                ProductNames = string.Join(", ", x.ProductInterests.Select(p => p.Product?.Name).Where(p => !string.IsNullOrWhiteSpace(p))),
+                CreatedAt = x.CreatedOn,
+                CreatedBy = x.CreatedBy,
+                DeletedBy = x.DeletedBy,
+                DeletedByUserName = x.DeletedBy.HasValue ? deletedByUsers.GetValueOrDefault(x.DeletedBy.Value) : null,
+                DeletedOn = x.DeletedOn
+            }).ToList();
+        }
+
         public async Task<LeadDetailViewModel?> GetLeadDetailAsync(Guid id, CancellationToken cancellationToken)
         {
             var lead = await _dbContext.Leads
@@ -110,7 +158,7 @@ namespace Leads.Infrastructure.Repositories
                 .Include(x => x.Industry)
                 .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
                 .Include(x => x.TimelineEntries)
-                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
 
             if (lead == null)
             {
@@ -132,7 +180,7 @@ namespace Leads.Infrastructure.Repositories
         {
             var edit = await _dbContext.Leads
                 .AsNoTracking()
-                .Where(x => x.Id == id && x.IsActive)
+                .Where(x => x.Id == id && x.IsActive && !x.IsDeleted)
                 .Select(x => new LeadEditViewModel
                 {
                     Id = x.Id,
@@ -172,7 +220,7 @@ namespace Leads.Infrastructure.Repositories
         {
             return _dbContext.Leads
                 .AsNoTracking()
-                .Where(x => x.IsActive && (!assignedToUserId.HasValue || x.AssignedToUserId == assignedToUserId.Value))
+                .Where(x => x.IsActive && !x.IsDeleted && (!assignedToUserId.HasValue || x.AssignedToUserId == assignedToUserId.Value))
                 .OrderBy(x => x.CompanyName)
                 .Select(x => new LeadLookupViewModel
                 {
@@ -220,13 +268,14 @@ namespace Leads.Infrastructure.Repositories
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
-        public Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Leads.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
+        public Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Leads.AnyAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
         public Task<bool> UserCanAccessLeadAsync(Guid id, Guid userId, bool hasOverrideAccess, CancellationToken cancellationToken)
         {
             return _dbContext.Leads
                 .AsNoTracking()
                 .AnyAsync(x => x.Id == id
                     && x.IsActive
+                    && !x.IsDeleted
                     && (hasOverrideAccess || x.AssignedToUserId == userId), cancellationToken);
         }
 
@@ -234,7 +283,7 @@ namespace Leads.Infrastructure.Repositories
         {
             return _dbContext.Leads
                 .AsNoTracking()
-                .Where(x => x.Id == id && x.IsActive)
+                .Where(x => x.Id == id && x.IsActive && !x.IsDeleted)
                 .Select(x => (LeadStatus?)x.Status)
                 .FirstOrDefaultAsync(cancellationToken);
         }
@@ -328,7 +377,7 @@ namespace Leads.Infrastructure.Repositories
             var lead = await _dbContext.Leads
                 .Include(x => x.ProductInterests)
                 .Include(x => x.TimelineEntries)
-                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
 
             if (lead == null || lead.Status == LeadStatus.Converted)
             {
@@ -376,7 +425,7 @@ namespace Leads.Infrastructure.Repositories
                 .AsNoTracking()
                 .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
                 .Include(x => x.TimelineEntries)
-                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
 
             if (lead == null)
             {
@@ -391,7 +440,7 @@ namespace Leads.Infrastructure.Repositories
         {
             var lead = await _dbContext.Leads
                 .Include(x => x.TimelineEntries)
-                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
 
             if (lead == null || lead.Status == LeadStatus.Converted)
             {
@@ -433,7 +482,7 @@ namespace Leads.Infrastructure.Repositories
 
         public async Task<List<LeadStatusHistoryItemViewModel>?> GetLeadStatusHistoryAsync(Guid id, CancellationToken cancellationToken)
         {
-            var leadExists = await _dbContext.Leads.AsNoTracking().AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
+            var leadExists = await _dbContext.Leads.AsNoTracking().AnyAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
             if (!leadExists)
             {
                 return null;
@@ -469,7 +518,7 @@ namespace Leads.Infrastructure.Repositories
             var lead = await _dbContext.Leads
                 .AsNoTracking()
                 .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
-                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
 
             if (lead == null)
             {
@@ -521,7 +570,7 @@ namespace Leads.Infrastructure.Repositories
             var lead = await _dbContext.Leads
                 .Include(x => x.ProductInterests)
                 .Include(x => x.TimelineEntries)
-                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
 
             if (lead == null || lead.Status != LeadStatus.Qualified || !lead.AssignedToUserId.HasValue || lead.ConvertedOpportunityId.HasValue)
             {
@@ -617,7 +666,7 @@ namespace Leads.Infrastructure.Repositories
         {
             var lead = await _dbContext.Leads
                 .Include(x => x.TimelineEntries)
-                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
 
             if (lead == null || lead.Status != LeadStatus.Qualified)
             {
@@ -674,7 +723,7 @@ namespace Leads.Infrastructure.Repositories
         {
             var lead = await _dbContext.Leads
                 .Include(x => x.TimelineEntries)
-                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
 
             if (lead == null)
             {
@@ -766,14 +815,20 @@ namespace Leads.Infrastructure.Repositories
         {
             var lead = await _dbContext.Leads
                 .Include(x => x.ProductInterests)
-                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+                .Include(x => x.TimelineEntries)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
 
             if (lead == null)
             {
                 return false;
             }
 
+            var deletedBy = _userContextService.GetUserId();
+            var deletedOn = DateTime.UtcNow;
             lead.IsActive = false;
+            lead.IsDeleted = true;
+            lead.DeletedBy = deletedBy;
+            lead.DeletedOn = deletedOn;
 
             foreach (var productInterest in lead.ProductInterests.Where(x => x.IsActive))
             {
@@ -783,7 +838,9 @@ namespace Leads.Infrastructure.Repositories
             lead.TimelineEntries.Add(new LeadTimelineEntry
             {
                 EventType = "LeadDeleted",
-                Description = "Lead was deleted."
+                Description = deletedBy.HasValue
+                    ? $"Lead was deleted by user {deletedBy.Value} on {deletedOn:O}."
+                    : $"Lead was deleted on {deletedOn:O}."
             });
 
             await _dbContext.SaveChangesAsync(cancellationToken);

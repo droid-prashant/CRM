@@ -5,11 +5,14 @@ using Partners.Domain.Constants;
 using Products.Application.Services;
 using System.Net.Mail;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Partners.Application.Services
 {
     public class PartnerService : IPartnerService, IPartnerLookupService
     {
+        private const string NepalContactNumberPattern = @"^\d{10}$";
+
         private readonly IPartnerRepository _partnerRepository;
         private readonly IProductLookupService _productLookupService;
 
@@ -85,7 +88,7 @@ namespace Partners.Application.Services
             if (countryId == Guid.Empty) errors.Add("Country is required.");
             if (name?.Length > 150) errors.Add("Partner name must be 150 characters or fewer.");
             if (contactPerson?.Length > 150) errors.Add("Contact person must be 150 characters or fewer.");
-            if (phoneNumber?.Length > 50) errors.Add("Phone number must be 50 characters or fewer.");
+            if (!string.IsNullOrWhiteSpace(phoneNumber) && !Regex.IsMatch(phoneNumber.Trim(), NepalContactNumberPattern)) errors.Add("Phone number must contain exactly 10 digits.");
             if (email?.Length > 250) errors.Add("Email must be 250 characters or fewer.");
             if (address?.Length > 500) errors.Add("Address must be 500 characters or fewer.");
             if (remarks?.Length > 1000) errors.Add("Remarks must be 1000 characters or fewer.");
