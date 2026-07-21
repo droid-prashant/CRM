@@ -471,6 +471,15 @@ export class OpportunityList implements OnInit {
         return `${Math.max(this.pipelineStages.length, 1) * 16}rem`;
     }
 
+    showCreateError(controlName: string, errorName?: string): boolean {
+        const control = this.opportunityForm.get(controlName);
+        if (!control || !(control.touched || control.dirty)) {
+            return false;
+        }
+
+        return errorName ? control.hasError(errorName) : control.invalid;
+    }
+
     applyFilters(): void {
         this.first = 0;
         this.pageNumber = 1;
