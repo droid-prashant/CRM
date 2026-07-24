@@ -370,19 +370,26 @@ export class Crud implements OnChanges, OnDestroy {
 
     fieldErrorMessage(field: DynamicField): string {
         const control = this.form.get(field.key);
-        if (!control?.errors || (!control.touched && !this.submitted)) {
+        if (!control?.errors || (!control.dirty && !control.touched && !this.submitted)) {
             return '';
         }
 
+        const messages = field.validationMessages ?? {};
+
         if (control.hasError('required')) {
-            return `${field.label} is required`;
+            return messages['required'] ?? `${field.label} is required`;
+        }
+
+        if (control.hasError('minlength')) {
+            return messages['minlength'] ?? `${field.label} must be at least ${control.errors['minlength'].requiredLength} characters`;
         }
 
         if (control.hasError('pattern')) {
-            return field.patternMessage ?? `${field.label} format is invalid`;
+            return messages['pattern'] ?? field.patternMessage ?? `${field.label} format is invalid`;
         }
 
-        return `${field.label} is invalid`;
+        const firstKey = Object.keys(control.errors)[0];
+        return messages[firstKey] ?? `${field.label} is invalid`;
     }
 
     private buildForm(): FormGroup {

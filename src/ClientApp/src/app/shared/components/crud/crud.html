@@ -164,7 +164,7 @@
                                         <p-select [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" class="w-full" />
                                     }
                                     @case ('multiSelect') {
-                                        <p-multiselect [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" display="chip" [panelStyle]="{ 'max-height': '250px', 'overflow-y': 'auto' }" class="w-full" />
+                                        <p-multiselect [options]="fieldOptions(field)" optionLabel="label" optionValue="value" appendTo="body" [formControlName]="field.key" [placeholder]="field.placeholder ?? 'Select'" display="chip" scrollHeight="250px" class="w-full" />
                                     }
                                     @case ('radio') {
                                         <div class="grid grid-cols-12 gap-3">
