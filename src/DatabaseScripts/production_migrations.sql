@@ -1496,4 +1496,103 @@ BEGIN
 END
 $migration$;
 
+-- -------------------------------------------------------------------------
+-- 20260730120000_OpportunityCommercialFinalization
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260730120000_OpportunityCommercialFinalization') THEN
+        RETURN;
+    END IF;
+
+    CREATE TABLE IF NOT EXISTS "leads"."OpportunityCommercialDocuments" (
+        "Id" uuid NOT NULL,
+        "OpportunityId" uuid NOT NULL,
+        "DocumentType" character varying(30) NOT NULL,
+        "FileName" character varying(255) NOT NULL,
+        "StoredFileName" character varying(255) NOT NULL,
+        "FilePath" character varying(500) NOT NULL,
+        "ContentType" character varying(150) NOT NULL,
+        "FileSize" bigint NOT NULL,
+        "Remarks" character varying(1000) NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL,
+        CONSTRAINT "PK_OpportunityCommercialDocuments" PRIMARY KEY ("Id")
+    );
+
+    CREATE TABLE IF NOT EXISTS "leads"."OpportunityCommercialBreakdowns" (
+        "Id" uuid NOT NULL,
+        "OpportunityId" uuid NOT NULL,
+        "CurrencyId" uuid NOT NULL,
+        "FinalPayableAmount" numeric(18,2) NOT NULL,
+        "AgreementDocumentId" uuid NULL,
+        "AgreementDate" timestamp with time zone NULL,
+        "AgreementExpiryDate" timestamp with time zone NULL,
+        "PurchaseOrderDocumentId" uuid NULL,
+        "PurchaseOrderDate" timestamp with time zone NULL,
+        "AmcApplicable" boolean NOT NULL,
+        "AmcAmount" numeric(18,2) NULL,
+        "AmcStartDate" timestamp with time zone NULL,
+        "AmcRenewalDate" timestamp with time zone NULL,
+        "AmcExpiryDate" timestamp with time zone NULL,
+        "SubscriptionApplicable" boolean NOT NULL,
+        "SubscriptionAmount" numeric(18,2) NULL,
+        "SubscriptionBillingFrequency" character varying(50) NULL,
+        "SubscriptionStartDate" timestamp with time zone NULL,
+        "NextSubscriptionBillingDate" timestamp with time zone NULL,
+        "Remarks" character varying(1000) NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL,
+        CONSTRAINT "PK_OpportunityCommercialBreakdowns" PRIMARY KEY ("Id")
+    );
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_OpportunityCommercialDocuments_Opportunities_OpportunityId') THEN
+        ALTER TABLE "leads"."OpportunityCommercialDocuments" ADD CONSTRAINT "FK_OpportunityCommercialDocuments_Opportunities_OpportunityId"
+        FOREIGN KEY ("OpportunityId") REFERENCES "leads"."Opportunities" ("Id") ON DELETE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_OpportunityCommercialBreakdowns_Opportunities_OpportunityId') THEN
+        ALTER TABLE "leads"."OpportunityCommercialBreakdowns" ADD CONSTRAINT "FK_OpportunityCommercialBreakdowns_Opportunities_OpportunityId"
+        FOREIGN KEY ("OpportunityId") REFERENCES "leads"."Opportunities" ("Id") ON DELETE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_OppCommercialBreakdowns_AgreementDocumentId') THEN
+        ALTER TABLE "leads"."OpportunityCommercialBreakdowns" ADD CONSTRAINT "FK_OppCommercialBreakdowns_AgreementDocumentId"
+        FOREIGN KEY ("AgreementDocumentId") REFERENCES "leads"."OpportunityCommercialDocuments" ("Id");
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_OppCommercialBreakdowns_PurchaseOrderDocumentId') THEN
+        ALTER TABLE "leads"."OpportunityCommercialBreakdowns" ADD CONSTRAINT "FK_OppCommercialBreakdowns_PurchaseOrderDocumentId"
+        FOREIGN KEY ("PurchaseOrderDocumentId") REFERENCES "leads"."OpportunityCommercialDocuments" ("Id");
+    END IF;
+
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_AgreementDocumentId"
+        ON "leads"."OpportunityCommercialBreakdowns" ("AgreementDocumentId");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_AgreementExpiryDate"
+        ON "leads"."OpportunityCommercialBreakdowns" ("AgreementExpiryDate");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_AmcExpiryDate"
+        ON "leads"."OpportunityCommercialBreakdowns" ("AmcExpiryDate");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_AmcRenewalDate"
+        ON "leads"."OpportunityCommercialBreakdowns" ("AmcRenewalDate");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_NextSubBillingDate"
+        ON "leads"."OpportunityCommercialBreakdowns" ("NextSubscriptionBillingDate");
+    CREATE UNIQUE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_OpportunityId"
+        ON "leads"."OpportunityCommercialBreakdowns" ("OpportunityId");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_PurchaseOrderDocumentId"
+        ON "leads"."OpportunityCommercialBreakdowns" ("PurchaseOrderDocumentId");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialDocuments_OpportunityId_DocumentType_IsActive"
+        ON "leads"."OpportunityCommercialDocuments" ("OpportunityId", "DocumentType", "IsActive");
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260730120000_OpportunityCommercialFinalization', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
 COMMIT;
