@@ -39,6 +39,7 @@ import { OpportunityApiService } from '../../services/opportunity-api.service';
     standalone: true,
     imports: [ButtonModule, CommonModule, ConfirmDialogModule, DatePickerModule, DialogModule, InputNumberModule, InputTextModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, ToastModule],
     templateUrl: './opportunity-list.html',
+    styleUrls: ['./opportunity-list.scss'],
     providers: [ConfirmationService, MessageService]
 })
 export class OpportunityList implements OnInit, OnDestroy {
@@ -794,14 +795,6 @@ export class OpportunityList implements OnInit, OnDestroy {
 
     stageOptionsFor(opportunity: OpportunityListItemViewModel): LookupViewModel[] {
         return this.stages.filter((stage) => !stage.isFinal && (stage.sequence ?? 0) > opportunity.stageSequence);
-    }
-
-    get pipelineGridTemplate(): string {
-        return `repeat(${Math.max(this.pipelineStages.length, 1)}, minmax(14rem, 1fr))`;
-    }
-
-    get pipelineMinWidth(): string {
-        return `${Math.max(this.pipelineStages.length, 1) * 16}rem`;
     }
 
     showCreateError(controlName: string, errorName?: string): boolean {

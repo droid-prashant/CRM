@@ -1,5 +1,5 @@
 <p-toast position="bottom-right"></p-toast>
-<p-confirmdialog [style]="{ width: '450px' }" />
+<p-confirmdialog styleClass="opportunity-confirm-dialog" />
 
 <section class="rounded-md border border-surface-200 bg-surface-0 shadow-sm dark:border-surface-700 dark:bg-surface-900">
     <div class="flex flex-wrap items-center justify-between gap-4 border-b border-surface-200 px-5 py-4 dark:border-surface-700">
@@ -60,7 +60,7 @@
 
     @if (viewMode === 'pipeline') {
         <div class="overflow-x-auto px-5 py-4">
-            <div class="grid gap-3" [style.grid-template-columns]="pipelineGridTemplate" [style.min-width]="pipelineMinWidth">
+            <div class="opportunity-pipeline-grid">
                 @for (stage of pipelineStages; track stage.stageId) {
                     <div
                         class="rounded-md border border-surface-200 bg-surface-50 transition-colors dark:border-surface-700 dark:bg-surface-950/40"
@@ -162,8 +162,7 @@
                 [showCurrentPageReport]="true"
                 currentPageReportTemplate="Showing {first} to {last} of {totalRecords} opportunities"
                 (onLazyLoad)="onLazyLoad($event)"
-                [tableStyle]="{ 'min-width': '78rem' }"
-                styleClass="text-sm"
+                styleClass="text-sm opportunity-table"
             >
                 <ng-template #header>
                     <tr>
@@ -224,7 +223,7 @@
     }
 </section>
 
-<p-dialog [(visible)]="activityDialog" [modal]="true" [style]="{ width: 'min(860px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" header="Opportunity Activity">
+<p-dialog [(visible)]="activityDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--activity opportunity-dialog--scrollable" header="Opportunity Activity">
     <div class="grid grid-cols-12 gap-5">
         <form [formGroup]="activityForm" class="col-span-12 grid grid-cols-12 gap-3 lg:col-span-5">
             <div class="col-span-12">
@@ -293,7 +292,7 @@
     </div>
 </p-dialog>
 
-<p-dialog [(visible)]="closeDialog" [modal]="true" [style]="{ width: 'min(560px, 96vw)' }" [header]="closingMode === 'won' ? 'Mark Opportunity Won' : 'Mark Opportunity Lost'">
+<p-dialog [(visible)]="closeDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--close" [header]="closingMode === 'won' ? 'Mark Opportunity Won' : 'Mark Opportunity Lost'">
     <form [formGroup]="closeForm" class="grid grid-cols-12 gap-4">
         @if (closingMode === 'won') {
             <div class="col-span-12">
@@ -322,7 +321,7 @@
     </ng-template>
 </p-dialog>
 
-<p-dialog [(visible)]="stageChangeDialog" [modal]="true" [style]="{ width: 'min(520px, 96vw)' }" header="Move Opportunity">
+<p-dialog [(visible)]="stageChangeDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--stage-change" header="Move Opportunity">
     <form [formGroup]="stageChangeForm" class="grid grid-cols-12 gap-4">
         <div class="col-span-12 rounded-md border border-surface-200 bg-surface-50 p-3 text-sm dark:border-surface-700 dark:bg-surface-950/40">
             <div class="font-semibold text-surface-950 dark:text-surface-0">{{ pendingStageOpportunity?.opportunityNumber }}</div>
@@ -363,7 +362,7 @@
     </ng-template>
 </p-dialog>
 
-<p-dialog [(visible)]="commercialDialog" [modal]="true" [style]="{ width: 'min(1120px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" header="Commercial Finalization">
+<p-dialog [(visible)]="commercialDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--commercial opportunity-dialog--scrollable" header="Commercial Finalization">
     @if (selectedOpportunity) {
         <div class="mb-4 rounded-md border border-surface-200 bg-surface-50 p-3 text-sm dark:border-surface-700 dark:bg-surface-950/40">
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -558,7 +557,7 @@
     </ng-template>
 </p-dialog>
 
-<p-dialog [(visible)]="editDialog" [modal]="true" [style]="{ width: 'min(640px, 96vw)' }" header="Edit Opportunity">
+<p-dialog [(visible)]="editDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--edit" header="Edit Opportunity">
     <form [formGroup]="editForm" class="grid grid-cols-12 gap-4">
         <div class="col-span-12">
             <label class="mb-2 block text-sm font-semibold">Opportunity #</label>
@@ -584,7 +583,7 @@
     </ng-template>
 </p-dialog>
 
-<p-dialog [(visible)]="createDialog" [modal]="true" [style]="{ width: 'min(960px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" header="Create Opportunity">
+<p-dialog [(visible)]="createDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--create opportunity-dialog--scrollable" header="Create Opportunity">
     <form [formGroup]="opportunityForm" class="grid grid-cols-12 gap-4">
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Client</label>
