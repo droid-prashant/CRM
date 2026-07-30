@@ -143,6 +143,88 @@ namespace Opportunities.Application.Services
             return await _opportunityRepository.GetProposalDocumentAsync(id, cancellationToken);
         }
 
+        public async Task<List<ProposalVersionViewModel>?> GetProposalHistoryAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await CanAccessOpportunityAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _opportunityRepository.GetProposalHistoryAsync(id, cancellationToken);
+        }
+
+        public async Task<OpportunityDocumentViewModel?> GetProposalDocumentVersionAsync(Guid documentId, CancellationToken cancellationToken)
+        {
+            var document = await _opportunityRepository.GetProposalDocumentVersionAsync(documentId, cancellationToken);
+            if (document == null)
+            {
+                return null;
+            }
+
+            if (!await CanAccessOpportunityAsync(document.OpportunityId, cancellationToken))
+            {
+                return null;
+            }
+
+            return document;
+        }
+
+        public async Task<OpportunityDocumentViewModel?> UploadProposalVersionAsync(Guid id, UploadProposalVersionRequest request, CancellationToken cancellationToken)
+        {
+            if (!await CanModifyOpportunityAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            var errors = ValidateProposalDocument(request);
+            if (errors.Count > 0)
+            {
+                return null;
+            }
+
+            return await _opportunityRepository.UploadProposalVersionAsync(id, request, cancellationToken);
+        }
+
+        private static List<string> ValidateProposalDocument(UploadProposalVersionRequest request)
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(request.ProposalDocumentFileName))
+            {
+                errors.Add("Proposal document file name is required.");
+                return errors;
+            }
+
+            var extension = Path.GetExtension(request.ProposalDocumentFileName);
+            if (!AllowedProposalDocumentExtensions.Contains(extension))
+            {
+                errors.Add("Proposal document must be a PDF, DOC, or DOCX file.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ProposalDocumentContentType)
+                && !AllowedProposalDocumentContentTypes.Contains(request.ProposalDocumentContentType)
+                && !string.Equals(request.ProposalDocumentContentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Proposal document content type is invalid.");
+            }
+
+            if (!request.ProposalDocumentSize.HasValue || request.ProposalDocumentSize <= 0)
+            {
+                errors.Add("Proposal document is required.");
+            }
+            else if (request.ProposalDocumentSize > MaxProposalDocumentBytes)
+            {
+                errors.Add("Proposal document must be 10 MB or smaller.");
+            }
+
+            if (request.Description?.Length > 500)
+            {
+                errors.Add("Description must be 500 characters or fewer.");
+            }
+
+            return errors;
+        }
+
         public async Task<List<OpportunityActivityViewModel>?> GetActivitiesAsync(Guid id, CancellationToken cancellationToken)
         {
             if (!await CanAccessOpportunityAsync(id, cancellationToken))

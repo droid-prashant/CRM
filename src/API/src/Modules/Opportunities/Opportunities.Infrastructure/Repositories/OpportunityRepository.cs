@@ -238,17 +238,8 @@ namespace Opportunities.Infrastructure.Repositories
 
             if (!string.IsNullOrWhiteSpace(request.ProposalDocumentPath))
             {
-                DeactivateExistingProposalDocuments(opportunity.Id);
-                _dbContext.OpportunityDocuments.Add(new OpportunityDocument
-                {
-                    OpportunityId = opportunity.Id,
-                    DocumentType = ProposalDocumentType,
-                    FileName = request.ProposalDocumentFileName?.Trim() ?? string.Empty,
-                    StoredFileName = request.ProposalDocumentStoredFileName?.Trim() ?? string.Empty,
-                    FilePath = request.ProposalDocumentPath.Trim(),
-                    ContentType = request.ProposalDocumentContentType?.Trim() ?? string.Empty,
-                    FileSize = request.ProposalDocumentSize ?? 0
-                });
+                await AddProposalVersionAsync(opportunity, request.ProposalDocumentFileName, request.ProposalDocumentStoredFileName,
+                    request.ProposalDocumentPath, request.ProposalDocumentContentType, request.ProposalDocumentSize, null, cancellationToken);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -541,7 +532,9 @@ namespace Opportunities.Infrastructure.Repositories
                 HasProposalDocument = proposalDocument != null,
                 ProposalDocumentId = proposalDocument?.Id,
                 ProposalDocumentFileName = proposalDocument?.FileName,
-                ProposalDocumentUploadedOn = proposalDocument?.CreatedOn
+                ProposalDocumentUploadedOn = proposalDocument?.CreatedOn,
+                ProposalVersionNumber = proposalDocument?.VersionNumber,
+                ProposalIsLastCommunicated = proposalDocument?.IsLastCommunicated
             };
         }
 
@@ -666,7 +659,10 @@ namespace Opportunities.Infrastructure.Repositories
                 FileSize = document.FileSize,
                 UploadedByUserId = document.CreatedBy,
                 UploadedByUserName = await GetUserFullNameAsync(document.CreatedBy),
-                UploadedOn = document.CreatedOn
+                UploadedOn = document.CreatedOn,
+                VersionNumber = document.VersionNumber,
+                Description = document.Description,
+                IsLastCommunicated = document.IsLastCommunicated
             };
         }
 
@@ -674,19 +670,127 @@ namespace Opportunities.Infrastructure.Repositories
         {
             return _dbContext.OpportunityDocuments
                 .AsNoTracking()
-                .Where(x => x.OpportunityId == opportunityId && x.IsActive && x.DocumentType == ProposalDocumentType)
-                .OrderByDescending(x => x.CreatedOn);
+                .Where(x => x.OpportunityId == opportunityId && x.IsLastCommunicated && x.DocumentType == ProposalDocumentType);
         }
 
-        private void DeactivateExistingProposalDocuments(Guid opportunityId)
+        public async Task<List<ProposalVersionViewModel>> GetProposalHistoryAsync(Guid id, CancellationToken cancellationToken)
         {
-            var documents = _dbContext.OpportunityDocuments
-                .Where(x => x.OpportunityId == opportunityId && x.IsActive && x.DocumentType == ProposalDocumentType);
+            var documents = await _dbContext.OpportunityDocuments
+                .AsNoTracking()
+                .Where(x => x.OpportunityId == id && x.DocumentType == ProposalDocumentType)
+                .OrderByDescending(x => x.VersionNumber)
+                .ToListAsync(cancellationToken);
 
+            var viewModels = new List<ProposalVersionViewModel>();
             foreach (var document in documents)
             {
-                document.IsActive = false;
+                viewModels.Add(new ProposalVersionViewModel
+                {
+                    DocumentId = document.Id,
+                    VersionNumber = document.VersionNumber,
+                    FileName = document.FileName,
+                    ContentType = document.ContentType,
+                    FileSize = document.FileSize,
+                    UploadedByUserId = document.CreatedBy,
+                    UploadedByUserName = await GetUserFullNameAsync(document.CreatedBy),
+                    UploadedOn = document.CreatedOn,
+                    Description = document.Description,
+                    IsLastCommunicated = document.IsLastCommunicated
+                });
             }
+
+            return viewModels;
+        }
+
+        public async Task<OpportunityDocumentViewModel?> GetProposalDocumentVersionAsync(Guid documentId, CancellationToken cancellationToken)
+        {
+            var document = await _dbContext.OpportunityDocuments
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == documentId && x.DocumentType == ProposalDocumentType, cancellationToken);
+
+            return document == null ? null : await MapDocumentAsync(document);
+        }
+
+        public async Task<OpportunityDocumentViewModel?> UploadProposalVersionAsync(Guid id, UploadProposalVersionRequest request, CancellationToken cancellationToken)
+        {
+            var opportunity = await _dbContext.Opportunities
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+
+            if (opportunity == null || IsClosed(opportunity))
+            {
+                return null;
+            }
+
+            var document = await AddProposalVersionAsync(opportunity, request.ProposalDocumentFileName, request.ProposalDocumentStoredFileName,
+                request.ProposalDocumentPath!, request.ProposalDocumentContentType, request.ProposalDocumentSize, request.Description, cancellationToken);
+
+            await AddProposalTimelineEntryAsync(opportunity, document, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return await MapDocumentAsync(document);
+        }
+
+        private async Task<OpportunityDocument> AddProposalVersionAsync(Opportunity opportunity, string? fileName, string? storedFileName,
+            string filePath, string? contentType, long? fileSize, string? description, CancellationToken cancellationToken)
+        {
+            var maxVersion = await _dbContext.OpportunityDocuments
+                .Where(x => x.OpportunityId == opportunity.Id && x.DocumentType == ProposalDocumentType)
+                .MaxAsync(x => (int?)x.VersionNumber, cancellationToken) ?? 0;
+
+            var existingLastCommunicated = await _dbContext.OpportunityDocuments
+                .Where(x => x.OpportunityId == opportunity.Id && x.DocumentType == ProposalDocumentType && x.IsLastCommunicated)
+                .ToListAsync(cancellationToken);
+
+            foreach (var doc in existingLastCommunicated)
+            {
+                doc.IsLastCommunicated = false;
+            }
+
+            var document = new OpportunityDocument
+            {
+                OpportunityId = opportunity.Id,
+                DocumentType = ProposalDocumentType,
+                FileName = fileName?.Trim() ?? string.Empty,
+                StoredFileName = storedFileName?.Trim() ?? string.Empty,
+                FilePath = filePath.Trim(),
+                ContentType = contentType?.Trim() ?? string.Empty,
+                FileSize = fileSize ?? 0,
+                VersionNumber = maxVersion + 1,
+                Description = description?.Trim(),
+                IsLastCommunicated = true
+            };
+
+            _dbContext.OpportunityDocuments.Add(document);
+            return document;
+        }
+
+        private async Task AddProposalTimelineEntryAsync(Opportunity opportunity, OpportunityDocument document, CancellationToken cancellationToken)
+        {
+            if (!opportunity.LeadId.HasValue)
+            {
+                return;
+            }
+
+            var lead = await _dbContext.Leads
+                .Include(x => x.TimelineEntries)
+                .FirstOrDefaultAsync(x => x.Id == opportunity.LeadId.Value && x.IsActive && !x.IsDeleted, cancellationToken);
+
+            if (lead == null)
+            {
+                return;
+            }
+
+            var description = $"Proposal v{document.VersionNumber} uploaded: {document.FileName}";
+            if (!string.IsNullOrWhiteSpace(document.Description))
+            {
+                description += $" ({document.Description})";
+            }
+
+            lead.TimelineEntries.Add(new LeadTimelineEntry
+            {
+                EventType = "ProposalUploaded",
+                Description = description
+            });
         }
 
         private static string GetCurrencyCode(Guid currencyId)

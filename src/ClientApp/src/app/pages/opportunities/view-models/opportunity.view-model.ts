@@ -29,6 +29,8 @@ export interface OpportunityListItemViewModel {
     proposalDocumentId?: string;
     proposalDocumentFileName?: string;
     proposalDocumentUploadedOn?: string;
+    proposalVersionNumber?: number;
+    proposalIsLastCommunicated?: boolean;
 }
 
 export interface PagedResult<T> {
@@ -129,4 +131,34 @@ export interface OpportunityActivityViewModel {
     activityDate: string;
     followUpDate?: string;
     createdByUserName?: string;
+}
+
+export interface ProposalVersionViewModel {
+    documentId: string;
+    versionNumber: number;
+    fileName: string;
+    contentType: string;
+    fileSize: number;
+    uploadedByUserId: string;
+    uploadedByUserName?: string;
+    uploadedOn: string;
+    description?: string;
+    isLastCommunicated: boolean;
+}
+
+export interface OpportunityDocumentViewModel {
+    id: string;
+    opportunityId: string;
+    documentType: string;
+    fileName: string;
+    storedFileName: string;
+    filePath: string;
+    contentType: string;
+    fileSize: number;
+    uploadedByUserId: string;
+    uploadedByUserName?: string;
+    uploadedOn: string;
+    versionNumber: number;
+    description?: string;
+    isLastCommunicated: boolean;
 }

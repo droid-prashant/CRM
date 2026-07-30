@@ -49,3 +49,8 @@ export interface CreateOpportunityActivityRequest {
     activityDate?: string;
     followUpDate?: string;
 }
+
+export interface UploadProposalVersionRequest {
+    description?: string;
+    proposalDocument: File;
+}

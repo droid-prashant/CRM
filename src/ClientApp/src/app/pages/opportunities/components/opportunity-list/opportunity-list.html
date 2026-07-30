@@ -103,9 +103,15 @@
                                         <div>Close: {{ formatDate(opportunity.expectedCloseDate) }}</div>
                                         <div>Owner: {{ opportunity.ownerUserName || 'Not set' }}</div>
                                         @if (opportunity.hasProposalDocument) {
-                                            <button type="button" class="text-left text-xs font-semibold text-primary hover:underline" (click)="downloadProposalDocument(opportunity)">
-                                                {{ opportunity.proposalDocumentFileName || 'Proposal document' }}
-                                            </button>
+                                            <div class="flex items-center gap-2">
+                                                <button type="button" class="text-left text-xs font-semibold text-primary hover:underline" (click)="downloadProposalDocument(opportunity)">
+                                                    {{ opportunity.proposalDocumentFileName || 'Proposal document' }}
+                                                </button>
+                                                @if (opportunity.proposalVersionNumber) {
+                                                    <span class="text-xs text-surface-400">v{{ opportunity.proposalVersionNumber }}</span>
+                                                }
+                                                <button type="button" class="text-xs text-primary hover:underline" (click)="openProposalHistory(opportunity)">History</button>
+                                            </div>
                                         }
                                     </div>
 
@@ -121,6 +127,7 @@
                                     <div class="mt-3 flex flex-wrap justify-end gap-1">
                                         <p-button icon="pi pi-history" severity="secondary" text rounded size="small" ariaLabel="Activity" (onClick)="openActivityDialog(opportunity)" />
                                         @if (canEdit && opportunity.status === 'Open') {
+                                            <p-button icon="pi pi-upload" severity="secondary" text rounded size="small" ariaLabel="Upload proposal" (onClick)="openUploadProposalDialog(opportunity)" />
                                             <p-button icon="pi pi-pencil" severity="secondary" text rounded size="small" ariaLabel="Edit" (onClick)="openEditDialog(opportunity)" />
                                         }
                                         @if (canApprove && opportunity.status === 'Open') {
@@ -193,7 +200,13 @@
                         <td><p-tag [severity]="statusSeverity(opportunity.status)" [value]="opportunity.status" /></td>
                         <td>
                             @if (opportunity.hasProposalDocument) {
-                                <p-button icon="pi pi-download" label="Proposal" severity="secondary" text size="small" (onClick)="downloadProposalDocument(opportunity)" />
+                                <div class="flex items-center gap-2">
+                                    <p-button icon="pi pi-download" severity="secondary" text size="small" (onClick)="downloadProposalDocument(opportunity)" />
+                                    @if (opportunity.proposalVersionNumber) {
+                                        <span class="text-xs text-surface-500">v{{ opportunity.proposalVersionNumber }}</span>
+                                    }
+                                    <p-button icon="pi pi-eye" severity="secondary" text size="small" (onClick)="openProposalHistory(opportunity)" />
+                                </div>
                             } @else {
                                 <span class="text-sm text-surface-500">Not set</span>
                             }
@@ -482,5 +495,83 @@
     <ng-template #footer>
         <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSaving" (onClick)="createDialog = false" />
         <p-button label="Create" icon="pi pi-check" [loading]="isSaving" (onClick)="createOpportunity()" />
+    </ng-template>
+</p-dialog>
+
+<p-dialog [(visible)]="proposalHistoryDialog" [modal]="true" [style]="{ width: 'min(720px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" header="Proposal History">
+    <div class="space-y-3">
+        @if (selectedOpportunity) {
+            <div class="mb-4 rounded-md border border-surface-200 bg-surface-50 p-3 text-sm dark:border-surface-700 dark:bg-surface-950/40">
+                <div class="font-semibold text-surface-950 dark:text-surface-0">{{ selectedOpportunity.opportunityNumber }}</div>
+                <div class="text-surface-600 dark:text-surface-300">{{ selectedOpportunity.title }}</div>
+            </div>
+        }
+        @for (version of selectedProposalHistory; track version.documentId) {
+            <div class="rounded-md border border-surface-200 p-4 text-sm dark:border-surface-700" [class.border-primary]="version.isLastCommunicated">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-surface-950 dark:text-surface-0">Version {{ version.versionNumber }}</span>
+                            @if (version.isLastCommunicated) {
+                                <p-tag severity="info" value="Last Communicated" />
+                            }
+                        </div>
+                        <div class="mt-1 text-surface-600 dark:text-surface-300">{{ version.fileName }}</div>
+                        @if (version.description) {
+                            <div class="mt-1 italic text-surface-500">{{ version.description }}</div>
+                        }
+                        <div class="mt-2 text-xs text-surface-500">
+                            Uploaded by {{ version.uploadedByUserName || 'Unknown' }} on {{ formatDate(version.uploadedOn) }}
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 flex gap-2">
+                    <p-button icon="pi pi-eye" label="Preview" severity="secondary" text size="small" (onClick)="previewProposalVersion(selectedOpportunity!.id, version)" />
+                    <p-button icon="pi pi-download" label="Download" severity="secondary" text size="small" (onClick)="downloadProposalVersion(selectedOpportunity!.id, version)" />
+                </div>
+            </div>
+        } @empty {
+            <div class="rounded-md border border-dashed border-surface-300 p-6 text-center text-sm text-surface-500 dark:border-surface-700">
+                @if (selectedProposalHistory === undefined) {
+                    Loading...
+                } @else {
+                    No proposal versions found.
+                }
+            </div>
+        }
+    </div>
+</p-dialog>
+
+<p-dialog [(visible)]="documentPreviewDialog" [modal]="true" [style]="{ width: 'min(960px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 8rem)', overflow: 'auto' }" [header]="'Document Preview' + (documentPreviewFileName ? ': ' + documentPreviewFileName : '')" (onHide)="documentPreviewDialog = false">
+    @if (isDocxLoading) {
+        <div class="flex flex-col items-center justify-center py-16">
+            <p-progressSpinner />
+            <span class="mt-4 text-sm text-surface-500">Loading document preview...</span>
+        </div>
+    }
+    <div #docxContainer class="docx-preview-container"></div>
+</p-dialog>
+
+<p-dialog [(visible)]="uploadProposalDialog" [modal]="true" [style]="{ width: 'min(520px, 96vw)' }" header="Upload New Proposal Version">
+    <div class="grid grid-cols-12 gap-4">
+        @if (selectedUploadOpportunity) {
+            <div class="col-span-12 rounded-md border border-surface-200 bg-surface-50 p-3 text-sm dark:border-surface-700 dark:bg-surface-950/40">
+                <div class="font-semibold text-surface-950 dark:text-surface-0">{{ selectedUploadOpportunity.opportunityNumber }}</div>
+                <div class="text-surface-600 dark:text-surface-300">{{ selectedUploadOpportunity.title }}</div>
+            </div>
+        }
+        <div class="col-span-12">
+            <label class="mb-2 block text-sm font-semibold">Proposal Document <span class="text-red-500">*</span></label>
+            <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="w-full rounded-md border border-surface-300 bg-surface-0 p-2 text-sm dark:border-surface-600 dark:bg-surface-900" (change)="onUploadProposalFileSelected($event)" />
+        </div>
+        <div class="col-span-12">
+            <label class="mb-2 block text-sm font-semibold">Description / Remarks</label>
+            <textarea rows="3" class="w-full rounded-md border border-surface-300 bg-surface-0 p-3 text-sm dark:border-surface-600 dark:bg-surface-900" placeholder="Optional description for this version" (input)="onUploadProposalDescriptionChange($event)"></textarea>
+        </div>
+    </div>
+
+    <ng-template #footer>
+        <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSaving" (onClick)="cancelUploadProposal()" />
+        <p-button label="Upload" icon="pi pi-upload" [loading]="isSaving" (onClick)="confirmUploadProposal()" [disabled]="!uploadProposalFile" />
     </ng-template>
 </p-dialog>

@@ -2,8 +2,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { apiUrl } from '@/core/http/api-url';
-import { ChangeOpportunityStageRequest, CloseOpportunityRequest, CreateOpportunityActivityRequest, CreateOpportunityRequest, OpportunityListQuery, UpdateOpportunityRequest } from '../dtos/opportunity.dto';
-import { OpportunityActivityViewModel, OpportunityListItemViewModel, OpportunityLookupBundle, OpportunityPipelineStageViewModel, OpportunityStageHistoryViewModel, PagedResult } from '../view-models/opportunity.view-model';
+import { ChangeOpportunityStageRequest, CloseOpportunityRequest, CreateOpportunityActivityRequest, CreateOpportunityRequest, OpportunityListQuery, UpdateOpportunityRequest, UploadProposalVersionRequest } from '../dtos/opportunity.dto';
+import { OpportunityActivityViewModel, OpportunityDocumentViewModel, OpportunityListItemViewModel, OpportunityLookupBundle, OpportunityPipelineStageViewModel, OpportunityStageHistoryViewModel, PagedResult, ProposalVersionViewModel } from '../view-models/opportunity.view-model';
 
 @Injectable({ providedIn: 'root' })
 export class OpportunityApiService {
@@ -77,6 +77,29 @@ export class OpportunityApiService {
 
     downloadProposalDocument(id: string): Observable<Blob> {
         return this.http.get(`${this.opportunitiesUrl}/${id}/proposal-document`, { responseType: 'blob' });
+    }
+
+    getProposalHistory(id: string): Observable<ProposalVersionViewModel[]> {
+        return this.http.get<ProposalVersionViewModel[]>(`${this.opportunitiesUrl}/${id}/proposal-versions`);
+    }
+
+    uploadProposalVersion(id: string, request: UploadProposalVersionRequest): Observable<OpportunityDocumentViewModel> {
+        const formData = new FormData();
+        formData.append('proposalDocument', request.proposalDocument);
+
+        if (request.description) {
+            formData.append('description', request.description);
+        }
+
+        return this.http.post<OpportunityDocumentViewModel>(`${this.opportunitiesUrl}/${id}/proposal-versions`, formData);
+    }
+
+    downloadProposalVersion(id: string, documentId: string): Observable<Blob> {
+        return this.http.get(`${this.opportunitiesUrl}/${id}/proposal-versions/${documentId}/download`, { responseType: 'blob' });
+    }
+
+    previewProposalVersion(id: string, documentId: string): Observable<Blob> {
+        return this.http.get(`${this.opportunitiesUrl}/${id}/proposal-versions/${documentId}/preview`, { responseType: 'blob' });
     }
 
     getLookupBundle(): Observable<OpportunityLookupBundle> {

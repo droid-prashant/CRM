@@ -30,6 +30,7 @@ namespace Opportunities.Infrastructure.Persistence.Data
         public DbSet<OpportunityStageHistory> OpportunityStageHistories { get; set; }
         public DbSet<OpportunityActivity> OpportunityActivities { get; set; }
         public DbSet<OpportunityDocument> OpportunityDocuments { get; set; }
+        public DbSet<LeadTimelineEntry> LeadTimelineEntries { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -96,8 +97,10 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Property(x => x.StoredFileName).HasMaxLength(255).IsRequired();
                 entity.Property(x => x.FilePath).HasMaxLength(500).IsRequired();
                 entity.Property(x => x.ContentType).HasMaxLength(150).IsRequired();
+                entity.Property(x => x.Description).HasMaxLength(500);
                 entity.HasOne(x => x.Opportunity).WithMany(x => x.Documents).HasForeignKey(x => x.OpportunityId);
-                entity.HasIndex(x => new { x.OpportunityId, x.DocumentType, x.IsActive });
+                entity.HasIndex(x => new { x.OpportunityId, x.DocumentType, x.IsLastCommunicated });
+                entity.HasIndex(x => new { x.OpportunityId, x.DocumentType, x.VersionNumber });
             });
 
             modelBuilder.Entity<Lead>(entity =>
@@ -109,8 +112,16 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Ignore(x => x.Country);
                 entity.Ignore(x => x.Industry);
                 entity.Ignore(x => x.ProductInterests);
-                entity.Ignore(x => x.TimelineEntries);
                 entity.Ignore(x => x.Interactions);
+            });
+
+            modelBuilder.Entity<LeadTimelineEntry>(entity =>
+            {
+                entity.ToTable("LeadTimelineEntries", "leads");
+                entity.Property(x => x.EventType).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.Description).HasMaxLength(1000).IsRequired();
+                entity.HasOne(x => x.Lead).WithMany(x => x.TimelineEntries).HasForeignKey(x => x.LeadId);
+                entity.HasIndex(x => new { x.LeadId, x.CreatedOn });
             });
 
             modelBuilder.Entity<Product>(entity =>

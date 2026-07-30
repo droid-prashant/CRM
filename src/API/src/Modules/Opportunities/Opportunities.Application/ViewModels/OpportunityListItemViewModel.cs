@@ -32,5 +32,7 @@ namespace Opportunities.Application.ViewModels
         public Guid? ProposalDocumentId { get; set; }
         public string? ProposalDocumentFileName { get; set; }
         public DateTime? ProposalDocumentUploadedOn { get; set; }
+        public int? ProposalVersionNumber { get; set; }
+        public bool? ProposalIsLastCommunicated { get; set; }
     }
 }
