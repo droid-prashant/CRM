@@ -1,9 +1,9 @@
-using System.Net.Mail;
-using System.Text.RegularExpressions;
 using Clients.Application.DTOs;
 using Clients.Application.Repositories;
 using Clients.Application.ViewModels;
 using Clients.Domain.Enums;
+using System.Net.Mail;
+using System.Text.RegularExpressions;
 
 namespace Clients.Application.Services
 {

@@ -93,6 +93,23 @@ Authentication, authorization, input validation, file handling, and sensitive da
 
 Database and model changes must preserve existing data unless migration or cleanup behavior is explicitly planned. New statuses, enum values, or required fields must be handled everywhere they are read or displayed.
 
+When a database change is introduced through an EF migration, `src/DatabaseScripts/production_migrations.sql` must be updated in the same PR. A migration is not complete for review until both the EF migration and the production migration script are present and aligned.
+
+Production migration SQL must be deployment-safe and reviewable. Do not approve arbitrary SQL just because it creates the expected table or column.
+
+Required rules for `production_migrations.sql` changes:
+
+- Add a clearly separated migration block near the end of the file, before the final `COMMIT;`.
+- Insert the matching migration ID into `__EFMigrationsHistory` with `ON CONFLICT ("MigrationId") DO NOTHING`.
+- Use idempotent statements such as `CREATE SCHEMA IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, guarded `ALTER TABLE`, and conflict-safe seed inserts.
+- Guard constraints, foreign keys, columns, and indexes so the script can run safely more than once or against a partially updated database.
+- Keep schema, table, column, index, constraint, precision, nullability, defaults, and seed data consistent with the EF migration.
+- For new required columns on existing tables, include a safe default or backfill strategy before enforcing `NOT NULL`.
+- For data changes, make the target rows explicit and reversible by review; avoid broad updates without filters.
+- Avoid destructive operations such as dropping columns, truncating tables, deleting data, or changing column types in a lossy way unless the PR documents the data impact and approval plan.
+- Do not include local database names, machine paths, credentials, environment-specific values, or manual one-off SQL.
+- Keep seed data deterministic and conflict-safe, especially IDs, codes, names, and unique keys.
+
 ### Testing Standard
 
 Tests should cover the main success path and the highest-risk failure paths. A PR can be approved without new tests only when the change is low risk, clearly mechanical, or covered by existing tests.
@@ -194,6 +211,8 @@ npm test
 ### Data And Compatibility
 
 - Database schema changes are backwards-compatible or clearly coordinated.
+- EF migrations that change the database also update `src/DatabaseScripts/production_migrations.sql`.
+- Production migration SQL is idempotent, guarded, and aligned with the EF migration.
 - Existing records remain valid after the change.
 - API changes do not break existing frontend consumers unless the PR explicitly includes the matching update.
 - New enum values, statuses, or constants are handled everywhere they are displayed or processed.
@@ -221,6 +240,8 @@ Do not approve a PR when any of the following are present:
 - The PR includes unrelated changes that are not explained.
 - A user can access, update, or delete data they should not control.
 - The backend trusts client-side validation for important rules.
+- A database migration is added without the matching `src/DatabaseScripts/production_migrations.sql` update.
+- The production migration script is not idempotent, is not aligned with the EF migration, or contains unsafe destructive SQL without an approved data plan.
 - API changes are not reflected in the frontend or dependent consumers.
 - Error cases fail silently or expose technical details to users.
 - File uploads accept unsafe file types, paths, or sizes.

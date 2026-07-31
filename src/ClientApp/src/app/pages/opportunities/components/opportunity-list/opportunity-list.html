@@ -547,6 +547,26 @@
                         <textarea formControlName="remarks" rows="3" class="w-full rounded-md border border-surface-300 bg-surface-0 p-3 text-sm dark:border-surface-600 dark:bg-surface-900"></textarea>
                     </div>
                 </form>
+
+                @if (commercialBreakdown && commercialReminderEvents().length) {
+                    <section class="commercial-reminder-panel">
+                        <div>
+                            <h4>Resolve Reminder Events</h4>
+                            <p>Mark renewal, expiry, or billing reminders resolved after the follow-up action is completed.</p>
+                        </div>
+                        <div class="commercial-reminder-list">
+                            @for (event of commercialReminderEvents(); track event.eventType) {
+                                <article class="commercial-reminder-item">
+                                    <div>
+                                        <span>{{ event.label }}</span>
+                                        <small>{{ formatDate(event.dueDate) }}</small>
+                                    </div>
+                                    <p-button label="Resolve" icon="pi pi-check" size="small" severity="success" [outlined]="true" [disabled]="isResolvingCommercialReminder" (onClick)="resolveCommercialReminder(event.eventType, event.dueDate)" />
+                                </article>
+                            }
+                        </div>
+                    </section>
+                }
             </section>
         </div>
     }

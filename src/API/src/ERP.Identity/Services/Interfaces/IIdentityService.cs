@@ -1,12 +1,7 @@
 ﻿using ERP.Identity.Model.Dtos;
 using ERP.Identity.Model.Requests;
-using ERP.Identity.Model.ViewModels;
 using ERP.Identity.Model.VIewModel;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ERP.Identity.Model.ViewModels;
 
 namespace ERP.Identity.Services.Interfaces
 {

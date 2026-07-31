@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace ERP.Identity.Model.Dtos
+﻿namespace ERP.Identity.Model.Dtos
 {
     public class RegisterUserDto
     {
@@ -13,7 +7,7 @@ namespace ERP.Identity.Model.Dtos
         public required string Address { get; set; }
         public required string FullName { get; set; }
         public required string Password { get; set; }
-        public required Guid DepartmentId{ get; set; }
+        public required Guid DepartmentId { get; set; }
         public required List<string> Roles { get; set; }
     }
 }

@@ -33,6 +33,7 @@ import {
     ProductLookupViewModel
 } from '../../view-models/opportunity.view-model';
 import { OpportunityApiService } from '../../services/opportunity-api.service';
+import { NotificationApiService } from '../../../notifications/services/notification-api.service';
 
 @Component({
     selector: 'app-opportunity-list',
@@ -108,6 +109,7 @@ export class OpportunityList implements OnInit, OnDestroy {
     commercialError = '';
     isLoadingCommercial = false;
     isSavingCommercial = false;
+    isResolvingCommercialReminder = false;
     totalRecords = 0;
     first = 0;
     pageNumber = 1;
@@ -195,6 +197,7 @@ export class OpportunityList implements OnInit, OnDestroy {
 
     constructor(
         private readonly opportunityApiService: OpportunityApiService,
+        private readonly notificationApiService: NotificationApiService,
         private readonly messageService: MessageService,
         private readonly confirmationService: ConfirmationService,
         private readonly authService: AuthService
@@ -752,6 +755,49 @@ export class OpportunityList implements OnInit, OnDestroy {
                 this.isSavingCommercial = false;
             }
         });
+    }
+
+    commercialReminderEvents(): { label: string; eventType: string; dueDate?: string }[] {
+        const breakdown = this.commercialBreakdown;
+        if (!breakdown) {
+            return [];
+        }
+
+        const events = [
+            { label: 'Agreement expiry', eventType: 'AgreementExpiry', dueDate: breakdown.agreementExpiryDate },
+            { label: 'AMC renewal', eventType: 'AmcRenewal', dueDate: breakdown.amcApplicable ? breakdown.amcRenewalDate : undefined },
+            { label: 'AMC expiry', eventType: 'AmcExpiry', dueDate: breakdown.amcApplicable ? breakdown.amcExpiryDate : undefined },
+            { label: 'Subscription billing', eventType: 'SubscriptionBilling', dueDate: breakdown.subscriptionApplicable ? breakdown.nextSubscriptionBillingDate : undefined }
+        ];
+
+        return events.filter((event) => !!event.dueDate);
+    }
+
+    resolveCommercialReminder(eventType: string, sourceDueDate?: string): void {
+        if (!this.commercialBreakdown || !sourceDueDate) {
+            return;
+        }
+
+        this.isResolvingCommercialReminder = true;
+        this.notificationApiService
+            .resolveEvent({
+                eventType,
+                sourceRecordType: 'OpportunityCommercialBreakdown',
+                sourceRecordId: this.commercialBreakdown.id,
+                sourceDueDate,
+                resolutionRemarks: 'Resolved from opportunity commercial breakdown.'
+            })
+            .subscribe({
+                next: () => {
+                    this.isResolvingCommercialReminder = false;
+                    this.messageService.add({ severity: 'success', summary: 'Reminder resolved', detail: 'Future reminders for this event will stop.', life: 3000 });
+                },
+                error: (error) => {
+                    const detail = error.error?.errors?.join?.(' ') ?? 'Reminder event could not be resolved.';
+                    this.isResolvingCommercialReminder = false;
+                    this.messageService.add({ severity: 'error', summary: 'Resolve failed', detail, life: 6000 });
+                }
+            });
     }
 
     canManageCommercial(opportunity: OpportunityListItemViewModel): boolean {

@@ -1,6 +1,7 @@
 using Clients.Infrastructure.Persistence.Data;
 using Leads.Infrastructure.Persistence.Data;
 using Microsoft.EntityFrameworkCore;
+using Notifications.Infrastructure.Persistence.Data;
 using Opportunities.Infrastructure.Persistence.Data;
 using Partners.Infrastructure.Persistence.Data;
 using Products.Infrastructure.Persistence.Data;
@@ -32,49 +33,8 @@ namespace ERP.API.Extensions
             var opportunitiesDbContext = scope.ServiceProvider.GetRequiredService<OpportunitiesDbContext>();
             await opportunitiesDbContext.Database.MigrateAsync();
 
-            await ApplyProductionMigrationScriptAsync(app);
-        }
-
-        private static async Task ApplyProductionMigrationScriptAsync(WebApplication app)
-        {
-            var scriptPath = FindProductionMigrationScript(app.Environment.ContentRootPath);
-            if (scriptPath == null)
-            {
-                return;
-            }
-
-            var script = await File.ReadAllTextAsync(scriptPath);
-            if (string.IsNullOrWhiteSpace(script))
-            {
-                return;
-            }
-
-            using var scope = app.Services.CreateScope();
-            var clientsDbContext = scope.ServiceProvider.GetRequiredService<ClientsDbContext>();
-            await clientsDbContext.Database.ExecuteSqlRawAsync(script);
-        }
-
-        private static string? FindProductionMigrationScript(string contentRootPath)
-        {
-            var directory = new DirectoryInfo(contentRootPath);
-            while (directory != null)
-            {
-                var candidate = Path.Combine(directory.FullName, "DatabaseScripts", "production_migrations.sql");
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-
-                var srcCandidate = Path.Combine(directory.FullName, "src", "DatabaseScripts", "production_migrations.sql");
-                if (File.Exists(srcCandidate))
-                {
-                    return srcCandidate;
-                }
-
-                directory = directory.Parent;
-            }
-
-            return null;
+            var notificationsDbContext = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+            await notificationsDbContext.Database.MigrateAsync();
         }
     }
 }
