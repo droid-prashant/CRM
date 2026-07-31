@@ -1,4 +1,5 @@
 <p-toast position="bottom-right"></p-toast>
+<p-confirmdialog styleClass="opportunity-confirm-dialog" />
 
 <section class="rounded-md border border-surface-200 bg-surface-0 shadow-sm dark:border-surface-700 dark:bg-surface-900">
     <div class="flex flex-wrap items-center justify-between gap-4 border-b border-surface-200 px-5 py-4 dark:border-surface-700">
@@ -59,7 +60,7 @@
 
     @if (viewMode === 'pipeline') {
         <div class="overflow-x-auto px-5 py-4">
-            <div class="grid gap-3" [style.grid-template-columns]="pipelineGridTemplate" [style.min-width]="pipelineMinWidth">
+            <div class="opportunity-pipeline-grid">
                 @for (stage of pipelineStages; track stage.stageId) {
                     <div
                         class="rounded-md border border-surface-200 bg-surface-50 transition-colors dark:border-surface-700 dark:bg-surface-950/40"
@@ -127,6 +128,9 @@
                                             <p-button icon="pi pi-check" severity="success" text rounded size="small" ariaLabel="Mark won" (onClick)="openCloseDialog(opportunity, 'won')" />
                                             <p-button icon="pi pi-times" severity="danger" text rounded size="small" ariaLabel="Mark lost" (onClick)="openCloseDialog(opportunity, 'lost')" />
                                         }
+                                        @if (canManageCommercial(opportunity)) {
+                                            <p-button icon="pi pi-file-check" severity="success" text rounded size="small" ariaLabel="Commercial finalization" (onClick)="openCommercialDialog(opportunity)" />
+                                        }
                                     </div>
                                 </article>
                             } @empty {
@@ -158,8 +162,7 @@
                 [showCurrentPageReport]="true"
                 currentPageReportTemplate="Showing {first} to {last} of {totalRecords} opportunities"
                 (onLazyLoad)="onLazyLoad($event)"
-                [tableStyle]="{ 'min-width': '78rem' }"
-                styleClass="text-sm"
+                styleClass="text-sm opportunity-table"
             >
                 <ng-template #header>
                     <tr>
@@ -203,6 +206,9 @@
                             @if (canEdit && opportunity.status === 'Open') {
                                 <p-button icon="pi pi-pencil" severity="secondary" text rounded size="small" ariaLabel="Edit opportunity" (onClick)="openEditDialog(opportunity)" />
                             }
+                            @if (canManageCommercial(opportunity)) {
+                                <p-button icon="pi pi-file-check" severity="success" text rounded size="small" ariaLabel="Commercial finalization" (onClick)="openCommercialDialog(opportunity)" />
+                            }
                         </td>
                     </tr>
                 </ng-template>
@@ -217,7 +223,7 @@
     }
 </section>
 
-<p-dialog [(visible)]="activityDialog" [modal]="true" [style]="{ width: 'min(860px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" header="Opportunity Activity">
+<p-dialog [(visible)]="activityDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--activity opportunity-dialog--scrollable" header="Opportunity Activity">
     <div class="grid grid-cols-12 gap-5">
         <form [formGroup]="activityForm" class="col-span-12 grid grid-cols-12 gap-3 lg:col-span-5">
             <div class="col-span-12">
@@ -286,7 +292,7 @@
     </div>
 </p-dialog>
 
-<p-dialog [(visible)]="closeDialog" [modal]="true" [style]="{ width: 'min(560px, 96vw)' }" [header]="closingMode === 'won' ? 'Mark Opportunity Won' : 'Mark Opportunity Lost'">
+<p-dialog [(visible)]="closeDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--close" [header]="closingMode === 'won' ? 'Mark Opportunity Won' : 'Mark Opportunity Lost'">
     <form [formGroup]="closeForm" class="grid grid-cols-12 gap-4">
         @if (closingMode === 'won') {
             <div class="col-span-12">
@@ -315,7 +321,7 @@
     </ng-template>
 </p-dialog>
 
-<p-dialog [(visible)]="stageChangeDialog" [modal]="true" [style]="{ width: 'min(520px, 96vw)' }" header="Move Opportunity">
+<p-dialog [(visible)]="stageChangeDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--stage-change" header="Move Opportunity">
     <form [formGroup]="stageChangeForm" class="grid grid-cols-12 gap-4">
         <div class="col-span-12 rounded-md border border-surface-200 bg-surface-50 p-3 text-sm dark:border-surface-700 dark:bg-surface-950/40">
             <div class="font-semibold text-surface-950 dark:text-surface-0">{{ pendingStageOpportunity?.opportunityNumber }}</div>
@@ -356,7 +362,202 @@
     </ng-template>
 </p-dialog>
 
-<p-dialog [(visible)]="editDialog" [modal]="true" [style]="{ width: 'min(640px, 96vw)' }" header="Edit Opportunity">
+<p-dialog [(visible)]="commercialDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--commercial opportunity-dialog--scrollable" header="Commercial Finalization">
+    @if (selectedOpportunity) {
+        <div class="mb-4 rounded-md border border-surface-200 bg-surface-50 p-3 text-sm dark:border-surface-700 dark:bg-surface-950/40">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <div class="font-semibold text-surface-950 dark:text-surface-0">{{ selectedOpportunity.opportunityNumber }} &middot; {{ selectedOpportunity.title }}</div>
+                    <div class="mt-1 text-surface-600 dark:text-surface-300">{{ selectedOpportunity.clientName }} &middot; {{ selectedOpportunity.productName }}</div>
+                </div>
+                <p-tag [severity]="statusSeverity(selectedOpportunity.status)" [value]="selectedOpportunity.status" />
+            </div>
+        </div>
+    }
+
+    @if (commercialError) {
+        <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-900/20 dark:text-red-200">{{ commercialError }}</div>
+    }
+
+    @if (isLoadingCommercial) {
+        <div class="rounded-md border border-surface-200 p-4 text-sm text-surface-500 dark:border-surface-700">Loading commercial details...</div>
+    } @else {
+        <div class="grid grid-cols-12 gap-5">
+            <section class="col-span-12 lg:col-span-5">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <h3 class="m-0 text-base font-semibold text-surface-950 dark:text-surface-0">Agreement / PO Documents</h3>
+                    <span class="text-xs font-medium text-surface-500">{{ commercialDocuments.length }} active</span>
+                </div>
+
+                <form [formGroup]="commercialUploadForm" class="mb-4 grid grid-cols-12 gap-3 rounded-md border border-surface-200 p-3 dark:border-surface-700">
+                    <div class="col-span-12 md:col-span-5">
+                        <label class="mb-2 block text-sm font-semibold">Type</label>
+                        <p-select [options]="commercialDocumentTypes" optionLabel="label" optionValue="value" appendTo="body" formControlName="documentType" class="w-full" />
+                    </div>
+                    <div class="col-span-12 md:col-span-7">
+                        <label class="mb-2 block text-sm font-semibold">Document</label>
+                        <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="w-full rounded-md border border-surface-300 bg-surface-0 p-2 text-sm dark:border-surface-600 dark:bg-surface-900" (change)="onCommercialDocumentSelected($event)" />
+                    </div>
+                    <div class="col-span-12">
+                        <label class="mb-2 block text-sm font-semibold">Remarks</label>
+                        <textarea formControlName="remarks" rows="3" class="w-full rounded-md border border-surface-300 bg-surface-0 p-3 text-sm dark:border-surface-600 dark:bg-surface-900"></textarea>
+                    </div>
+                    @if (commercialDocumentError) {
+                        <div class="col-span-12 text-sm text-red-600">{{ commercialDocumentError }}</div>
+                    }
+                    <div class="col-span-12 flex justify-end">
+                        <p-button label="Upload" icon="pi pi-upload" size="small" [loading]="isSavingCommercial" (onClick)="uploadCommercialDocument()" />
+                    </div>
+                </form>
+
+                <div class="space-y-2">
+                    @for (document of commercialDocuments; track document.id) {
+                        <article class="rounded-md border border-surface-200 p-3 text-sm dark:border-surface-700">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p-tag severity="info" [value]="documentTypeLabel(document.documentType)" />
+                                        <span class="text-xs text-surface-500">{{ formatFileSize(document.fileSize) }}</span>
+                                    </div>
+                                    <div class="mt-2 truncate font-semibold text-surface-950 dark:text-surface-0">{{ document.fileName }}</div>
+                                    <div class="mt-1 text-xs text-surface-500">{{ formatDate(document.uploadedOn) }} &middot; {{ document.uploadedByUserName || 'System' }}</div>
+                                    @if (document.remarks) {
+                                        <p class="mb-0 mt-2 text-surface-600 dark:text-surface-300">{{ document.remarks }}</p>
+                                    }
+                                </div>
+                                <div class="flex shrink-0 gap-1">
+                                    <p-button icon="pi pi-eye" severity="secondary" text rounded size="small" ariaLabel="Preview" (onClick)="previewCommercialDocument(document)" />
+                                    <p-button icon="pi pi-download" severity="secondary" text rounded size="small" ariaLabel="Download" (onClick)="downloadCommercialDocument(document)" />
+                                    <p-button icon="pi pi-trash" severity="danger" text rounded size="small" ariaLabel="Delete" [disabled]="isSavingCommercial" (onClick)="confirmDeleteCommercialDocument(document)" />
+                                </div>
+                            </div>
+                        </article>
+                    } @empty {
+                        <div class="rounded-md border border-dashed border-surface-300 p-4 text-center text-sm text-surface-500 dark:border-surface-700">No Agreement or PO document uploaded.</div>
+                    }
+                </div>
+            </section>
+
+            <section class="col-span-12 lg:col-span-7">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <h3 class="m-0 text-base font-semibold text-surface-950 dark:text-surface-0">Confirmed Commercial Breakdown</h3>
+                    @if (commercialBreakdown) {
+                        <span class="text-xs text-surface-500">Updated {{ formatDate(commercialBreakdown.updatedOn) }}</span>
+                    }
+                </div>
+
+                <form [formGroup]="commercialForm" class="grid grid-cols-12 gap-4">
+                    <div class="col-span-12 md:col-span-6">
+                        <label class="mb-2 block text-sm font-semibold">Currency</label>
+                        <p-select [options]="currencies" optionLabel="code" optionValue="id" appendTo="body" formControlName="currencyId" class="w-full" />
+                    </div>
+                    <div class="col-span-12 md:col-span-6">
+                        <label class="mb-2 block text-sm font-semibold">Final Payable Amount</label>
+                        <p-inputnumber formControlName="finalPayableAmount" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                    </div>
+
+                    <div class="col-span-12 rounded-md border border-surface-200 p-3 dark:border-surface-700">
+                        <div class="mb-3 text-sm font-semibold">Agreement Reference</div>
+                        <div class="grid grid-cols-12 gap-3">
+                            <div class="col-span-12">
+                                <label class="mb-2 block text-sm font-semibold">Agreement Document</label>
+                                <p-select [options]="agreementDocuments" optionLabel="fileName" optionValue="id" appendTo="body" formControlName="agreementDocumentId" placeholder="Select agreement" [showClear]="true" class="w-full" />
+                            </div>
+                            <div class="col-span-12 md:col-span-6">
+                                <label class="mb-2 block text-sm font-semibold">Agreement Date</label>
+                                <p-datepicker #agreementDatePicker formControlName="agreementDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(agreementDatePicker)" />
+                            </div>
+                            <div class="col-span-12 md:col-span-6">
+                                <label class="mb-2 block text-sm font-semibold">Agreement Expiry Date</label>
+                                <p-datepicker #agreementExpiryDatePicker formControlName="agreementExpiryDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(agreementExpiryDatePicker)" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-span-12 rounded-md border border-surface-200 p-3 dark:border-surface-700">
+                        <div class="mb-3 text-sm font-semibold">Purchase Order Reference</div>
+                        <div class="grid grid-cols-12 gap-3">
+                            <div class="col-span-12">
+                                <label class="mb-2 block text-sm font-semibold">PO Document</label>
+                                <p-select [options]="purchaseOrderDocuments" optionLabel="fileName" optionValue="id" appendTo="body" formControlName="purchaseOrderDocumentId" placeholder="Select PO" [showClear]="true" class="w-full" />
+                            </div>
+                            <div class="col-span-12">
+                                <label class="mb-2 block text-sm font-semibold">PO Date</label>
+                                <p-datepicker #purchaseOrderDatePicker formControlName="purchaseOrderDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(purchaseOrderDatePicker)" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-span-12 rounded-md border border-surface-200 p-3 dark:border-surface-700">
+                        <label class="mb-3 flex items-center gap-2 text-sm font-semibold">
+                            <input type="checkbox" formControlName="amcApplicable" class="h-4 w-4" />
+                            <span>AMC Applicable</span>
+                        </label>
+                        @if (commercialForm.controls.amcApplicable.value) {
+                            <div class="grid grid-cols-12 gap-3">
+                                <div class="col-span-12 md:col-span-6">
+                                    <label class="mb-2 block text-sm font-semibold">AMC Amount</label>
+                                    <p-inputnumber formControlName="amcAmount" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                                </div>
+                                <div class="col-span-12 md:col-span-6">
+                                    <label class="mb-2 block text-sm font-semibold">AMC Start Date</label>
+                                    <p-datepicker #amcStartDatePicker formControlName="amcStartDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(amcStartDatePicker)" />
+                                </div>
+                                <div class="col-span-12 md:col-span-6">
+                                    <label class="mb-2 block text-sm font-semibold">AMC Renewal Date</label>
+                                    <p-datepicker #amcRenewalDatePicker formControlName="amcRenewalDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(amcRenewalDatePicker)" />
+                                </div>
+                                <div class="col-span-12 md:col-span-6">
+                                    <label class="mb-2 block text-sm font-semibold">AMC Expiry Date</label>
+                                    <p-datepicker #amcExpiryDatePicker formControlName="amcExpiryDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(amcExpiryDatePicker)" />
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="col-span-12 rounded-md border border-surface-200 p-3 dark:border-surface-700">
+                        <label class="mb-3 flex items-center gap-2 text-sm font-semibold">
+                            <input type="checkbox" formControlName="subscriptionApplicable" class="h-4 w-4" />
+                            <span>Subscription Applicable</span>
+                        </label>
+                        @if (commercialForm.controls.subscriptionApplicable.value) {
+                            <div class="grid grid-cols-12 gap-3">
+                                <div class="col-span-12 md:col-span-6">
+                                    <label class="mb-2 block text-sm font-semibold">Subscription Amount</label>
+                                    <p-inputnumber formControlName="subscriptionAmount" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                                </div>
+                                <div class="col-span-12 md:col-span-6">
+                                    <label class="mb-2 block text-sm font-semibold">Billing Frequency</label>
+                                    <p-select [options]="subscriptionBillingFrequencies" optionLabel="label" optionValue="value" appendTo="body" formControlName="subscriptionBillingFrequency" class="w-full" />
+                                </div>
+                                <div class="col-span-12 md:col-span-6">
+                                    <label class="mb-2 block text-sm font-semibold">Subscription Start Date</label>
+                                    <p-datepicker #subscriptionStartDatePicker formControlName="subscriptionStartDate" dateFormat="yy-mm-dd" dataType="string" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(subscriptionStartDatePicker)" />
+                                </div>
+                                <div class="col-span-12 md:col-span-6">
+                                    <label class="mb-2 block text-sm font-semibold">Next Billing Date</label>
+                                    <input pInputText formControlName="nextSubscriptionBillingDate" readonly class="w-full" />
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="col-span-12">
+                        <label class="mb-2 block text-sm font-semibold">Remarks</label>
+                        <textarea formControlName="remarks" rows="3" class="w-full rounded-md border border-surface-300 bg-surface-0 p-3 text-sm dark:border-surface-600 dark:bg-surface-900"></textarea>
+                    </div>
+                </form>
+            </section>
+        </div>
+    }
+
+    <ng-template #footer>
+        <p-button label="Close" icon="pi pi-times" text [disabled]="isSavingCommercial" (onClick)="commercialDialog = false" />
+        <p-button label="Save Breakdown" icon="pi pi-check" [loading]="isSavingCommercial" [disabled]="isLoadingCommercial || !hasCommercialDocument" (onClick)="saveCommercialBreakdown()" />
+    </ng-template>
+</p-dialog>
+
+<p-dialog [(visible)]="editDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--edit" header="Edit Opportunity">
     <form [formGroup]="editForm" class="grid grid-cols-12 gap-4">
         <div class="col-span-12">
             <label class="mb-2 block text-sm font-semibold">Opportunity #</label>
@@ -382,7 +583,7 @@
     </ng-template>
 </p-dialog>
 
-<p-dialog [(visible)]="createDialog" [modal]="true" [style]="{ width: 'min(960px, 96vw)' }" [contentStyle]="{ 'max-height': 'calc(100vh - 12rem)', overflow: 'auto' }" header="Create Opportunity">
+<p-dialog [(visible)]="createDialog" [modal]="true" styleClass="opportunity-dialog opportunity-dialog--create opportunity-dialog--scrollable" header="Create Opportunity">
     <form [formGroup]="opportunityForm" class="grid grid-cols-12 gap-4">
         <div class="col-span-12 md:col-span-6">
             <label class="mb-2 block text-sm font-semibold">Client</label>

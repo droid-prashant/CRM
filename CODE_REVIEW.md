@@ -176,6 +176,7 @@ npm test
 ### Frontend
 
 - Components follow existing Angular structure, naming, and styling conventions.
+- Inline CSS is not acceptable in frontend templates or components. Styles must be placed in the appropriate existing CSS/SCSS file for the component or shared style layer.
 - Forms validate required fields, invalid formats, loading states, and submit errors.
 - API calls have clear success, empty, loading, and failure states.
 - State updates do not rely on stale data after create, update, delete, or navigation flows.
