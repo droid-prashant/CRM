@@ -1156,6 +1156,72 @@ END
 $migration$;
 
 -- -------------------------------------------------------------------------
+-- 20260721120000_OpportunityProposalVersioning
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260721120000_OpportunityProposalVersioning') THEN
+        RETURN;
+    END IF;
+
+    DROP INDEX IF EXISTS "leads"."IX_OpportunityDocuments_OpportunityId_DocumentType_IsActive";
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'leads'
+            AND table_name = 'OpportunityDocuments'
+            AND column_name = 'VersionNumber'
+    ) THEN
+        ALTER TABLE "leads"."OpportunityDocuments"
+            ADD COLUMN "VersionNumber" integer NOT NULL DEFAULT 1;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'leads'
+            AND table_name = 'OpportunityDocuments'
+            AND column_name = 'Description'
+    ) THEN
+        ALTER TABLE "leads"."OpportunityDocuments"
+            ADD COLUMN "Description" character varying(500) NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'leads'
+            AND table_name = 'OpportunityDocuments'
+            AND column_name = 'IsLastCommunicated'
+    ) THEN
+        ALTER TABLE "leads"."OpportunityDocuments"
+            ADD COLUMN "IsLastCommunicated" boolean NOT NULL DEFAULT false;
+    END IF;
+
+    UPDATE "leads"."OpportunityDocuments"
+    SET "IsLastCommunicated" = "IsActive",
+        "VersionNumber" = 1
+    WHERE "DocumentType" = 'Proposal';
+
+    UPDATE "leads"."OpportunityDocuments"
+    SET "IsLastCommunicated" = false,
+        "VersionNumber" = 1
+    WHERE "DocumentType" <> 'Proposal';
+
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityDocuments_OpportunityId_DocumentType_IsLastCommunicated"
+        ON "leads"."OpportunityDocuments" ("OpportunityId", "DocumentType", "IsLastCommunicated");
+
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityDocuments_OpportunityId_DocumentType_VersionNumber"
+        ON "leads"."OpportunityDocuments" ("OpportunityId", "DocumentType", "VersionNumber");
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260721120000_OpportunityProposalVersioning', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
 -- 20260528140000_ClientProductMappings
 -- -------------------------------------------------------------------------
 DO $migration$

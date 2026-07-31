@@ -159,6 +159,115 @@ namespace ERP.API.Controllers.Opportunities
             return PhysicalFile(path, document.ContentType, document.FileName);
         }
 
+        [HttpGet("{id:guid}/proposal-versions")]
+        [Authorize(Policy = PermissionPolicyNames.OpportunitiesView)]
+        public async Task<ActionResult<List<ProposalVersionViewModel>>> GetProposalHistory(Guid id, CancellationToken cancellationToken)
+        {
+            var history = await _opportunityService.GetProposalHistoryAsync(id, cancellationToken);
+            return history == null ? NotFound() : history;
+        }
+
+        [HttpPost("{id:guid}/proposal-versions")]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(MaxProposalDocumentBytes + 1024 * 1024)]
+        [Authorize(Policy = PermissionPolicyNames.OpportunitiesEdit)]
+        public async Task<ActionResult<OpportunityDocumentViewModel>> UploadProposalVersion(Guid id, [FromForm] UploadProposalVersionFormRequest form, CancellationToken cancellationToken)
+        {
+            if (form.ProposalDocument == null)
+            {
+                return BadRequest(new { errors = new[] { "Proposal document is required." } });
+            }
+
+            var request = new UploadProposalVersionRequest
+            {
+                Description = form.Description,
+                ProposalDocumentFileName = form.ProposalDocument.FileName,
+                ProposalDocumentContentType = form.ProposalDocument.ContentType,
+                ProposalDocumentSize = form.ProposalDocument.Length
+            };
+
+            var preflight = await _opportunityService.ValidateProposalVersionUploadAsync(id, request, cancellationToken);
+            if (preflight.Forbidden)
+            {
+                return Forbid();
+            }
+
+            if (preflight.NotFound)
+            {
+                return NotFound();
+            }
+
+            if (preflight.Errors.Count > 0)
+            {
+                return BadRequest(new { errors = preflight.Errors });
+            }
+
+            var savedFile = await SaveProposalDocumentAsync(id, form.ProposalDocument, cancellationToken);
+            request.ProposalDocumentStoredFileName = savedFile.StoredFileName;
+            request.ProposalDocumentPath = savedFile.FilePath;
+
+            var result = await _opportunityService.UploadProposalVersionAsync(id, request, cancellationToken);
+            if (!result.Succeeded)
+            {
+                TryDeleteSavedFile(savedFile.FilePath);
+            }
+
+            if (result.Succeeded)
+            {
+                return CreatedAtAction(nameof(GetProposalHistory), new { id }, result.Document);
+            }
+
+            if (result.NotFound)
+            {
+                return NotFound();
+            }
+
+            if (result.Forbidden)
+            {
+                return Forbid();
+            }
+
+            return BadRequest(new { errors = result.Errors });
+        }
+
+        [HttpGet("{id:guid}/proposal-versions/{documentId:guid}/download")]
+        [Authorize(Policy = PermissionPolicyNames.OpportunitiesView)]
+        public async Task<IActionResult> DownloadProposalDocumentVersion(Guid id, Guid documentId, CancellationToken cancellationToken)
+        {
+            var document = await _opportunityService.GetProposalDocumentVersionAsync(id, documentId, cancellationToken);
+            if (document == null)
+            {
+                return NotFound();
+            }
+
+            var path = ResolveUploadPath(document.FilePath);
+            if (!System.IO.File.Exists(path))
+            {
+                return NotFound();
+            }
+
+            return PhysicalFile(path, document.ContentType, document.FileName);
+        }
+
+        [HttpGet("{id:guid}/proposal-versions/{documentId:guid}/preview")]
+        [Authorize(Policy = PermissionPolicyNames.OpportunitiesView)]
+        public async Task<IActionResult> PreviewProposalDocumentVersion(Guid id, Guid documentId, CancellationToken cancellationToken)
+        {
+            var document = await _opportunityService.GetProposalDocumentVersionAsync(id, documentId, cancellationToken);
+            if (document == null)
+            {
+                return NotFound();
+            }
+
+            var path = ResolveUploadPath(document.FilePath);
+            if (!System.IO.File.Exists(path))
+            {
+                return NotFound();
+            }
+
+            return PhysicalFile(path, document.ContentType, enableRangeProcessing: true);
+        }
+
         [HttpGet("{id:guid}/commercial-documents")]
         [Authorize(Policy = PermissionPolicyNames.OpportunitiesView)]
         public async Task<ActionResult<List<OpportunityCommercialDocumentViewModel>>> GetCommercialDocuments(Guid id, CancellationToken cancellationToken)
@@ -460,6 +569,12 @@ namespace ERP.API.Controllers.Opportunities
     {
         public Guid StageId { get; set; }
         public string? Remarks { get; set; }
+        public IFormFile? ProposalDocument { get; set; }
+    }
+
+    public class UploadProposalVersionFormRequest
+    {
+        public string? Description { get; set; }
         public IFormFile? ProposalDocument { get; set; }
     }
 

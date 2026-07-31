@@ -84,6 +84,14 @@
         width: min(520px, 96vw);
     }
 
+    .opportunity-dialog--proposal-history {
+        width: min(720px, 96vw);
+    }
+
+    .opportunity-dialog--proposal-upload {
+        width: min(520px, 96vw);
+    }
+
     .opportunity-dialog--commercial {
         width: min(1120px, 96vw);
     }
@@ -96,4 +104,5 @@
         max-height: calc(100vh - 12rem);
         overflow: auto;
     }
+
 }

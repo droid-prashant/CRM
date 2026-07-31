@@ -101,8 +101,10 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Property(x => x.StoredFileName).HasMaxLength(255).IsRequired();
                 entity.Property(x => x.FilePath).HasMaxLength(500).IsRequired();
                 entity.Property(x => x.ContentType).HasMaxLength(150).IsRequired();
+                entity.Property(x => x.Description).HasMaxLength(500);
                 entity.HasOne(x => x.Opportunity).WithMany(x => x.Documents).HasForeignKey(x => x.OpportunityId);
-                entity.HasIndex(x => new { x.OpportunityId, x.DocumentType, x.IsActive });
+                entity.HasIndex(x => new { x.OpportunityId, x.DocumentType, x.IsLastCommunicated });
+                entity.HasIndex(x => new { x.OpportunityId, x.DocumentType, x.VersionNumber });
             });
 
             modelBuilder.Entity<OpportunityCommercialDocument>(entity =>
@@ -152,7 +154,10 @@ namespace Opportunities.Infrastructure.Persistence.Data
             modelBuilder.Entity<LeadTimelineEntry>(entity =>
             {
                 entity.ToTable("LeadTimelineEntries", "leads");
-                entity.HasOne(x => x.Lead).WithMany().HasForeignKey(x => x.LeadId);
+                entity.Property(x => x.EventType).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.Description).HasMaxLength(1000).IsRequired();
+                entity.HasOne(x => x.Lead).WithMany(x => x.TimelineEntries).HasForeignKey(x => x.LeadId);
+                entity.HasIndex(x => new { x.LeadId, x.CreatedOn });
             });
 
             modelBuilder.Entity<Product>(entity =>

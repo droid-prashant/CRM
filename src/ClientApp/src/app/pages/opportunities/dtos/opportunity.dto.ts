@@ -50,6 +50,11 @@ export interface CreateOpportunityActivityRequest {
     followUpDate?: string;
 }
 
+export interface UploadProposalVersionRequest {
+    description?: string;
+    proposalDocument: File;
+}
+
 export interface UploadOpportunityCommercialDocumentRequest {
     documentType: 'Agreement' | 'PurchaseOrder';
     remarks?: string;

@@ -24,5 +24,9 @@ namespace Opportunities.Application.Services
         Task<List<OpportunityStageHistoryViewModel>?> GetStageHistoryAsync(Guid id, CancellationToken cancellationToken);
         Task<List<OpportunityActivityViewModel>?> GetActivitiesAsync(Guid id, CancellationToken cancellationToken);
         Task<OpportunityActivityResult> CreateActivityAsync(Guid id, CreateOpportunityActivityRequest request, CancellationToken cancellationToken);
+        Task<List<ProposalVersionViewModel>?> GetProposalHistoryAsync(Guid id, CancellationToken cancellationToken);
+        Task<OpportunityDocumentViewModel?> GetProposalDocumentVersionAsync(Guid id, Guid documentId, CancellationToken cancellationToken);
+        Task<OpportunityProposalDocumentResult> ValidateProposalVersionUploadAsync(Guid id, UploadProposalVersionRequest request, CancellationToken cancellationToken);
+        Task<OpportunityProposalDocumentResult> UploadProposalVersionAsync(Guid id, UploadProposalVersionRequest request, CancellationToken cancellationToken);
     }
 }

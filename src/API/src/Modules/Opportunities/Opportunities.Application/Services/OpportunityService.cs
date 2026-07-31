@@ -160,6 +160,56 @@ namespace Opportunities.Application.Services
             return await _opportunityRepository.GetProposalDocumentAsync(id, cancellationToken);
         }
 
+        public async Task<List<ProposalVersionViewModel>?> GetProposalHistoryAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await CanAccessOpportunityAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _opportunityRepository.GetProposalHistoryAsync(id, cancellationToken);
+        }
+
+        public async Task<OpportunityDocumentViewModel?> GetProposalDocumentVersionAsync(Guid id, Guid documentId, CancellationToken cancellationToken)
+        {
+            if (!await CanAccessOpportunityAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _opportunityRepository.GetProposalDocumentVersionAsync(id, documentId, cancellationToken);
+        }
+
+        public async Task<OpportunityProposalDocumentResult> ValidateProposalVersionUploadAsync(Guid id, UploadProposalVersionRequest request, CancellationToken cancellationToken)
+        {
+            if (!await CanModifyOpportunityAsync(id, cancellationToken))
+            {
+                return new OpportunityProposalDocumentResult { Forbidden = true };
+            }
+
+            var errors = ValidateProposalDocument(request);
+            return new OpportunityProposalDocumentResult { Errors = errors };
+        }
+
+        public async Task<OpportunityProposalDocumentResult> UploadProposalVersionAsync(Guid id, UploadProposalVersionRequest request, CancellationToken cancellationToken)
+        {
+            if (!await CanModifyOpportunityAsync(id, cancellationToken))
+            {
+                return new OpportunityProposalDocumentResult { Forbidden = true };
+            }
+
+            var errors = ValidateProposalDocument(request);
+            if (errors.Count > 0)
+            {
+                return new OpportunityProposalDocumentResult { Errors = errors };
+            }
+
+            var document = await _opportunityRepository.UploadProposalVersionAsync(id, request, cancellationToken);
+            return document == null
+                ? new OpportunityProposalDocumentResult { NotFound = true }
+                : new OpportunityProposalDocumentResult { Document = document };
+        }
+
         public async Task<List<OpportunityCommercialDocumentViewModel>?> GetCommercialDocumentsAsync(Guid id, CancellationToken cancellationToken)
         {
             if (!await CanAccessOpportunityAsync(id, cancellationToken))
@@ -476,6 +526,46 @@ namespace Opportunities.Application.Services
             else if (request.ProposalDocumentSize > MaxProposalDocumentBytes)
             {
                 errors.Add("Proposal document must be 10 MB or smaller.");
+            }
+
+            return errors;
+        }
+
+        private static List<string> ValidateProposalDocument(UploadProposalVersionRequest request)
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(request.ProposalDocumentFileName))
+            {
+                errors.Add("Proposal document file name is required.");
+                return errors;
+            }
+
+            var extension = Path.GetExtension(request.ProposalDocumentFileName);
+            if (!AllowedProposalDocumentExtensions.Contains(extension))
+            {
+                errors.Add("Proposal document must be a PDF, DOC, or DOCX file.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ProposalDocumentContentType)
+                && !AllowedProposalDocumentContentTypes.Contains(request.ProposalDocumentContentType)
+                && !string.Equals(request.ProposalDocumentContentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Proposal document content type is invalid.");
+            }
+
+            if (!request.ProposalDocumentSize.HasValue || request.ProposalDocumentSize <= 0)
+            {
+                errors.Add("Proposal document is required.");
+            }
+            else if (request.ProposalDocumentSize > MaxProposalDocumentBytes)
+            {
+                errors.Add("Proposal document must be 10 MB or smaller.");
+            }
+
+            if (request.Description?.Length > 500)
+            {
+                errors.Add("Description must be 500 characters or fewer.");
             }
 
             return errors;

@@ -11,6 +11,9 @@ namespace Opportunities.Domain.Entities
         public string FilePath { get; set; } = string.Empty;
         public string ContentType { get; set; } = string.Empty;
         public long FileSize { get; set; }
+        public int VersionNumber { get; set; } = 1;
+        public string? Description { get; set; }
+        public bool IsLastCommunicated { get; set; }
 
         public Opportunity? Opportunity { get; set; }
     }

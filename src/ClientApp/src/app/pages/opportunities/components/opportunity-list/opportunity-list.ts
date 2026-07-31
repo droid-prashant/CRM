@@ -15,7 +15,7 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/core/auth/auth.service';
 import { Permissions } from '@/core/auth/permissions';
-import { CreateOpportunityActivityRequest, CreateOpportunityRequest, OpportunityListQuery, SaveOpportunityCommercialBreakdownRequest, UpdateOpportunityRequest } from '../../dtos/opportunity.dto';
+import { CreateOpportunityActivityRequest, CreateOpportunityRequest, OpportunityListQuery, SaveOpportunityCommercialBreakdownRequest, UpdateOpportunityRequest, UploadProposalVersionRequest } from '../../dtos/opportunity.dto';
 import {
     ClientLookupViewModel,
     ContactLookupViewModel,
@@ -30,7 +30,8 @@ import {
     OpportunityPipelineStageViewModel,
     OpportunityStageHistoryViewModel,
     OpportunityUserLookupViewModel,
-    ProductLookupViewModel
+    ProductLookupViewModel,
+    ProposalVersionViewModel
 } from '../../view-models/opportunity.view-model';
 import { OpportunityApiService } from '../../services/opportunity-api.service';
 import { NotificationApiService } from '../../../notifications/services/notification-api.service';
@@ -86,7 +87,13 @@ export class OpportunityList implements OnInit, OnDestroy {
     closeDialog = false;
     activityDialog = false;
     stageChangeDialog = false;
+    proposalHistoryDialog = false;
+    uploadProposalDialog = false;
     commercialDialog = false;
+    selectedProposalHistory?: ProposalVersionViewModel[];
+    selectedUploadOpportunity?: OpportunityListItemViewModel;
+    uploadProposalDescription = '';
+    uploadProposalFile?: File;
     closingMode: 'won' | 'lost' = 'won';
     canCreate = false;
     canEdit = false;
@@ -595,15 +602,120 @@ export class OpportunityList implements OnInit, OnDestroy {
 
         this.opportunityApiService.downloadProposalDocument(opportunity.id).subscribe({
             next: (blob) => {
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = opportunity.proposalDocumentFileName || `${opportunity.opportunityNumber}-proposal`;
-                link.click();
-                URL.revokeObjectURL(url);
+                this.downloadBlob(blob, opportunity.proposalDocumentFileName || `${opportunity.opportunityNumber}-proposal`);
             },
             error: () => {
                 this.messageService.add({ severity: 'error', summary: 'Download failed', detail: 'Proposal document could not be downloaded.', life: 5000 });
+            }
+        });
+    }
+
+    openProposalHistory(opportunity: OpportunityListItemViewModel): void {
+        this.selectedOpportunity = opportunity;
+        this.selectedProposalHistory = undefined;
+        this.proposalHistoryDialog = true;
+        this.opportunityApiService.getProposalHistory(opportunity.id).subscribe({
+            next: (versions) => {
+                this.selectedProposalHistory = versions;
+            },
+            error: () => {
+                this.selectedProposalHistory = [];
+                this.messageService.add({ severity: 'error', summary: 'Failed to load', detail: 'Proposal history could not be loaded.', life: 5000 });
+            }
+        });
+    }
+
+    openUploadProposalDialog(opportunity: OpportunityListItemViewModel): void {
+        this.selectedUploadOpportunity = opportunity;
+        this.uploadProposalDescription = '';
+        this.uploadProposalFile = undefined;
+        this.uploadProposalDialog = true;
+    }
+
+    onUploadProposalFileSelected(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        this.uploadProposalFile = input.files?.item(0) ?? undefined;
+    }
+
+    confirmUploadProposal(): void {
+        if (!this.selectedUploadOpportunity || !this.uploadProposalFile) {
+            return;
+        }
+
+        const file = this.uploadProposalFile;
+        const extension = this.fileExtension(file.name);
+        if (!this.allowedProposalDocumentExtensions.has(extension)) {
+            this.messageService.add({ severity: 'error', summary: 'Invalid file', detail: 'Proposal document must be a PDF, DOC, or DOCX file.', life: 5000 });
+            return;
+        }
+
+        if (file.size > this.maxProposalDocumentBytes) {
+            this.messageService.add({ severity: 'error', summary: 'File too large', detail: 'Proposal document must be 10 MB or smaller.', life: 5000 });
+            return;
+        }
+
+        this.isSaving = true;
+        const request: UploadProposalVersionRequest = {
+            proposalDocument: file,
+            description: this.uploadProposalDescription.trim() || undefined
+        };
+
+        this.opportunityApiService.uploadProposalVersion(this.selectedUploadOpportunity.id, request).subscribe({
+            next: () => {
+                this.uploadProposalDialog = false;
+                this.selectedUploadOpportunity = undefined;
+                this.uploadProposalFile = undefined;
+                this.messageService.add({ severity: 'success', summary: 'Proposal uploaded', detail: 'New proposal version was uploaded successfully.', life: 3000 });
+                this.isSaving = false;
+                this.refreshData();
+            },
+            error: (error) => {
+                const detail = error.error?.errors?.join?.(' ') ?? 'Proposal could not be uploaded.';
+                this.messageService.add({ severity: 'error', summary: 'Upload failed', detail, life: 5000 });
+                this.isSaving = false;
+            }
+        });
+    }
+
+    cancelUploadProposal(): void {
+        this.uploadProposalDialog = false;
+        this.selectedUploadOpportunity = undefined;
+        this.uploadProposalFile = undefined;
+    }
+
+    onUploadProposalDescriptionChange(event: Event): void {
+        this.uploadProposalDescription = (event.target as HTMLTextAreaElement).value;
+    }
+
+    downloadProposalVersion(opportunityId: string, version: ProposalVersionViewModel): void {
+        this.opportunityApiService.downloadProposalVersion(opportunityId, version.documentId).subscribe({
+            next: (blob) => {
+                this.downloadBlob(blob, version.fileName);
+            },
+            error: (error) => {
+                this.showBlobError(error, 'Download failed', 'Proposal version could not be downloaded.');
+            }
+        });
+    }
+
+    previewProposalVersion(opportunityId: string, version: ProposalVersionViewModel): void {
+        const previewWindow = window.open('', '_blank');
+        if (!previewWindow) {
+            this.messageService.add({ severity: 'warn', summary: 'Preview blocked', detail: 'Allow pop-ups for this site and try preview again.', life: 5000 });
+            return;
+        }
+
+        previewWindow.opener = null;
+        previewWindow.document.write('<p>Loading proposal preview...</p>');
+        this.opportunityApiService.previewProposalVersion(opportunityId, version.documentId).subscribe({
+            next: (blob) => {
+                const url = URL.createObjectURL(blob);
+                previewWindow.location.href = url;
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            },
+            error: (error) => {
+                previewWindow.close();
+                this.showBlobError(error, 'Preview failed', 'Proposal version could not be previewed.');
             }
         });
     }
@@ -691,15 +803,7 @@ export class OpportunityList implements OnInit, OnDestroy {
 
         this.opportunityApiService.downloadCommercialDocument(this.selectedOpportunity.id, commercialDocument.id).subscribe({
             next: (blob) => {
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = commercialDocument.fileName;
-                link.rel = 'noopener';
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                this.downloadBlob(blob, commercialDocument.fileName);
             },
             error: (error) => {
                 this.showBlobError(error, 'Download failed', 'Document could not be downloaded.');
@@ -967,6 +1071,18 @@ export class OpportunityList implements OnInit, OnDestroy {
                 this.isLoadingCommercial = false;
             }
         });
+    }
+
+    private downloadBlob(blob: Blob, fileName: string): void {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     private showBlobError(error: unknown, summary: string, fallback: string): void {
