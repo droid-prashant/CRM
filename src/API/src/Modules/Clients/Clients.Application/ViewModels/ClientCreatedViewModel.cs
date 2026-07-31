@@ -1,5 +1,3 @@
-using Clients.Domain.Enums;
-
 namespace Clients.Application.ViewModels
 {
     public class ClientCreatedViewModel : ClientListItemViewModel

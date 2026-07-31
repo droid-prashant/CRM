@@ -43,7 +43,7 @@ namespace ERP.API.Controllers.Clients
         [HttpGet("{id:guid}")]
         [Authorize(Policy = PermissionPolicyNames.ClientsView)]
         public async Task<ActionResult<ClientDetailViewModel>> GetClient(Guid id, CancellationToken cancellationToken)
-            {
+        {
             var client = await _clientService.GetClientDetailAsync(id, cancellationToken);
             return client == null ? NotFound() : client;
         }

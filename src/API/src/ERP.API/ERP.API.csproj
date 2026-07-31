@@ -39,6 +39,8 @@
 	  <ProjectReference Include="..\Modules\Dashboard\Dashboard.Infrastructure\Dashboard.Infrastructure.csproj" />
 	  <ProjectReference Include="..\Modules\Leads\Leads.Application\Leads.Application.csproj" />
 	  <ProjectReference Include="..\Modules\Leads\Leads.Infrastructure\Leads.Infrastructure.csproj" />
+	  <ProjectReference Include="..\Modules\Notifications\Notifications.Application\Notifications.Application.csproj" />
+	  <ProjectReference Include="..\Modules\Notifications\Notifications.Infrastructure\Notifications.Infrastructure.csproj" />
 	  <ProjectReference Include="..\Modules\Opportunities\Opportunities.Application\Opportunities.Application.csproj" />
 	  <ProjectReference Include="..\Modules\Opportunities\Opportunities.Infrastructure\Opportunities.Infrastructure.csproj" />
 	  <ProjectReference Include="..\Modules\Partners\Partners.Application\Partners.Application.csproj" />

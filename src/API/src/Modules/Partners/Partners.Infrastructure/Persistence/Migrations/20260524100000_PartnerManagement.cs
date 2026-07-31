@@ -1,4 +1,3 @@
-using System;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Partners.Infrastructure.Persistence.Data;

@@ -1,10 +1,5 @@
 ﻿using ERP.Identity.Constants;
 using Microsoft.AspNetCore.Authorization;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ERP.Identity.Extensions
 {

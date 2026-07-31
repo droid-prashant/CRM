@@ -1,13 +1,7 @@
-﻿using ERP.Identity.Constants;
-using ERP.Identity.Entities;
+﻿using ERP.Identity.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ERP.Identity.Seed
 {

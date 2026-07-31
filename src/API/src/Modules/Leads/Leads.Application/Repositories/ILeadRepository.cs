@@ -1,6 +1,5 @@
 using Leads.Application.DTOs;
 using Leads.Application.ViewModels;
-using Leads.Domain.Entities;
 using Leads.Domain.Enums;
 
 namespace Leads.Application.Repositories

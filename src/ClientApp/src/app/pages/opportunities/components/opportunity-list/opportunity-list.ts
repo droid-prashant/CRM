@@ -30,6 +30,7 @@ import {
     ProductLookupViewModel
 } from '../../view-models/opportunity.view-model';
 import { OpportunityApiService } from '../../services/opportunity-api.service';
+import { NotificationApiService } from '../../../notifications/services/notification-api.service';
 
 @Component({
     selector: 'app-opportunity-list',
@@ -84,6 +85,14 @@ export class OpportunityList implements OnInit {
     dragOverStageId = '';
     stageHistory: OpportunityStageHistoryViewModel[] = [];
     activities: OpportunityActivityViewModel[] = [];
+    commercialDocuments: OpportunityCommercialDocumentViewModel[] = [];
+    commercialBreakdown?: OpportunityCommercialBreakdownViewModel | null;
+    selectedCommercialDocument?: File;
+    commercialDocumentError = '';
+    commercialError = '';
+    isLoadingCommercial = false;
+    isSavingCommercial = false;
+    isResolvingCommercialReminder = false;
     totalRecords = 0;
     first = 0;
     pageNumber = 1;
@@ -144,6 +153,7 @@ export class OpportunityList implements OnInit {
 
     constructor(
         private readonly opportunityApiService: OpportunityApiService,
+        private readonly notificationApiService: NotificationApiService,
         private readonly messageService: MessageService,
         private readonly authService: AuthService
     ) {}
@@ -533,6 +543,230 @@ export class OpportunityList implements OnInit {
                 this.messageService.add({ severity: 'error', summary: 'Download failed', detail: 'Proposal document could not be downloaded.', life: 5000 });
             }
         });
+    }
+
+    onCommercialDocumentSelected(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.item(0) ?? undefined;
+        this.selectedCommercialDocument = file;
+        this.commercialDocumentError = '';
+
+        if (file) {
+            this.isValidCommercialDocument(file);
+        }
+    }
+
+    uploadCommercialDocument(): void {
+        this.commercialUploadForm.markAllAsTouched();
+        if (this.commercialUploadForm.invalid || !this.selectedOpportunity) {
+            return;
+        }
+
+        if (!this.selectedCommercialDocument) {
+            this.commercialDocumentError = 'Agreement or PO document is required.';
+            return;
+        }
+
+        if (!this.isValidCommercialDocument(this.selectedCommercialDocument)) {
+            return;
+        }
+
+        const value = this.commercialUploadForm.getRawValue();
+        this.isSavingCommercial = true;
+        this.opportunityApiService
+            .uploadCommercialDocument(this.selectedOpportunity.id, {
+                documentType: value.documentType ?? 'Agreement',
+                remarks: value.remarks?.trim() || undefined,
+                commercialDocument: this.selectedCommercialDocument
+            })
+            .subscribe({
+                next: () => {
+                    this.messageService.add({ severity: 'success', summary: 'Document uploaded', detail: 'Agreement/PO document was saved.', life: 3000 });
+                    this.selectedCommercialDocument = undefined;
+                    this.commercialUploadForm.reset({ documentType: value.documentType ?? 'Agreement', remarks: '' });
+                    this.loadCommercialFinalization(this.selectedOpportunity!.id);
+                    this.isSavingCommercial = false;
+                },
+                error: (error) => {
+                    const detail = error.error?.errors?.join?.(' ') ?? 'Agreement/PO document could not be uploaded.';
+                    this.messageService.add({ severity: 'error', summary: 'Upload failed', detail, life: 5000 });
+                    this.isSavingCommercial = false;
+                }
+            });
+    }
+
+    previewCommercialDocument(document: OpportunityCommercialDocumentViewModel): void {
+        if (!this.selectedOpportunity) {
+            return;
+        }
+
+        this.opportunityApiService.previewCommercialDocument(this.selectedOpportunity.id, document.id).subscribe({
+            next: (blob) => {
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank', 'noopener');
+                setTimeout(() => URL.revokeObjectURL(url), 30000);
+            },
+            error: () => {
+                this.messageService.add({ severity: 'error', summary: 'Preview failed', detail: 'Document preview is unavailable.', life: 5000 });
+            }
+        });
+    }
+
+    downloadCommercialDocument(commercialDocument: OpportunityCommercialDocumentViewModel): void {
+        if (!this.selectedOpportunity) {
+            return;
+        }
+
+        this.opportunityApiService.downloadCommercialDocument(this.selectedOpportunity.id, commercialDocument.id).subscribe({
+            next: (blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = commercialDocument.fileName;
+                link.click();
+                URL.revokeObjectURL(url);
+            },
+            error: () => {
+                this.messageService.add({ severity: 'error', summary: 'Download failed', detail: 'Document could not be downloaded.', life: 5000 });
+            }
+        });
+    }
+
+    confirmDeleteCommercialDocument(commercialDocument: OpportunityCommercialDocumentViewModel): void {
+        this.confirmationService.confirm({
+            message: `Delete ${commercialDocument.fileName}?`,
+            header: 'Delete Document',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => this.deleteCommercialDocument(commercialDocument)
+        });
+    }
+
+    deleteCommercialDocument(commercialDocument: OpportunityCommercialDocumentViewModel): void {
+        if (!this.selectedOpportunity) {
+            return;
+        }
+
+        this.isSavingCommercial = true;
+        this.opportunityApiService.deleteCommercialDocument(this.selectedOpportunity.id, commercialDocument.id).subscribe({
+            next: () => {
+                this.commercialDocuments = this.commercialDocuments.filter((document) => document.id !== commercialDocument.id);
+                this.clearDeletedCommercialDocumentSelection(commercialDocument);
+                this.messageService.add({ severity: 'success', summary: 'Document deleted', detail: 'Agreement/PO document was removed.', life: 3000 });
+                this.isSavingCommercial = false;
+            },
+            error: (error) => {
+                const detail = error.error?.errors?.join?.(' ') ?? 'Agreement/PO document could not be deleted.';
+                this.messageService.add({ severity: 'error', summary: 'Delete failed', detail, life: 6000 });
+                this.isSavingCommercial = false;
+            }
+        });
+    }
+
+    saveCommercialBreakdown(): void {
+        this.commercialForm.markAllAsTouched();
+        this.commercialError = '';
+
+        if (this.commercialForm.invalid || !this.selectedOpportunity) {
+            return;
+        }
+
+        const request = this.buildCommercialBreakdownRequest();
+        const errors = this.validateCommercialBreakdownRequest(request);
+        if (errors.length) {
+            this.commercialError = errors.join(' ');
+            return;
+        }
+
+        this.isSavingCommercial = true;
+        this.opportunityApiService.saveCommercialBreakdown(this.selectedOpportunity.id, request).subscribe({
+            next: (breakdown) => {
+                this.commercialBreakdown = breakdown;
+                this.patchCommercialForm(breakdown);
+                this.commercialDialog = false;
+                this.messageService.add({ severity: 'success', summary: 'Commercial breakdown saved', detail: 'Final commercial details were recorded.', life: 3000 });
+                this.isSavingCommercial = false;
+            },
+            error: (error) => {
+                const detail = error.error?.errors?.join?.(' ') ?? 'Commercial breakdown could not be saved.';
+                this.messageService.add({ severity: 'error', summary: 'Save failed', detail, life: 6000 });
+                this.isSavingCommercial = false;
+            }
+        });
+    }
+
+    commercialReminderEvents(): { label: string; eventType: string; dueDate?: string }[] {
+        const breakdown = this.commercialBreakdown;
+        if (!breakdown) {
+            return [];
+        }
+
+        const events = [
+            { label: 'Agreement expiry', eventType: 'AgreementExpiry', dueDate: breakdown.agreementExpiryDate },
+            { label: 'AMC renewal', eventType: 'AmcRenewal', dueDate: breakdown.amcApplicable ? breakdown.amcRenewalDate : undefined },
+            { label: 'AMC expiry', eventType: 'AmcExpiry', dueDate: breakdown.amcApplicable ? breakdown.amcExpiryDate : undefined },
+            { label: 'Subscription billing', eventType: 'SubscriptionBilling', dueDate: breakdown.subscriptionApplicable ? breakdown.nextSubscriptionBillingDate : undefined }
+        ];
+
+        return events.filter((event) => !!event.dueDate);
+    }
+
+    resolveCommercialReminder(eventType: string, sourceDueDate?: string): void {
+        if (!this.commercialBreakdown || !sourceDueDate) {
+            return;
+        }
+
+        this.isResolvingCommercialReminder = true;
+        this.notificationApiService
+            .resolveEvent({
+                eventType,
+                sourceRecordType: 'OpportunityCommercialBreakdown',
+                sourceRecordId: this.commercialBreakdown.id,
+                sourceDueDate,
+                resolutionRemarks: 'Resolved from opportunity commercial breakdown.'
+            })
+            .subscribe({
+                next: () => {
+                    this.isResolvingCommercialReminder = false;
+                    this.messageService.add({ severity: 'success', summary: 'Reminder resolved', detail: 'Future reminders for this event will stop.', life: 3000 });
+                },
+                error: (error) => {
+                    const detail = error.error?.errors?.join?.(' ') ?? 'Reminder event could not be resolved.';
+                    this.isResolvingCommercialReminder = false;
+                    this.messageService.add({ severity: 'error', summary: 'Resolve failed', detail, life: 6000 });
+                }
+            });
+    }
+
+    canManageCommercial(opportunity: OpportunityListItemViewModel): boolean {
+        return this.canEdit && this.isWonOpportunity(opportunity);
+    }
+
+    isWonOpportunity(opportunity?: OpportunityListItemViewModel): boolean {
+        return opportunity?.status?.toLowerCase() === 'won';
+    }
+
+    documentTypeLabel(value?: string): string {
+        return value === 'PurchaseOrder' ? 'Purchase Order' : 'Agreement';
+    }
+
+    formatFileSize(bytes?: number): string {
+        if (!bytes) {
+            return '0 KB';
+        }
+
+        return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
+    }
+
+    get agreementDocuments(): OpportunityCommercialDocumentViewModel[] {
+        return this.commercialDocuments.filter((document) => document.documentType === 'Agreement');
+    }
+
+    get purchaseOrderDocuments(): OpportunityCommercialDocumentViewModel[] {
+        return this.commercialDocuments.filter((document) => document.documentType === 'PurchaseOrder');
+    }
+
+    get hasCommercialDocument(): boolean {
+        return this.commercialDocuments.length > 0;
     }
 
     statusSeverity(status?: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {

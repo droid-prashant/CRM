@@ -1,11 +1,6 @@
 ﻿using ERP.Identity.Constants;
 using ERP.Identity.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ERP.Identity.Services.Implementations
 {
@@ -48,7 +43,7 @@ namespace ERP.Identity.Services.Implementations
 
         public IList<string> GetUserRoles()
         {
-           var roles = _httpContextAccessor.HttpContext?.User?.Claims.Where(c => c.Type == IdentityClaimTypes.Role).Select(c => c.Value).ToList();
+            var roles = _httpContextAccessor.HttpContext?.User?.Claims.Where(c => c.Type == IdentityClaimTypes.Role).Select(c => c.Value).ToList();
             return roles ?? new List<string>();
         }
     }
