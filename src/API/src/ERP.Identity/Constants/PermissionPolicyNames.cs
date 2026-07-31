@@ -30,6 +30,12 @@ namespace ERP.Identity.Constants
         public const string OpportunitiesDelete = "Permission:opportunities:delete";
         public const string OpportunitiesApprove = "Permission:opportunities:approve";
         public const string OpportunitiesExport = "Permission:opportunities:export";
+        public const string NotificationsView = "Permission:notifications:view";
+        public const string NotificationsCreate = "Permission:notifications:create";
+        public const string NotificationsEdit = "Permission:notifications:edit";
+        public const string NotificationsDelete = "Permission:notifications:delete";
+        public const string NotificationsApprove = "Permission:notifications:approve";
+        public const string NotificationsExport = "Permission:notifications:export";
         public const string PartnersView = "Permission:partners:view";
         public const string PartnersCreate = "Permission:partners:create";
         public const string PartnersEdit = "Permission:partners:edit";

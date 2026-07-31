@@ -43,7 +43,8 @@ export class AppMenu {
                 label: 'Administration',
                 items: [
                     ...(this.authService.hasPermission(Permissions.users.view) ? [{ label: 'Users', icon: 'pi pi-fw pi-users', routerLink: ['/pages/users'] }] : []),
-                    ...(this.authService.hasPermission(Permissions.roles.view) ? [{ label: 'Roles', icon: 'pi pi-fw pi-shield', routerLink: ['/pages/roles'] }] : [])
+                    ...(this.authService.hasPermission(Permissions.roles.view) ? [{ label: 'Roles', icon: 'pi pi-fw pi-shield', routerLink: ['/pages/roles'] }] : []),
+                    ...(this.authService.hasPermission(Permissions.notifications.view) ? [{ label: 'Notifications', icon: 'pi pi-fw pi-bell', routerLink: ['/pages/notifications'] }] : [])
                 ]
             }
         ].filter((group) => !!group.items?.length);

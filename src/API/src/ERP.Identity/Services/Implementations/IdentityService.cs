@@ -2,20 +2,15 @@
 using ERP.Identity.Entities;
 using ERP.Identity.Model.Dtos;
 using ERP.Identity.Model.Requests;
-using ERP.Identity.Model.ViewModels;
 using ERP.Identity.Model.VIewModel;
+using ERP.Identity.Model.ViewModels;
 using ERP.Identity.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 using System.Transactions;
 
 namespace ERP.Identity.Services.Implementations
@@ -141,7 +136,7 @@ namespace ERP.Identity.Services.Implementations
                 {
                     var roles = (await _userManager.GetRolesAsync(identityUser)).ToList();
                     List<Claim> claims = await ConstructUserClaimAsync(identityUser);
-                    var tokenResult =  _tokenService.GenerateToken(identityUser, claims);
+                    var tokenResult = _tokenService.GenerateToken(identityUser, claims);
                     identityUser.LastLoginAt = DateTime.UtcNow;
                     await _userManager.UpdateAsync(identityUser);
 

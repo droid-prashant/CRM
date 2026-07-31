@@ -9,6 +9,9 @@ namespace Opportunities.Application.Services
     public class OpportunityService : IOpportunityService
     {
         private const long MaxProposalDocumentBytes = 10 * 1024 * 1024;
+        private const long MaxCommercialDocumentBytes = 10 * 1024 * 1024;
+        private const string AgreementDocumentType = "Agreement";
+        private const string PurchaseOrderDocumentType = "PurchaseOrder";
 
         private static readonly HashSet<Guid> SupportedCurrencyIds =
         [
@@ -17,11 +20,25 @@ namespace Opportunities.Application.Services
             Guid.Parse("70000000-0000-0000-0000-000000000003")
         ];
         private static readonly HashSet<string> AllowedProposalDocumentExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx" };
+        private static readonly HashSet<string> AllowedCommercialDocumentExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx" };
         private static readonly HashSet<string> AllowedProposalDocumentContentTypes = new(StringComparer.OrdinalIgnoreCase)
         {
             "application/pdf",
             "application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        };
+        private static readonly HashSet<string> AllowedCommercialDocumentContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        };
+        private static readonly HashSet<string> AllowedSubscriptionBillingFrequencies = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Monthly",
+            "Quarterly",
+            "SemiAnnual",
+            "Annual"
         };
 
         private readonly IOpportunityRepository _opportunityRepository;
@@ -153,76 +170,183 @@ namespace Opportunities.Application.Services
             return await _opportunityRepository.GetProposalHistoryAsync(id, cancellationToken);
         }
 
-        public async Task<OpportunityDocumentViewModel?> GetProposalDocumentVersionAsync(Guid documentId, CancellationToken cancellationToken)
+        public async Task<OpportunityDocumentViewModel?> GetProposalDocumentVersionAsync(Guid id, Guid documentId, CancellationToken cancellationToken)
         {
-            var document = await _opportunityRepository.GetProposalDocumentVersionAsync(documentId, cancellationToken);
-            if (document == null)
+            if (!await CanAccessOpportunityAsync(id, cancellationToken))
             {
                 return null;
             }
 
-            if (!await CanAccessOpportunityAsync(document.OpportunityId, cancellationToken))
-            {
-                return null;
-            }
-
-            return document;
+            return await _opportunityRepository.GetProposalDocumentVersionAsync(id, documentId, cancellationToken);
         }
 
-        public async Task<OpportunityDocumentViewModel?> UploadProposalVersionAsync(Guid id, UploadProposalVersionRequest request, CancellationToken cancellationToken)
+        public async Task<OpportunityProposalDocumentResult> ValidateProposalVersionUploadAsync(Guid id, UploadProposalVersionRequest request, CancellationToken cancellationToken)
         {
             if (!await CanModifyOpportunityAsync(id, cancellationToken))
             {
-                return null;
+                return new OpportunityProposalDocumentResult { Forbidden = true };
+            }
+
+            var errors = ValidateProposalDocument(request);
+            return new OpportunityProposalDocumentResult { Errors = errors };
+        }
+
+        public async Task<OpportunityProposalDocumentResult> UploadProposalVersionAsync(Guid id, UploadProposalVersionRequest request, CancellationToken cancellationToken)
+        {
+            if (!await CanModifyOpportunityAsync(id, cancellationToken))
+            {
+                return new OpportunityProposalDocumentResult { Forbidden = true };
             }
 
             var errors = ValidateProposalDocument(request);
             if (errors.Count > 0)
             {
+                return new OpportunityProposalDocumentResult { Errors = errors };
+            }
+
+            var document = await _opportunityRepository.UploadProposalVersionAsync(id, request, cancellationToken);
+            return document == null
+                ? new OpportunityProposalDocumentResult { NotFound = true }
+                : new OpportunityProposalDocumentResult { Document = document };
+        }
+
+        public async Task<List<OpportunityCommercialDocumentViewModel>?> GetCommercialDocumentsAsync(Guid id, CancellationToken cancellationToken)
+        {
+            if (!await CanAccessOpportunityAsync(id, cancellationToken))
+            {
                 return null;
             }
 
-            return await _opportunityRepository.UploadProposalVersionAsync(id, request, cancellationToken);
+            return await _opportunityRepository.GetCommercialDocumentsAsync(id, cancellationToken);
         }
 
-        private static List<string> ValidateProposalDocument(UploadProposalVersionRequest request)
+        public async Task<OpportunityCommercialDocumentViewModel?> GetCommercialDocumentAsync(Guid id, Guid documentId, CancellationToken cancellationToken)
         {
+            if (!await CanAccessOpportunityAsync(id, cancellationToken))
+            {
+                return null;
+            }
+
+            return await _opportunityRepository.GetCommercialDocumentAsync(id, documentId, cancellationToken);
+        }
+
+        public async Task<OpportunityCommercialDocumentResult> ValidateCommercialDocumentUploadAsync(Guid id, UploadOpportunityCommercialDocumentRequest request, CancellationToken cancellationToken)
+        {
+            if (!await CanModifyOpportunityAsync(id, cancellationToken))
+            {
+                return new OpportunityCommercialDocumentResult { Forbidden = true };
+            }
+
+            var errors = await ValidateCommercialDocumentUploadRequestAsync(id, request, cancellationToken);
+            return new OpportunityCommercialDocumentResult { Errors = errors };
+        }
+
+        public async Task<OpportunityCommercialDocumentResult> UploadCommercialDocumentAsync(Guid id, UploadOpportunityCommercialDocumentRequest request, CancellationToken cancellationToken)
+        {
+            if (!await CanModifyOpportunityAsync(id, cancellationToken))
+            {
+                return new OpportunityCommercialDocumentResult { Forbidden = true };
+            }
+
+            var errors = await ValidateCommercialDocumentUploadRequestAsync(id, request, cancellationToken);
+            if (errors.Count > 0)
+            {
+                return new OpportunityCommercialDocumentResult { Errors = errors };
+            }
+
+            request.DocumentType = NormalizeCommercialDocumentType(request.DocumentType);
+            var document = await _opportunityRepository.UploadCommercialDocumentAsync(id, request, cancellationToken);
+            return document == null
+                ? new OpportunityCommercialDocumentResult { NotFound = true }
+                : new OpportunityCommercialDocumentResult { Document = document };
+        }
+
+        public async Task<OpportunityCommercialDocumentResult> DeleteCommercialDocumentAsync(Guid id, Guid documentId, CancellationToken cancellationToken)
+        {
+            if (!await CanModifyOpportunityAsync(id, cancellationToken))
+            {
+                return new OpportunityCommercialDocumentResult { Forbidden = true };
+            }
+
             var errors = new List<string>();
-
-            if (string.IsNullOrWhiteSpace(request.ProposalDocumentFileName))
+            if (documentId == Guid.Empty)
             {
-                errors.Add("Proposal document file name is required.");
-                return errors;
+                errors.Add("Commercial document id is required.");
             }
 
-            var extension = Path.GetExtension(request.ProposalDocumentFileName);
-            if (!AllowedProposalDocumentExtensions.Contains(extension))
+            if (!await _opportunityRepository.OpportunityIsWonAsync(id, cancellationToken))
             {
-                errors.Add("Proposal document must be a PDF, DOC, or DOCX file.");
+                errors.Add("Agreement or PO documents can be deleted only for Won opportunities.");
             }
 
-            if (!string.IsNullOrWhiteSpace(request.ProposalDocumentContentType)
-                && !AllowedProposalDocumentContentTypes.Contains(request.ProposalDocumentContentType)
-                && !string.Equals(request.ProposalDocumentContentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+            if (errors.Count > 0)
             {
-                errors.Add("Proposal document content type is invalid.");
+                return new OpportunityCommercialDocumentResult { Errors = errors };
             }
 
-            if (!request.ProposalDocumentSize.HasValue || request.ProposalDocumentSize <= 0)
+            var existingDocument = await _opportunityRepository.GetCommercialDocumentAsync(id, documentId, cancellationToken);
+            if (existingDocument == null)
             {
-                errors.Add("Proposal document is required.");
-            }
-            else if (request.ProposalDocumentSize > MaxProposalDocumentBytes)
-            {
-                errors.Add("Proposal document must be 10 MB or smaller.");
+                return new OpportunityCommercialDocumentResult { NotFound = true };
             }
 
-            if (request.Description?.Length > 500)
+            if (await _opportunityRepository.CommercialDocumentIsReferencedByBreakdownAsync(id, documentId, cancellationToken))
             {
-                errors.Add("Description must be 500 characters or fewer.");
+                return new OpportunityCommercialDocumentResult
+                {
+                    Errors =
+                    [
+                        "This document is already referenced in the saved commercial breakdown. Upload the corrected document of the same type first; the reference will be replaced automatically."
+                    ]
+                };
             }
 
-            return errors;
+            var document = await _opportunityRepository.DeleteCommercialDocumentAsync(id, documentId, cancellationToken);
+            return document == null
+                ? new OpportunityCommercialDocumentResult { NotFound = true }
+                : new OpportunityCommercialDocumentResult { Document = document, Deleted = true };
+        }
+
+        public async Task<OpportunityCommercialBreakdownQueryResult> GetCommercialBreakdownAsync(Guid id, CancellationToken cancellationToken)
+        {
+            var currentUserId = _userContextService.GetUserId();
+            if (!currentUserId.HasValue)
+            {
+                return new OpportunityCommercialBreakdownQueryResult { Forbidden = true };
+            }
+
+            var canAccess = await _opportunityRepository.UserCanAccessOpportunityAsync(id, currentUserId.Value, HasOverrideAccess(), cancellationToken);
+            if (!canAccess)
+            {
+                return await _opportunityRepository.OpportunityExistsAsync(id, cancellationToken)
+                    ? new OpportunityCommercialBreakdownQueryResult { Forbidden = true }
+                    : new OpportunityCommercialBreakdownQueryResult { NotFound = true };
+            }
+
+            return new OpportunityCommercialBreakdownQueryResult
+            {
+                Breakdown = await _opportunityRepository.GetCommercialBreakdownAsync(id, cancellationToken)
+            };
+        }
+
+        public async Task<OpportunityCommercialBreakdownResult> SaveCommercialBreakdownAsync(Guid id, SaveOpportunityCommercialBreakdownRequest request, CancellationToken cancellationToken)
+        {
+            if (!await CanModifyOpportunityAsync(id, cancellationToken))
+            {
+                return new OpportunityCommercialBreakdownResult { Forbidden = true };
+            }
+
+            ApplyCommercialBreakdownDefaults(request);
+            var errors = await ValidateCommercialBreakdownRequestAsync(id, request, cancellationToken);
+            if (errors.Count > 0)
+            {
+                return new OpportunityCommercialBreakdownResult { Errors = errors };
+            }
+
+            var breakdown = await _opportunityRepository.SaveCommercialBreakdownAsync(id, request, cancellationToken);
+            return breakdown == null
+                ? new OpportunityCommercialBreakdownResult { NotFound = true }
+                : new OpportunityCommercialBreakdownResult { Breakdown = breakdown };
         }
 
         public async Task<List<OpportunityActivityViewModel>?> GetActivitiesAsync(Guid id, CancellationToken cancellationToken)
@@ -407,6 +531,46 @@ namespace Opportunities.Application.Services
             return errors;
         }
 
+        private static List<string> ValidateProposalDocument(UploadProposalVersionRequest request)
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(request.ProposalDocumentFileName))
+            {
+                errors.Add("Proposal document file name is required.");
+                return errors;
+            }
+
+            var extension = Path.GetExtension(request.ProposalDocumentFileName);
+            if (!AllowedProposalDocumentExtensions.Contains(extension))
+            {
+                errors.Add("Proposal document must be a PDF, DOC, or DOCX file.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ProposalDocumentContentType)
+                && !AllowedProposalDocumentContentTypes.Contains(request.ProposalDocumentContentType)
+                && !string.Equals(request.ProposalDocumentContentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Proposal document content type is invalid.");
+            }
+
+            if (!request.ProposalDocumentSize.HasValue || request.ProposalDocumentSize <= 0)
+            {
+                errors.Add("Proposal document is required.");
+            }
+            else if (request.ProposalDocumentSize > MaxProposalDocumentBytes)
+            {
+                errors.Add("Proposal document must be 10 MB or smaller.");
+            }
+
+            if (request.Description?.Length > 500)
+            {
+                errors.Add("Description must be 500 characters or fewer.");
+            }
+
+            return errors;
+        }
+
         private static List<string> ValidateCloseRequest(CloseOpportunityRequest request, bool won)
         {
             var errors = new List<string>();
@@ -477,6 +641,197 @@ namespace Opportunities.Application.Services
             return errors;
         }
 
+        private async Task<List<string>> ValidateCommercialDocumentUploadRequestAsync(Guid opportunityId, UploadOpportunityCommercialDocumentRequest request, CancellationToken cancellationToken)
+        {
+            var errors = new List<string>();
+
+            if (!await _opportunityRepository.OpportunityIsWonAsync(opportunityId, cancellationToken))
+            {
+                errors.Add("Agreement or PO documents can be uploaded only for Won opportunities.");
+                return errors;
+            }
+
+            var normalizedType = NormalizeCommercialDocumentType(request.DocumentType);
+            if (string.IsNullOrWhiteSpace(request.DocumentType)
+                || (normalizedType != AgreementDocumentType && normalizedType != PurchaseOrderDocumentType))
+            {
+                errors.Add("DocumentType must be Agreement or PurchaseOrder.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.FileName))
+            {
+                errors.Add("Document file name is required.");
+                return errors;
+            }
+
+            if (request.Remarks?.Length > 1000)
+            {
+                errors.Add("Remarks must be 1000 characters or fewer.");
+            }
+
+            var extension = Path.GetExtension(request.FileName);
+            if (!AllowedCommercialDocumentExtensions.Contains(extension))
+            {
+                errors.Add("Agreement or PO document must be a PDF, DOC, or DOCX file.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ContentType)
+                && !AllowedCommercialDocumentContentTypes.Contains(request.ContentType)
+                && !string.Equals(request.ContentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Agreement or PO document content type is invalid.");
+            }
+
+            if (request.FileSize <= 0)
+            {
+                errors.Add("Agreement or PO document is required.");
+            }
+            else if (request.FileSize > MaxCommercialDocumentBytes)
+            {
+                errors.Add("Agreement or PO document must be 10 MB or smaller.");
+            }
+
+            return errors;
+        }
+
+        private async Task<List<string>> ValidateCommercialBreakdownRequestAsync(Guid opportunityId, SaveOpportunityCommercialBreakdownRequest request, CancellationToken cancellationToken)
+        {
+            var errors = new List<string>();
+
+            if (!await _opportunityRepository.OpportunityIsWonAsync(opportunityId, cancellationToken))
+            {
+                errors.Add("Commercial breakdown can be saved only for Won opportunities.");
+                return errors;
+            }
+
+            if (!await _opportunityRepository.OpportunityHasCommercialDocumentAsync(opportunityId, cancellationToken))
+            {
+                errors.Add("Agreement or PO document is required before saving commercial breakdown.");
+            }
+
+            if (!request.AgreementDocumentId.HasValue && !request.PurchaseOrderDocumentId.HasValue)
+            {
+                errors.Add("Select at least one Agreement or PO document reference.");
+            }
+
+            if (!request.AgreementDocumentId.HasValue && (request.AgreementDate.HasValue || request.AgreementExpiryDate.HasValue))
+            {
+                errors.Add("Agreement dates can be saved only when an Agreement document is referenced.");
+            }
+
+            if (!request.PurchaseOrderDocumentId.HasValue && request.PurchaseOrderDate.HasValue)
+            {
+                errors.Add("PurchaseOrderDate can be saved only when a PO document is referenced.");
+            }
+
+            if (request.CurrencyId == Guid.Empty)
+            {
+                errors.Add("CurrencyId is required.");
+            }
+            else if (!SupportedCurrencyIds.Contains(request.CurrencyId))
+            {
+                errors.Add("CurrencyId is invalid.");
+            }
+
+            if (request.FinalPayableAmount < 0)
+            {
+                errors.Add("FinalPayableAmount must be greater than or equal to 0.");
+            }
+
+            if (request.AgreementDocumentId.HasValue)
+            {
+                if (!await _opportunityRepository.CommercialDocumentBelongsToOpportunityAsync(opportunityId, request.AgreementDocumentId.Value, AgreementDocumentType, cancellationToken))
+                {
+                    errors.Add("Agreement document reference is invalid.");
+                }
+
+                if (!request.AgreementDate.HasValue)
+                {
+                    errors.Add("AgreementDate is required when an Agreement document is referenced.");
+                }
+
+                if (!request.AgreementExpiryDate.HasValue)
+                {
+                    errors.Add("AgreementExpiryDate is required when an Agreement document is referenced.");
+                }
+                else if (request.AgreementDate.HasValue && request.AgreementExpiryDate.Value < request.AgreementDate.Value)
+                {
+                    errors.Add("AgreementExpiryDate must be on or after AgreementDate.");
+                }
+            }
+
+            if (request.PurchaseOrderDocumentId.HasValue)
+            {
+                if (!await _opportunityRepository.CommercialDocumentBelongsToOpportunityAsync(opportunityId, request.PurchaseOrderDocumentId.Value, PurchaseOrderDocumentType, cancellationToken))
+                {
+                    errors.Add("PO document reference is invalid.");
+                }
+
+                if (!request.PurchaseOrderDate.HasValue)
+                {
+                    errors.Add("PurchaseOrderDate is required when a PO document is referenced.");
+                }
+            }
+
+            if (request.AmcApplicable)
+            {
+                if (!request.AmcAmount.HasValue || request.AmcAmount < 0) errors.Add("AMC Amount is required and must be greater than or equal to 0.");
+                if (!request.AmcStartDate.HasValue) errors.Add("AMC Start Date is required.");
+                if (!request.AmcRenewalDate.HasValue) errors.Add("AMC Renewal Date is required.");
+                if (!request.AmcExpiryDate.HasValue) errors.Add("AMC Expiry Date is required.");
+                if (request.AmcStartDate.HasValue && request.AmcExpiryDate.HasValue && request.AmcExpiryDate.Value < request.AmcStartDate.Value) errors.Add("AMC Expiry Date must be on or after AMC Start Date.");
+            }
+
+            if (request.SubscriptionApplicable)
+            {
+                if (!request.SubscriptionAmount.HasValue || request.SubscriptionAmount < 0) errors.Add("Subscription Amount is required and must be greater than or equal to 0.");
+                if (string.IsNullOrWhiteSpace(request.SubscriptionBillingFrequency)) errors.Add("Subscription Billing Frequency is required.");
+                else if (!AllowedSubscriptionBillingFrequencies.Contains(request.SubscriptionBillingFrequency.Trim())) errors.Add("Subscription Billing Frequency is invalid.");
+                if (!request.SubscriptionStartDate.HasValue) errors.Add("Subscription Start Date is required.");
+                if (!request.NextSubscriptionBillingDate.HasValue) errors.Add("Next Subscription Billing Date is required.");
+                if (request.SubscriptionStartDate.HasValue && request.NextSubscriptionBillingDate.HasValue && request.NextSubscriptionBillingDate.Value < request.SubscriptionStartDate.Value) errors.Add("Next Subscription Billing Date must be on or after Subscription Start Date.");
+            }
+
+            if (request.Remarks?.Length > 1000)
+            {
+                errors.Add("Remarks must be 1000 characters or fewer.");
+            }
+
+            return errors;
+        }
+
+        private static void ApplyCommercialBreakdownDefaults(SaveOpportunityCommercialBreakdownRequest request)
+        {
+            if (!request.SubscriptionApplicable)
+            {
+                request.NextSubscriptionBillingDate = null;
+                return;
+            }
+
+            if (!request.SubscriptionStartDate.HasValue || string.IsNullOrWhiteSpace(request.SubscriptionBillingFrequency))
+            {
+                return;
+            }
+
+            request.NextSubscriptionBillingDate = CalculateNextSubscriptionBillingDate(
+                request.SubscriptionStartDate.Value,
+                request.SubscriptionBillingFrequency.Trim());
+        }
+
+        private static DateTime CalculateNextSubscriptionBillingDate(DateTime startDate, string frequency)
+        {
+            var months = frequency.Trim().ToLowerInvariant() switch
+            {
+                "monthly" => 1,
+                "quarterly" => 3,
+                "semiannual" => 6,
+                "annual" => 12,
+                _ => 0
+            };
+
+            return months == 0 ? startDate : startDate.AddMonths(months);
+        }
+
         private async Task<string> GenerateNextOpportunityNumberAsync(CancellationToken cancellationToken)
         {
             await Task.CompletedTask;
@@ -531,6 +886,23 @@ namespace Opportunities.Application.Services
                 string.Equals(role, DefaultRoles.SuperAdmin, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(role, DefaultRoles.Admin, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(role, DefaultRoles.Manager, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string NormalizeCommercialDocumentType(string documentType)
+        {
+            if (string.Equals(documentType, PurchaseOrderDocumentType, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(documentType, "PO", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(documentType, "Purchase Order", StringComparison.OrdinalIgnoreCase))
+            {
+                return PurchaseOrderDocumentType;
+            }
+
+            if (string.Equals(documentType, AgreementDocumentType, StringComparison.OrdinalIgnoreCase))
+            {
+                return AgreementDocumentType;
+            }
+
+            return string.Empty;
         }
     }
 }

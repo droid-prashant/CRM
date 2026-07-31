@@ -1156,6 +1156,72 @@ END
 $migration$;
 
 -- -------------------------------------------------------------------------
+-- 20260721120000_OpportunityProposalVersioning
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260721120000_OpportunityProposalVersioning') THEN
+        RETURN;
+    END IF;
+
+    DROP INDEX IF EXISTS "leads"."IX_OpportunityDocuments_OpportunityId_DocumentType_IsActive";
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'leads'
+            AND table_name = 'OpportunityDocuments'
+            AND column_name = 'VersionNumber'
+    ) THEN
+        ALTER TABLE "leads"."OpportunityDocuments"
+            ADD COLUMN "VersionNumber" integer NOT NULL DEFAULT 1;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'leads'
+            AND table_name = 'OpportunityDocuments'
+            AND column_name = 'Description'
+    ) THEN
+        ALTER TABLE "leads"."OpportunityDocuments"
+            ADD COLUMN "Description" character varying(500) NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'leads'
+            AND table_name = 'OpportunityDocuments'
+            AND column_name = 'IsLastCommunicated'
+    ) THEN
+        ALTER TABLE "leads"."OpportunityDocuments"
+            ADD COLUMN "IsLastCommunicated" boolean NOT NULL DEFAULT false;
+    END IF;
+
+    UPDATE "leads"."OpportunityDocuments"
+    SET "IsLastCommunicated" = "IsActive",
+        "VersionNumber" = 1
+    WHERE "DocumentType" = 'Proposal';
+
+    UPDATE "leads"."OpportunityDocuments"
+    SET "IsLastCommunicated" = false,
+        "VersionNumber" = 1
+    WHERE "DocumentType" <> 'Proposal';
+
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityDocuments_OpportunityId_DocumentType_IsLastCommunicated"
+        ON "leads"."OpportunityDocuments" ("OpportunityId", "DocumentType", "IsLastCommunicated");
+
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityDocuments_OpportunityId_DocumentType_VersionNumber"
+        ON "leads"."OpportunityDocuments" ("OpportunityId", "DocumentType", "VersionNumber");
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260721120000_OpportunityProposalVersioning', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
 -- 20260528140000_ClientProductMappings
 -- -------------------------------------------------------------------------
 DO $migration$
@@ -1492,6 +1558,277 @@ BEGIN
 
     INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
     VALUES ('20260721090000_LeadSoftDeleteAudit', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260730120000_OpportunityCommercialFinalization
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260730120000_OpportunityCommercialFinalization') THEN
+        RETURN;
+    END IF;
+
+    CREATE TABLE IF NOT EXISTS "leads"."OpportunityCommercialDocuments" (
+        "Id" uuid NOT NULL,
+        "OpportunityId" uuid NOT NULL,
+        "DocumentType" character varying(30) NOT NULL,
+        "FileName" character varying(255) NOT NULL,
+        "StoredFileName" character varying(255) NOT NULL,
+        "FilePath" character varying(500) NOT NULL,
+        "ContentType" character varying(150) NOT NULL,
+        "FileSize" bigint NOT NULL,
+        "Remarks" character varying(1000) NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL,
+        CONSTRAINT "PK_OpportunityCommercialDocuments" PRIMARY KEY ("Id")
+    );
+
+    CREATE TABLE IF NOT EXISTS "leads"."OpportunityCommercialBreakdowns" (
+        "Id" uuid NOT NULL,
+        "OpportunityId" uuid NOT NULL,
+        "CurrencyId" uuid NOT NULL,
+        "FinalPayableAmount" numeric(18,2) NOT NULL,
+        "AgreementDocumentId" uuid NULL,
+        "AgreementDate" timestamp with time zone NULL,
+        "AgreementExpiryDate" timestamp with time zone NULL,
+        "PurchaseOrderDocumentId" uuid NULL,
+        "PurchaseOrderDate" timestamp with time zone NULL,
+        "AmcApplicable" boolean NOT NULL,
+        "AmcAmount" numeric(18,2) NULL,
+        "AmcStartDate" timestamp with time zone NULL,
+        "AmcRenewalDate" timestamp with time zone NULL,
+        "AmcExpiryDate" timestamp with time zone NULL,
+        "SubscriptionApplicable" boolean NOT NULL,
+        "SubscriptionAmount" numeric(18,2) NULL,
+        "SubscriptionBillingFrequency" character varying(50) NULL,
+        "SubscriptionStartDate" timestamp with time zone NULL,
+        "NextSubscriptionBillingDate" timestamp with time zone NULL,
+        "Remarks" character varying(1000) NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL,
+        CONSTRAINT "PK_OpportunityCommercialBreakdowns" PRIMARY KEY ("Id")
+    );
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_OpportunityCommercialDocuments_Opportunities_OpportunityId') THEN
+        ALTER TABLE "leads"."OpportunityCommercialDocuments" ADD CONSTRAINT "FK_OpportunityCommercialDocuments_Opportunities_OpportunityId"
+        FOREIGN KEY ("OpportunityId") REFERENCES "leads"."Opportunities" ("Id") ON DELETE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_OpportunityCommercialBreakdowns_Opportunities_OpportunityId') THEN
+        ALTER TABLE "leads"."OpportunityCommercialBreakdowns" ADD CONSTRAINT "FK_OpportunityCommercialBreakdowns_Opportunities_OpportunityId"
+        FOREIGN KEY ("OpportunityId") REFERENCES "leads"."Opportunities" ("Id") ON DELETE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_OppCommercialBreakdowns_AgreementDocumentId') THEN
+        ALTER TABLE "leads"."OpportunityCommercialBreakdowns" ADD CONSTRAINT "FK_OppCommercialBreakdowns_AgreementDocumentId"
+        FOREIGN KEY ("AgreementDocumentId") REFERENCES "leads"."OpportunityCommercialDocuments" ("Id");
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_OppCommercialBreakdowns_PurchaseOrderDocumentId') THEN
+        ALTER TABLE "leads"."OpportunityCommercialBreakdowns" ADD CONSTRAINT "FK_OppCommercialBreakdowns_PurchaseOrderDocumentId"
+        FOREIGN KEY ("PurchaseOrderDocumentId") REFERENCES "leads"."OpportunityCommercialDocuments" ("Id");
+    END IF;
+
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_AgreementDocumentId"
+        ON "leads"."OpportunityCommercialBreakdowns" ("AgreementDocumentId");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_AgreementExpiryDate"
+        ON "leads"."OpportunityCommercialBreakdowns" ("AgreementExpiryDate");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_AmcExpiryDate"
+        ON "leads"."OpportunityCommercialBreakdowns" ("AmcExpiryDate");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_AmcRenewalDate"
+        ON "leads"."OpportunityCommercialBreakdowns" ("AmcRenewalDate");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_NextSubBillingDate"
+        ON "leads"."OpportunityCommercialBreakdowns" ("NextSubscriptionBillingDate");
+    CREATE UNIQUE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_OpportunityId"
+        ON "leads"."OpportunityCommercialBreakdowns" ("OpportunityId");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_PurchaseOrderDocumentId"
+        ON "leads"."OpportunityCommercialBreakdowns" ("PurchaseOrderDocumentId");
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialDocuments_OpportunityId_DocumentType_IsActive"
+        ON "leads"."OpportunityCommercialDocuments" ("OpportunityId", "DocumentType", "IsActive");
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260730120000_OpportunityCommercialFinalization', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+DO $migration$
+BEGIN
+    CREATE SCHEMA IF NOT EXISTS "notifications";
+
+    CREATE TABLE IF NOT EXISTS "notifications"."NotificationConfigurations" (
+        "Id" uuid NOT NULL,
+        "EventType" character varying(80) NOT NULL,
+        "DisplayName" character varying(150) NOT NULL,
+        "IsEnabled" boolean NOT NULL,
+        "InitialLeadTimeDays" integer NOT NULL,
+        "OverdueIntervalDays" integer NOT NULL,
+        "InAppEnabled" boolean NOT NULL,
+        "EmailEnabled" boolean NOT NULL,
+        "SubjectTemplate" character varying(500) NOT NULL,
+        "BodyTemplate" text NOT NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL,
+        CONSTRAINT "PK_NotificationConfigurations" PRIMARY KEY ("Id")
+    );
+
+    CREATE TABLE IF NOT EXISTS "notifications"."NotificationReminderIntervals" (
+        "Id" uuid NOT NULL,
+        "ConfigurationId" uuid NOT NULL,
+        "DaysBeforeDue" integer NOT NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL,
+        CONSTRAINT "PK_NotificationReminderIntervals" PRIMARY KEY ("Id")
+    );
+
+    CREATE TABLE IF NOT EXISTS "notifications"."InAppNotifications" (
+        "Id" uuid NOT NULL,
+        "RecipientUserId" uuid NOT NULL,
+        "Title" character varying(300) NOT NULL,
+        "Message" text NOT NULL,
+        "EventType" character varying(80) NOT NULL,
+        "SourceRecordType" character varying(80) NOT NULL,
+        "SourceRecordId" uuid NOT NULL,
+        "SourceDueDate" timestamp with time zone NOT NULL,
+        "RelatedUrl" character varying(500) NULL,
+        "IsRead" boolean NOT NULL,
+        "ReadOn" timestamp with time zone NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL,
+        CONSTRAINT "PK_InAppNotifications" PRIMARY KEY ("Id")
+    );
+
+    CREATE TABLE IF NOT EXISTS "notifications"."NotificationDeliveryLogs" (
+        "Id" uuid NOT NULL,
+        "EventType" character varying(80) NOT NULL,
+        "SourceRecordType" character varying(80) NOT NULL,
+        "SourceRecordId" uuid NOT NULL,
+        "SourceDueDate" timestamp with time zone NOT NULL,
+        "ReminderKey" character varying(80) NOT NULL,
+        "Channel" character varying(30) NOT NULL,
+        "RecipientUserId" uuid NOT NULL,
+        "RecipientEmail" character varying(320) NULL,
+        "Status" character varying(30) NOT NULL,
+        "ErrorMessage" character varying(2000) NULL,
+        "SentOn" timestamp with time zone NULL,
+        "AttemptCount" integer NOT NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL,
+        CONSTRAINT "PK_NotificationDeliveryLogs" PRIMARY KEY ("Id")
+    );
+
+    CREATE TABLE IF NOT EXISTS "notifications"."NotificationResolutions" (
+        "Id" uuid NOT NULL,
+        "EventType" character varying(80) NOT NULL,
+        "SourceRecordType" character varying(80) NOT NULL,
+        "SourceRecordId" uuid NOT NULL,
+        "SourceDueDate" timestamp with time zone NOT NULL,
+        "IsResolved" boolean NOT NULL,
+        "ResolvedOn" timestamp with time zone NULL,
+        "ResolvedByUserId" uuid NULL,
+        "ResolutionRemarks" character varying(1000) NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL,
+        CONSTRAINT "PK_NotificationResolutions" PRIMARY KEY ("Id")
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS "IX_NotificationConfigurations_EventType"
+        ON "notifications"."NotificationConfigurations" ("EventType");
+    CREATE UNIQUE INDEX IF NOT EXISTS "IX_NotificationReminderIntervals_Config_DaysBefore"
+        ON "notifications"."NotificationReminderIntervals" ("ConfigurationId", "DaysBeforeDue");
+    CREATE INDEX IF NOT EXISTS "IX_InAppNotifications_RecipientUserId_IsRead_CreatedOn"
+        ON "notifications"."InAppNotifications" ("RecipientUserId", "IsRead", "CreatedOn");
+    CREATE INDEX IF NOT EXISTS "IX_InAppNotifications_Event_Source"
+        ON "notifications"."InAppNotifications" ("EventType", "SourceRecordType", "SourceRecordId", "SourceDueDate");
+
+    WITH ranked_delivery_logs AS (
+        SELECT
+            "Id",
+            row_number() OVER (
+                PARTITION BY "EventType", "SourceRecordType", "SourceRecordId", "SourceDueDate", "ReminderKey", "Channel", "RecipientUserId"
+                ORDER BY
+                    CASE WHEN "Status" IN ('Sent', 'AcceptedBySmtp') THEN 0 ELSE 1 END,
+                    COALESCE("SentOn", "UpdatedOn", "CreatedOn") DESC,
+                    "Id"
+            ) AS duplicate_rank
+        FROM "notifications"."NotificationDeliveryLogs"
+        WHERE "IsActive" = true
+    )
+    UPDATE "notifications"."NotificationDeliveryLogs" logs
+    SET "IsActive" = false,
+        "UpdatedOn" = now(),
+        "UpdatedBy" = '00000000-0000-0000-0000-000000000000'
+    FROM ranked_delivery_logs ranked
+    WHERE logs."Id" = ranked."Id"
+        AND ranked.duplicate_rank > 1;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS "UX_NotificationDeliveryLogs_DeliveryKey"
+        ON "notifications"."NotificationDeliveryLogs" ("EventType", "SourceRecordType", "SourceRecordId", "SourceDueDate", "ReminderKey", "Channel", "RecipientUserId")
+        WHERE "IsActive" = true;
+    CREATE INDEX IF NOT EXISTS "IX_NotificationDeliveryLogs_Channel_Status_CreatedOn"
+        ON "notifications"."NotificationDeliveryLogs" ("Channel", "Status", "CreatedOn");
+    CREATE INDEX IF NOT EXISTS "IX_NotificationResolutions_Event_Source_Resolved"
+        ON "notifications"."NotificationResolutions" ("EventType", "SourceRecordType", "SourceRecordId", "SourceDueDate", "IsResolved");
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_NotificationReminderIntervals_NotificationConfigurations_ConfigurationId') THEN
+        ALTER TABLE "notifications"."NotificationReminderIntervals"
+        ADD CONSTRAINT "FK_NotificationReminderIntervals_NotificationConfigurations_ConfigurationId"
+        FOREIGN KEY ("ConfigurationId") REFERENCES "notifications"."NotificationConfigurations" ("Id") ON DELETE CASCADE;
+    END IF;
+
+    INSERT INTO "notifications"."NotificationConfigurations"
+        ("Id", "EventType", "DisplayName", "IsEnabled", "InitialLeadTimeDays", "OverdueIntervalDays", "InAppEnabled", "EmailEnabled", "SubjectTemplate", "BodyTemplate", "CreatedBy", "CreatedOn", "IsActive")
+    VALUES
+        ('00000000-0000-0000-0001-000000000001', 'AgreementExpiry', 'Agreement Expiry', false, 90, 7, true, false, 'Agreement for {CustomerName} expires on {DueDate}.', 'Agreement for {CustomerName} linked to opportunity {OpportunityNumber} expires on {DueDate}. Please complete renewal or mark it resolved.', '00000000-0000-0000-0000-000000000000', TIMESTAMPTZ '2026-07-30 00:00:00+00', true),
+        ('00000000-0000-0000-0001-000000000002', 'AmcRenewal', 'AMC Renewal', false, 90, 7, true, false, 'AMC renewal for {CustomerName} is due on {DueDate}.', 'AMC renewal for {CustomerName} linked to opportunity {OpportunityNumber} is due on {DueDate}. Amount: {Amount}.', '00000000-0000-0000-0000-000000000000', TIMESTAMPTZ '2026-07-30 00:00:00+00', true),
+        ('00000000-0000-0000-0001-000000000003', 'AmcExpiry', 'AMC Expiry', false, 90, 7, true, false, 'AMC for {CustomerName} expires on {DueDate}.', 'AMC for {CustomerName} linked to opportunity {OpportunityNumber} expires on {DueDate}. Please complete renewal or mark it resolved.', '00000000-0000-0000-0000-000000000000', TIMESTAMPTZ '2026-07-30 00:00:00+00', true),
+        ('00000000-0000-0000-0001-000000000004', 'SubscriptionBilling', 'Subscription Billing', false, 90, 7, true, false, 'Subscription billing for {CustomerName} is due on {DueDate}.', 'Subscription billing for {CustomerName} linked to opportunity {OpportunityNumber} is due on {DueDate}. Amount: {Amount}.', '00000000-0000-0000-0000-000000000000', TIMESTAMPTZ '2026-07-30 00:00:00+00', true),
+        ('00000000-0000-0000-0001-000000000005', 'LeadFollowUp', 'Lead Follow-up', false, 90, 7, true, false, 'Lead follow-up for {CustomerName} is due on {DueDate}.', 'Lead {LeadNumber} follow-up for {CustomerName} is due on {DueDate}. Last note: {Notes}.', '00000000-0000-0000-0000-000000000000', TIMESTAMPTZ '2026-07-30 00:00:00+00', true),
+        ('00000000-0000-0000-0001-000000000006', 'OpportunityFollowUp', 'Opportunity Follow-up', false, 90, 7, true, false, 'Opportunity follow-up for {CustomerName} is due on {DueDate}.', 'Opportunity {OpportunityNumber} follow-up for {CustomerName} is due on {DueDate}. Last note: {Notes}.', '00000000-0000-0000-0000-000000000000', TIMESTAMPTZ '2026-07-30 00:00:00+00', true)
+    ON CONFLICT ("EventType") DO NOTHING;
+
+    INSERT INTO "notifications"."NotificationReminderIntervals"
+        ("Id", "ConfigurationId", "DaysBeforeDue", "CreatedBy", "CreatedOn", "IsActive")
+    SELECT ('00000000-0000-0000-0002-' || lpad(((cfg."SeedOrdinal" * 1000) + d."DaysBeforeDue")::text, 12, '0'))::uuid, c."Id", d."DaysBeforeDue", '00000000-0000-0000-0000-000000000000', TIMESTAMPTZ '2026-07-30 00:00:00+00', true
+    FROM "notifications"."NotificationConfigurations" c
+    INNER JOIN (
+        VALUES
+            ('AgreementExpiry', 1),
+            ('AmcRenewal', 2),
+            ('AmcExpiry', 3),
+            ('SubscriptionBilling', 4),
+            ('LeadFollowUp', 5),
+            ('OpportunityFollowUp', 6)
+    ) AS cfg("EventType", "SeedOrdinal") ON cfg."EventType" = c."EventType"
+    CROSS JOIN (VALUES (90), (60), (30), (7)) AS d("DaysBeforeDue")
+    ON CONFLICT ("ConfigurationId", "DaysBeforeDue") DO NOTHING;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260730130000_NotificationsInitial', '8.0.24')
     ON CONFLICT ("MigrationId") DO NOTHING;
 END
 $migration$;

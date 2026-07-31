@@ -2,8 +2,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { apiUrl } from '@/core/http/api-url';
-import { ChangeOpportunityStageRequest, CloseOpportunityRequest, CreateOpportunityActivityRequest, CreateOpportunityRequest, OpportunityListQuery, UpdateOpportunityRequest, UploadProposalVersionRequest } from '../dtos/opportunity.dto';
-import { OpportunityActivityViewModel, OpportunityDocumentViewModel, OpportunityListItemViewModel, OpportunityLookupBundle, OpportunityPipelineStageViewModel, OpportunityStageHistoryViewModel, PagedResult, ProposalVersionViewModel } from '../view-models/opportunity.view-model';
+import { ChangeOpportunityStageRequest, CloseOpportunityRequest, CreateOpportunityActivityRequest, CreateOpportunityRequest, OpportunityListQuery, SaveOpportunityCommercialBreakdownRequest, UpdateOpportunityRequest, UploadOpportunityCommercialDocumentRequest, UploadProposalVersionRequest } from '../dtos/opportunity.dto';
+import { OpportunityActivityViewModel, OpportunityCommercialBreakdownViewModel, OpportunityCommercialDocumentViewModel, OpportunityDocumentViewModel, OpportunityListItemViewModel, OpportunityLookupBundle, OpportunityPipelineStageViewModel, OpportunityStageHistoryViewModel, PagedResult, ProposalVersionViewModel } from '../view-models/opportunity.view-model';
 
 @Injectable({ providedIn: 'root' })
 export class OpportunityApiService {
@@ -100,6 +100,39 @@ export class OpportunityApiService {
 
     previewProposalVersion(id: string, documentId: string): Observable<Blob> {
         return this.http.get(`${this.opportunitiesUrl}/${id}/proposal-versions/${documentId}/preview`, { responseType: 'blob' });
+    }
+
+    getCommercialDocuments(id: string): Observable<OpportunityCommercialDocumentViewModel[]> {
+        return this.http.get<OpportunityCommercialDocumentViewModel[]>(`${this.opportunitiesUrl}/${id}/commercial-documents`);
+    }
+
+    uploadCommercialDocument(id: string, request: UploadOpportunityCommercialDocumentRequest): Observable<OpportunityCommercialDocumentViewModel> {
+        const formData = new FormData();
+        formData.append('documentType', request.documentType);
+        formData.append('remarks', request.remarks ?? '');
+        formData.append('commercialDocument', request.commercialDocument);
+
+        return this.http.post<OpportunityCommercialDocumentViewModel>(`${this.opportunitiesUrl}/${id}/commercial-documents`, formData);
+    }
+
+    previewCommercialDocument(id: string, documentId: string): Observable<Blob> {
+        return this.http.get(`${this.opportunitiesUrl}/${id}/commercial-documents/${documentId}/preview`, { responseType: 'blob' });
+    }
+
+    downloadCommercialDocument(id: string, documentId: string): Observable<Blob> {
+        return this.http.get(`${this.opportunitiesUrl}/${id}/commercial-documents/${documentId}/download`, { responseType: 'blob' });
+    }
+
+    deleteCommercialDocument(id: string, documentId: string): Observable<void> {
+        return this.http.delete<void>(`${this.opportunitiesUrl}/${id}/commercial-documents/${documentId}`);
+    }
+
+    getCommercialBreakdown(id: string): Observable<OpportunityCommercialBreakdownViewModel | null> {
+        return this.http.get<OpportunityCommercialBreakdownViewModel | null>(`${this.opportunitiesUrl}/${id}/commercial-breakdown`);
+    }
+
+    saveCommercialBreakdown(id: string, request: SaveOpportunityCommercialBreakdownRequest): Observable<OpportunityCommercialBreakdownViewModel> {
+        return this.http.put<OpportunityCommercialBreakdownViewModel>(`${this.opportunitiesUrl}/${id}/commercial-breakdown`, request);
     }
 
     getLookupBundle(): Observable<OpportunityLookupBundle> {

@@ -1,0 +1,147 @@
+<p-toast />
+
+<section class="notification-page">
+    <header class="notification-header">
+        <div>
+            <h1>Notification Settings</h1>
+            <p>Configure reminder offsets, delivery channels, and templates for commercial and follow-up events.</p>
+        </div>
+        <p-button label="Process Now" icon="pi pi-send" severity="secondary" [loading]="processing" (onClick)="processNow()" />
+    </header>
+
+    @if (loading) {
+        <div class="loading-state">Loading notification settings...</div>
+    } @else {
+        @if (processorStatus) {
+            <section class="processor-status" aria-label="Notification processor status">
+                <div class="processor-status-main">
+                    <span class="processor-status-label">Processor</span>
+                    <strong [class.processor-status-active]="processorStatus.processorEnabled" [class.processor-status-disabled]="!processorStatus.processorEnabled">
+                        {{ processorStatus.processorEnabled ? 'Automatic' : 'Disabled' }}
+                    </strong>
+                    <span>{{ processorStatus.processorEnabled ? 'Runs every ' + processorStatus.processorIntervalMinutes + ' minutes' : 'Automatic processing is off' }}</span>
+                </div>
+
+                <div class="processor-status-grid">
+                    <div>
+                        <span>Current</span>
+                        <strong>{{ processorStatus.isRunning ? 'Running' : 'Idle' }}</strong>
+                        <small>{{ processorStatus.currentTrigger || 'No active run' }}</small>
+                    </div>
+                    <div>
+                        <span>Last Started</span>
+                        <strong>{{ formatTimestamp(processorStatus.lastStartedOn) }}</strong>
+                        <small>{{ processorStatus.lastTrigger || 'No run recorded' }}</small>
+                    </div>
+                    <div>
+                        <span>Last Completed</span>
+                        <strong>{{ formatTimestamp(processorStatus.lastCompletedOn) }}</strong>
+                        <small [class.processor-status-active]="processorStatus.lastSucceeded === true" [class.processor-status-disabled]="processorStatus.lastSucceeded === false">
+                            {{ processorStatus.lastSucceeded === null || processorStatus.lastSucceeded === undefined ? 'No result' : processorStatus.lastSucceeded ? 'Success' : 'Failed' }}
+                        </small>
+                    </div>
+                </div>
+
+                <div class="processor-status-message">
+                    <span>{{ processorStatus.lastMessage || 'Waiting for the first processor run after API startup.' }}</span>
+                    <p-button icon="pi pi-refresh" ariaLabel="Refresh processor status" text severity="secondary" (onClick)="refreshProcessorStatus()" />
+                </div>
+            </section>
+        }
+
+        <div class="notification-layout">
+            <aside class="event-list" aria-label="Notification events">
+                @for (configuration of configurations; track configuration.eventType) {
+                    <button type="button" class="event-button" [class.event-button-active]="configuration.eventType === selectedEventType" (click)="selectConfiguration(configuration.eventType)">
+                        <span class="event-title">{{ configuration.displayName }}</span>
+                        <span class="event-status" [class.event-status-enabled]="configuration.isEnabled">{{ configuration.isEnabled ? 'Enabled' : 'Disabled' }}</span>
+                    </button>
+                }
+            </aside>
+
+            @if (selectedConfiguration) {
+                <form class="settings-panel" [formGroup]="form" (ngSubmit)="save()">
+                    <div class="panel-heading">
+                        <div>
+                            <h2>{{ selectedConfiguration.displayName }}</h2>
+                            <p>{{ selectedEventMetadata?.description }}</p>
+                        </div>
+                        <label class="switch-row">
+                            <input type="checkbox" formControlName="isEnabled" />
+                            <span>Enabled</span>
+                        </label>
+                    </div>
+
+                    <div class="settings-grid">
+                        <label class="field">
+                            <span>Initial Lead Time</span>
+                            <p-inputnumber formControlName="initialLeadTimeDays" [min]="0" suffix=" days" />
+                        </label>
+
+                        <label class="field">
+                            <span>Overdue Interval</span>
+                            <p-inputnumber formControlName="overdueIntervalDays" [min]="0" suffix=" days" />
+                        </label>
+                    </div>
+
+                    <fieldset class="channel-group">
+                        <legend>Delivery Channels</legend>
+                        <label class="checkbox-row">
+                            <input type="checkbox" formControlName="inAppEnabled" />
+                            <span>In-app notification</span>
+                        </label>
+                        <label class="checkbox-row">
+                            <input type="checkbox" formControlName="emailEnabled" />
+                            <span>Email notification</span>
+                        </label>
+                    </fieldset>
+
+                    <section class="interval-section">
+                        <div class="section-heading">
+                            <h3>Reminder Offsets</h3>
+                            <div class="interval-input">
+                                <p-inputnumber [(ngModel)]="intervalToAdd" [ngModelOptions]="{ standalone: true }" [min]="0" placeholder="Days before" />
+                                <p-button icon="pi pi-plus" ariaLabel="Add reminder interval" (onClick)="addInterval()" />
+                            </div>
+                        </div>
+
+                        <div class="interval-list">
+                            @for (interval of reminderIntervals.controls; track interval.value; let index = $index) {
+                                <span class="interval-chip">
+                                    {{ interval.value }} days before
+                                    <button type="button" aria-label="Remove reminder interval" (click)="removeInterval(index)">
+                                        <i class="pi pi-times"></i>
+                                    </button>
+                                </span>
+                            }
+                        </div>
+                    </section>
+
+                    <label class="field">
+                        <span>Subject Template</span>
+                        <input pInputText formControlName="subjectTemplate" />
+                    </label>
+
+                    <label class="field">
+                        <span>Body Template</span>
+                        <textarea pTextarea rows="8" formControlName="bodyTemplate"></textarea>
+                    </label>
+
+                    <section class="merge-fields">
+                        <h3>Merge Fields</h3>
+                        <div class="merge-field-list">
+                            @for (field of selectedEventMetadata?.mergeFields ?? []; track field) {
+                                <span>{{ '{' + field + '}' }}</span>
+                            }
+                        </div>
+                    </section>
+
+                    <footer class="form-actions">
+                        <p-button label="Reload" icon="pi pi-refresh" severity="secondary" text type="button" [disabled]="saving" (onClick)="load()" />
+                        <p-button label="Save Settings" icon="pi pi-check" type="submit" [loading]="saving" />
+                    </footer>
+                </form>
+            }
+        </div>
+    }
+</section>

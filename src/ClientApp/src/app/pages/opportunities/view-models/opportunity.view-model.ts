@@ -162,3 +162,47 @@ export interface OpportunityDocumentViewModel {
     description?: string;
     isLastCommunicated: boolean;
 }
+
+export interface OpportunityCommercialDocumentViewModel {
+    id: string;
+    opportunityId: string;
+    documentType: 'Agreement' | 'PurchaseOrder' | string;
+    fileName: string;
+    storedFileName: string;
+    filePath: string;
+    contentType: string;
+    fileSize: number;
+    remarks?: string;
+    uploadedByUserId: string;
+    uploadedByUserName?: string;
+    uploadedOn: string;
+}
+
+export interface OpportunityCommercialBreakdownViewModel {
+    id: string;
+    opportunityId: string;
+    currencyId: string;
+    currencyCode: string;
+    finalPayableAmount: number;
+    agreementDocumentId?: string;
+    agreementDocumentFileName?: string;
+    agreementDate?: string;
+    agreementExpiryDate?: string;
+    purchaseOrderDocumentId?: string;
+    purchaseOrderDocumentFileName?: string;
+    purchaseOrderDate?: string;
+    amcApplicable: boolean;
+    amcAmount?: number;
+    amcStartDate?: string;
+    amcRenewalDate?: string;
+    amcExpiryDate?: string;
+    subscriptionApplicable: boolean;
+    subscriptionAmount?: number;
+    subscriptionBillingFrequency?: string;
+    subscriptionStartDate?: string;
+    nextSubscriptionBillingDate?: string;
+    remarks?: string;
+    updatedByUserId: string;
+    updatedByUserName?: string;
+    updatedOn: string;
+}

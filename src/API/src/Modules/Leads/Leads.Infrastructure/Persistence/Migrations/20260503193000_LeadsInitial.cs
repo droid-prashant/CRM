@@ -1,4 +1,3 @@
-using System;
 using Leads.Infrastructure.Persistence.Data;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;

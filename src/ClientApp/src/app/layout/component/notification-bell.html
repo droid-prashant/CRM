@@ -1,0 +1,58 @@
+<div class="notification-bell">
+    <button type="button" class="layout-topbar-action notification-bell-trigger" [class.notification-bell-trigger-unread]="unreadCount > 0" aria-label="Notifications" (click)="togglePanel($event)">
+        <i class="pi pi-bell"></i>
+        @if (unreadCount > 0) {
+            <span class="notification-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+        }
+    </button>
+
+    @if (panelOpen) {
+        <section class="notification-panel" aria-label="Notifications">
+            <header class="notification-panel-header">
+                <div>
+                    <h2>Notifications</h2>
+                    <p>{{ unreadCount }} unread</p>
+                </div>
+                <p-button label="Mark all" icon="pi pi-check" size="small" text [disabled]="!unreadCount" (onClick)="markAllAsRead($event)" />
+            </header>
+
+            <div class="notification-list">
+                @if (loading && !latestNotifications.length) {
+                    <div class="notification-empty">Loading notifications...</div>
+                } @else {
+                    @for (notification of latestNotifications; track notification.id) {
+                        <article class="notification-item" [class.notification-item-unread]="!notification.isRead" (click)="openNotification(notification)">
+                            <div class="notification-item-content">
+                                <h3>{{ notification.title }}</h3>
+                                <p>{{ notification.message }}</p>
+                                <time>{{ formatTimestamp(notification.createdOn) }}</time>
+                            </div>
+                            @if (!notification.isRead) {
+                                <button type="button" class="notification-read-button" aria-label="Mark notification as read" (click)="markAsRead(notification, $event)">
+                                    <i class="pi pi-check"></i>
+                                </button>
+                            }
+                        </article>
+                    } @empty {
+                        <div class="notification-empty">No notifications</div>
+                    }
+                }
+            </div>
+        </section>
+    }
+
+    @if (alertNotification && !panelOpen) {
+        <section class="notification-alert" aria-label="New notification" (click)="openNotification(alertNotification)">
+            <div class="notification-alert-icon">
+                <i class="pi pi-bell"></i>
+            </div>
+            <div class="notification-alert-content">
+                <strong>{{ alertNotification.title }}</strong>
+                <p>{{ alertNotification.message }}</p>
+            </div>
+            <button type="button" class="notification-alert-dismiss" aria-label="Dismiss notification alert" (click)="dismissAlert($event)">
+                <i class="pi pi-times"></i>
+            </button>
+        </section>
+    }
+</div>

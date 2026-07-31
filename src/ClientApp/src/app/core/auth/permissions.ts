@@ -41,6 +41,14 @@ export const Permissions = {
         approve: 'opportunities:approve',
         export: 'opportunities:export'
     },
+    notifications: {
+        view: 'notifications:view',
+        create: 'notifications:create',
+        edit: 'notifications:edit',
+        delete: 'notifications:delete',
+        approve: 'notifications:approve',
+        export: 'notifications:export'
+    },
     partners: {
         view: 'partners:view',
         create: 'partners:create',

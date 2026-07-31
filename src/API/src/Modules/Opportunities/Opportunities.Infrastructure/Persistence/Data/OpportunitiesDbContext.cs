@@ -30,6 +30,8 @@ namespace Opportunities.Infrastructure.Persistence.Data
         public DbSet<OpportunityStageHistory> OpportunityStageHistories { get; set; }
         public DbSet<OpportunityActivity> OpportunityActivities { get; set; }
         public DbSet<OpportunityDocument> OpportunityDocuments { get; set; }
+        public DbSet<OpportunityCommercialDocument> OpportunityCommercialDocuments { get; set; }
+        public DbSet<OpportunityCommercialBreakdown> OpportunityCommercialBreakdowns { get; set; }
         public DbSet<LeadTimelineEntry> LeadTimelineEntries { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -59,6 +61,8 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.HasOne<CrmClient>().WithMany().HasForeignKey(x => x.ClientId);
                 entity.HasOne<CrmClientContact>().WithMany().HasForeignKey(x => x.ContactId);
                 entity.HasOne(x => x.CurrentStage).WithMany().HasForeignKey(x => x.StageId);
+                entity.HasMany(x => x.CommercialDocuments).WithOne(x => x.Opportunity).HasForeignKey(x => x.OpportunityId);
+                entity.HasOne(x => x.CommercialBreakdown).WithOne(x => x.Opportunity).HasForeignKey<OpportunityCommercialBreakdown>(x => x.OpportunityId);
             });
 
             modelBuilder.Entity<OpportunityStage>(entity =>
@@ -103,6 +107,37 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.HasIndex(x => new { x.OpportunityId, x.DocumentType, x.VersionNumber });
             });
 
+            modelBuilder.Entity<OpportunityCommercialDocument>(entity =>
+            {
+                entity.ToTable("OpportunityCommercialDocuments", "leads");
+                entity.Property(x => x.DocumentType).HasMaxLength(30).IsRequired();
+                entity.Property(x => x.FileName).HasMaxLength(255).IsRequired();
+                entity.Property(x => x.StoredFileName).HasMaxLength(255).IsRequired();
+                entity.Property(x => x.FilePath).HasMaxLength(500).IsRequired();
+                entity.Property(x => x.ContentType).HasMaxLength(150).IsRequired();
+                entity.Property(x => x.Remarks).HasMaxLength(1000);
+                entity.HasOne(x => x.Opportunity).WithMany(x => x.CommercialDocuments).HasForeignKey(x => x.OpportunityId);
+                entity.HasIndex(x => new { x.OpportunityId, x.DocumentType, x.IsActive });
+            });
+
+            modelBuilder.Entity<OpportunityCommercialBreakdown>(entity =>
+            {
+                entity.ToTable("OpportunityCommercialBreakdowns", "leads");
+                entity.Property(x => x.FinalPayableAmount).HasPrecision(18, 2);
+                entity.Property(x => x.AmcAmount).HasPrecision(18, 2);
+                entity.Property(x => x.SubscriptionAmount).HasPrecision(18, 2);
+                entity.Property(x => x.SubscriptionBillingFrequency).HasMaxLength(50);
+                entity.Property(x => x.Remarks).HasMaxLength(1000);
+                entity.HasIndex(x => x.OpportunityId).IsUnique();
+                entity.HasIndex(x => x.AgreementExpiryDate);
+                entity.HasIndex(x => x.AmcRenewalDate);
+                entity.HasIndex(x => x.AmcExpiryDate);
+                entity.HasIndex(x => x.NextSubscriptionBillingDate);
+                entity.HasOne(x => x.Opportunity).WithOne(x => x.CommercialBreakdown).HasForeignKey<OpportunityCommercialBreakdown>(x => x.OpportunityId);
+                entity.HasOne(x => x.AgreementDocument).WithMany().HasForeignKey(x => x.AgreementDocumentId);
+                entity.HasOne(x => x.PurchaseOrderDocument).WithMany().HasForeignKey(x => x.PurchaseOrderDocumentId);
+            });
+
             modelBuilder.Entity<Lead>(entity =>
             {
                 entity.ToTable("Leads", "leads");
@@ -112,6 +147,7 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Ignore(x => x.Country);
                 entity.Ignore(x => x.Industry);
                 entity.Ignore(x => x.ProductInterests);
+                entity.Ignore(x => x.TimelineEntries);
                 entity.Ignore(x => x.Interactions);
             });
 

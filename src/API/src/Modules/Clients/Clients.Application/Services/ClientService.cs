@@ -1,7 +1,6 @@
 using Clients.Application.DTOs;
 using Clients.Application.Repositories;
 using Clients.Application.ViewModels;
-using Clients.Domain.Enums;
 
 namespace Clients.Application.Services
 {

@@ -2,13 +2,12 @@ using Clients.Domain.Enums;
 using ERP.Core.Entities;
 using ERP.Identity.Entities;
 using Leads.Domain.Entities;
-using Leads.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Opportunities.Domain.Entities;
 using Products.Domain.Entities;
-using CrmClient = Clients.Domain.Entities.Client;
 using ClientProduct = Clients.Domain.Entities.ClientProduct;
 using ClientTimelineEntry = Clients.Domain.Entities.ClientTimelineEntry;
+using CrmClient = Clients.Domain.Entities.Client;
 
 namespace Dashboard.Infrastructure.Persistence
 {
