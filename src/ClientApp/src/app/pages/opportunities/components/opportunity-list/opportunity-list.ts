@@ -663,14 +663,23 @@ export class OpportunityList implements OnInit, OnDestroy {
             return;
         }
 
+        const previewWindow = window.open('', '_blank');
+        if (!previewWindow) {
+            this.messageService.add({ severity: 'warn', summary: 'Preview blocked', detail: 'Allow pop-ups for this site and try preview again.', life: 5000 });
+            return;
+        }
+
+        previewWindow.opener = null;
+        previewWindow.document.write('<p>Loading document preview...</p>');
         this.opportunityApiService.previewCommercialDocument(this.selectedOpportunity.id, document.id).subscribe({
             next: (blob) => {
                 const url = URL.createObjectURL(blob);
-                window.open(url, '_blank', 'noopener');
-                setTimeout(() => URL.revokeObjectURL(url), 30000);
+                previewWindow.location.href = url;
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
             },
-            error: () => {
-                this.messageService.add({ severity: 'error', summary: 'Preview failed', detail: 'Document preview is unavailable.', life: 5000 });
+            error: (error) => {
+                previewWindow.close();
+                this.showBlobError(error, 'Preview failed', 'Document preview is unavailable.');
             }
         });
     }
@@ -686,11 +695,14 @@ export class OpportunityList implements OnInit, OnDestroy {
                 const link = document.createElement('a');
                 link.href = url;
                 link.download = commercialDocument.fileName;
+                link.rel = 'noopener';
+                document.body.appendChild(link);
                 link.click();
-                URL.revokeObjectURL(url);
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
             },
-            error: () => {
-                this.messageService.add({ severity: 'error', summary: 'Download failed', detail: 'Document could not be downloaded.', life: 5000 });
+            error: (error) => {
+                this.showBlobError(error, 'Download failed', 'Document could not be downloaded.');
             }
         });
     }
@@ -955,6 +967,27 @@ export class OpportunityList implements OnInit, OnDestroy {
                 this.isLoadingCommercial = false;
             }
         });
+    }
+
+    private showBlobError(error: unknown, summary: string, fallback: string): void {
+        const errorBlob = (error as { error?: unknown })?.error;
+        if (errorBlob instanceof Blob && errorBlob.type.includes('application/json')) {
+            errorBlob
+                .text()
+                .then((text) => {
+                    try {
+                        const parsed = JSON.parse(text) as { errors?: string[]; message?: string };
+                        const detail = parsed.errors?.join(' ') || parsed.message || fallback;
+                        this.messageService.add({ severity: 'error', summary, detail, life: 5000 });
+                    } catch {
+                        this.messageService.add({ severity: 'error', summary, detail: fallback, life: 5000 });
+                    }
+                })
+                .catch(() => this.messageService.add({ severity: 'error', summary, detail: fallback, life: 5000 }));
+            return;
+        }
+
+        this.messageService.add({ severity: 'error', summary, detail: fallback, life: 5000 });
     }
 
     private applyLookups(lookups: OpportunityLookupBundle): void {
