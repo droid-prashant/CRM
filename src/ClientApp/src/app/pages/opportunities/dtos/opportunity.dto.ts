@@ -49,3 +49,30 @@ export interface CreateOpportunityActivityRequest {
     activityDate?: string;
     followUpDate?: string;
 }
+
+export interface UploadOpportunityCommercialDocumentRequest {
+    documentType: 'Agreement' | 'PurchaseOrder';
+    remarks?: string;
+    commercialDocument: File;
+}
+
+export interface SaveOpportunityCommercialBreakdownRequest {
+    currencyId: string;
+    finalPayableAmount: number;
+    agreementDocumentId?: string;
+    agreementDate?: string;
+    agreementExpiryDate?: string;
+    purchaseOrderDocumentId?: string;
+    purchaseOrderDate?: string;
+    amcApplicable: boolean;
+    amcAmount?: number;
+    amcStartDate?: string;
+    amcRenewalDate?: string;
+    amcExpiryDate?: string;
+    subscriptionApplicable: boolean;
+    subscriptionAmount?: number;
+    subscriptionBillingFrequency?: string;
+    subscriptionStartDate?: string;
+    nextSubscriptionBillingDate?: string;
+    remarks?: string;
+}

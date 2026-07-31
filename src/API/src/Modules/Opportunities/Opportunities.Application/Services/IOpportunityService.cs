@@ -14,6 +14,13 @@ namespace Opportunities.Application.Services
         Task<OpportunityResult> CloseAsWonAsync(Guid id, CloseOpportunityRequest request, CancellationToken cancellationToken);
         Task<OpportunityResult> CloseAsLostAsync(Guid id, CloseOpportunityRequest request, CancellationToken cancellationToken);
         Task<OpportunityDocumentViewModel?> GetProposalDocumentAsync(Guid id, CancellationToken cancellationToken);
+        Task<List<OpportunityCommercialDocumentViewModel>?> GetCommercialDocumentsAsync(Guid id, CancellationToken cancellationToken);
+        Task<OpportunityCommercialDocumentViewModel?> GetCommercialDocumentAsync(Guid id, Guid documentId, CancellationToken cancellationToken);
+        Task<OpportunityCommercialDocumentResult> ValidateCommercialDocumentUploadAsync(Guid id, UploadOpportunityCommercialDocumentRequest request, CancellationToken cancellationToken);
+        Task<OpportunityCommercialDocumentResult> UploadCommercialDocumentAsync(Guid id, UploadOpportunityCommercialDocumentRequest request, CancellationToken cancellationToken);
+        Task<OpportunityCommercialDocumentResult> DeleteCommercialDocumentAsync(Guid id, Guid documentId, CancellationToken cancellationToken);
+        Task<OpportunityCommercialBreakdownQueryResult> GetCommercialBreakdownAsync(Guid id, CancellationToken cancellationToken);
+        Task<OpportunityCommercialBreakdownResult> SaveCommercialBreakdownAsync(Guid id, SaveOpportunityCommercialBreakdownRequest request, CancellationToken cancellationToken);
         Task<List<OpportunityStageHistoryViewModel>?> GetStageHistoryAsync(Guid id, CancellationToken cancellationToken);
         Task<List<OpportunityActivityViewModel>?> GetActivitiesAsync(Guid id, CancellationToken cancellationToken);
         Task<OpportunityActivityResult> CreateActivityAsync(Guid id, CreateOpportunityActivityRequest request, CancellationToken cancellationToken);

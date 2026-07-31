@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { forkJoin } from 'rxjs';
-import { MessageService } from 'primeng/api';
+import { forkJoin, merge, Subscription } from 'rxjs';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DatePicker, DatePickerModule } from 'primeng/datepicker';
 import { DialogModule } from 'primeng/dialog';
 import { InputNumberModule } from 'primeng/inputnumber';
@@ -14,7 +15,7 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { AuthService } from '@/core/auth/auth.service';
 import { Permissions } from '@/core/auth/permissions';
-import { CreateOpportunityActivityRequest, CreateOpportunityRequest, OpportunityListQuery, UpdateOpportunityRequest } from '../../dtos/opportunity.dto';
+import { CreateOpportunityActivityRequest, CreateOpportunityRequest, OpportunityListQuery, SaveOpportunityCommercialBreakdownRequest, UpdateOpportunityRequest } from '../../dtos/opportunity.dto';
 import {
     ClientLookupViewModel,
     ContactLookupViewModel,
@@ -22,6 +23,8 @@ import {
     LeadLookupViewModel,
     LookupViewModel,
     OpportunityActivityViewModel,
+    OpportunityCommercialBreakdownViewModel,
+    OpportunityCommercialDocumentViewModel,
     OpportunityListItemViewModel,
     OpportunityLookupBundle,
     OpportunityPipelineStageViewModel,
@@ -35,14 +38,17 @@ import { NotificationApiService } from '../../../notifications/services/notifica
 @Component({
     selector: 'app-opportunity-list',
     standalone: true,
-    imports: [ButtonModule, CommonModule, DatePickerModule, DialogModule, InputNumberModule, InputTextModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, ToastModule],
+    imports: [ButtonModule, CommonModule, ConfirmDialogModule, DatePickerModule, DialogModule, InputNumberModule, InputTextModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, ToastModule],
     templateUrl: './opportunity-list.html',
-    providers: [MessageService]
+    styleUrls: ['./opportunity-list.scss'],
+    providers: [ConfirmationService, MessageService]
 })
-export class OpportunityList implements OnInit {
+export class OpportunityList implements OnInit, OnDestroy {
     private readonly proposalSentStageName = 'proposal sent';
     private readonly maxProposalDocumentBytes = 10 * 1024 * 1024;
+    private readonly maxCommercialDocumentBytes = 10 * 1024 * 1024;
     private readonly allowedProposalDocumentExtensions = new Set(['.pdf', '.doc', '.docx']);
+    private readonly allowedCommercialDocumentExtensions = new Set(['.pdf', '.doc', '.docx']);
 
     opportunities: OpportunityListItemViewModel[] = [];
     pipelineStages: OpportunityPipelineStageViewModel[] = [];
@@ -61,6 +67,16 @@ export class OpportunityList implements OnInit {
         { label: 'Meeting', value: 'Meeting' },
         { label: 'Follow-up', value: 'FollowUp' }
     ];
+    commercialDocumentTypes = [
+        { label: 'Agreement', value: 'Agreement' },
+        { label: 'Purchase Order', value: 'PurchaseOrder' }
+    ];
+    subscriptionBillingFrequencies = [
+        { label: 'Monthly', value: 'Monthly' },
+        { label: 'Quarterly', value: 'Quarterly' },
+        { label: 'Semi Annual', value: 'SemiAnnual' },
+        { label: 'Annual', value: 'Annual' }
+    ];
 
     viewMode: 'pipeline' | 'list' = 'pipeline';
     isLoading = true;
@@ -70,6 +86,7 @@ export class OpportunityList implements OnInit {
     closeDialog = false;
     activityDialog = false;
     stageChangeDialog = false;
+    commercialDialog = false;
     closingMode: 'won' | 'lost' = 'won';
     canCreate = false;
     canEdit = false;
@@ -101,6 +118,7 @@ export class OpportunityList implements OnInit {
     sortDirection: 'asc' | 'desc' = 'desc';
 
     private readonly fb = inject(FormBuilder);
+    private readonly subscriptions = new Subscription();
 
     filterForm = this.fb.group({
         searchTerm: [''],
@@ -151,10 +169,37 @@ export class OpportunityList implements OnInit {
         note: ['']
     });
 
+    commercialUploadForm = this.fb.group({
+        documentType: ['Agreement' as 'Agreement' | 'PurchaseOrder', Validators.required],
+        remarks: ['', Validators.maxLength(1000)]
+    });
+
+    commercialForm = this.fb.group({
+        currencyId: ['', Validators.required],
+        finalPayableAmount: [0, [Validators.required, Validators.min(0)]],
+        agreementDocumentId: [''],
+        agreementDate: [''],
+        agreementExpiryDate: [''],
+        purchaseOrderDocumentId: [''],
+        purchaseOrderDate: [''],
+        amcApplicable: [false],
+        amcAmount: [0],
+        amcStartDate: [''],
+        amcRenewalDate: [''],
+        amcExpiryDate: [''],
+        subscriptionApplicable: [false],
+        subscriptionAmount: [0],
+        subscriptionBillingFrequency: [''],
+        subscriptionStartDate: [''],
+        nextSubscriptionBillingDate: [''],
+        remarks: ['', Validators.maxLength(1000)]
+    });
+
     constructor(
         private readonly opportunityApiService: OpportunityApiService,
         private readonly notificationApiService: NotificationApiService,
         private readonly messageService: MessageService,
+        private readonly confirmationService: ConfirmationService,
         private readonly authService: AuthService
     ) {}
 
@@ -162,7 +207,12 @@ export class OpportunityList implements OnInit {
         this.canCreate = this.authService.hasPermission(Permissions.opportunities.create);
         this.canEdit = this.authService.hasPermission(Permissions.opportunities.edit);
         this.canApprove = this.authService.hasPermission(Permissions.opportunities.approve);
+        this.registerCommercialFormHandlers();
         this.loadPage();
+    }
+
+    ngOnDestroy(): void {
+        this.subscriptions.unsubscribe();
     }
 
     setViewMode(mode: 'pipeline' | 'list'): void {
@@ -238,6 +288,19 @@ export class OpportunityList implements OnInit {
                 this.messageService.add({ severity: 'error', summary: 'Unable to load timeline', detail: 'Activity and stage history could not be loaded.', life: 5000 });
             }
         });
+    }
+
+    openCommercialDialog(opportunity: OpportunityListItemViewModel): void {
+        this.selectedOpportunity = opportunity;
+        this.commercialDialog = true;
+        this.commercialDocuments = [];
+        this.commercialBreakdown = undefined;
+        this.commercialError = '';
+        this.selectedCommercialDocument = undefined;
+        this.commercialDocumentError = '';
+        this.commercialUploadForm.reset({ documentType: 'Agreement', remarks: '' });
+        this.resetCommercialForm(opportunity);
+        this.loadCommercialFinalization(opportunity.id);
     }
 
     onClientChange(clientId: string): void {
@@ -780,14 +843,6 @@ export class OpportunityList implements OnInit {
         return this.stages.filter((stage) => !stage.isFinal && (stage.sequence ?? 0) > opportunity.stageSequence);
     }
 
-    get pipelineGridTemplate(): string {
-        return `repeat(${Math.max(this.pipelineStages.length, 1)}, minmax(14rem, 1fr))`;
-    }
-
-    get pipelineMinWidth(): string {
-        return `${Math.max(this.pipelineStages.length, 1) * 16}rem`;
-    }
-
     showCreateError(controlName: string, errorName?: string): boolean {
         const control = this.opportunityForm.get(controlName);
         if (!control || !(control.touched || control.dirty)) {
@@ -879,6 +934,29 @@ export class OpportunityList implements OnInit {
         });
     }
 
+    private loadCommercialFinalization(opportunityId: string): void {
+        this.isLoadingCommercial = true;
+        forkJoin({
+            documents: this.opportunityApiService.getCommercialDocuments(opportunityId),
+            breakdown: this.opportunityApiService.getCommercialBreakdown(opportunityId)
+        }).subscribe({
+            next: (result) => {
+                this.commercialDocuments = result.documents;
+                this.commercialBreakdown = result.breakdown;
+                if (result.breakdown) {
+                    this.patchCommercialForm(result.breakdown);
+                } else if (this.selectedOpportunity) {
+                    this.resetCommercialForm(this.selectedOpportunity);
+                }
+                this.isLoadingCommercial = false;
+            },
+            error: () => {
+                this.commercialError = 'Commercial finalization details could not be loaded.';
+                this.isLoadingCommercial = false;
+            }
+        });
+    }
+
     private applyLookups(lookups: OpportunityLookupBundle): void {
         this.clients = lookups.clients;
         this.allContacts = lookups.contacts;
@@ -954,6 +1032,146 @@ export class OpportunityList implements OnInit {
         this.proposalDocumentError = '';
     }
 
+    private resetCommercialForm(opportunity: OpportunityListItemViewModel): void {
+        this.commercialForm.reset({
+            currencyId: opportunity.currencyId,
+            finalPayableAmount: opportunity.finalAmount ?? opportunity.estimatedValue ?? 0,
+            agreementDocumentId: '',
+            agreementDate: '',
+            agreementExpiryDate: '',
+            purchaseOrderDocumentId: '',
+            purchaseOrderDate: '',
+            amcApplicable: false,
+            amcAmount: 0,
+            amcStartDate: '',
+            amcRenewalDate: '',
+            amcExpiryDate: '',
+            subscriptionApplicable: false,
+            subscriptionAmount: 0,
+            subscriptionBillingFrequency: '',
+            subscriptionStartDate: '',
+            nextSubscriptionBillingDate: '',
+            remarks: ''
+        });
+    }
+
+    private patchCommercialForm(breakdown: OpportunityCommercialBreakdownViewModel): void {
+        this.commercialForm.reset({
+            currencyId: breakdown.currencyId,
+            finalPayableAmount: breakdown.finalPayableAmount,
+            agreementDocumentId: breakdown.agreementDocumentId ?? '',
+            agreementDate: this.formatDateInput(breakdown.agreementDate),
+            agreementExpiryDate: this.formatDateInput(breakdown.agreementExpiryDate),
+            purchaseOrderDocumentId: breakdown.purchaseOrderDocumentId ?? '',
+            purchaseOrderDate: this.formatDateInput(breakdown.purchaseOrderDate),
+            amcApplicable: breakdown.amcApplicable,
+            amcAmount: breakdown.amcAmount ?? 0,
+            amcStartDate: this.formatDateInput(breakdown.amcStartDate),
+            amcRenewalDate: this.formatDateInput(breakdown.amcRenewalDate),
+            amcExpiryDate: this.formatDateInput(breakdown.amcExpiryDate),
+            subscriptionApplicable: breakdown.subscriptionApplicable,
+            subscriptionAmount: breakdown.subscriptionAmount ?? 0,
+            subscriptionBillingFrequency: breakdown.subscriptionBillingFrequency ?? '',
+            subscriptionStartDate: this.formatDateInput(breakdown.subscriptionStartDate),
+            nextSubscriptionBillingDate: this.formatDateInput(breakdown.nextSubscriptionBillingDate),
+            remarks: breakdown.remarks ?? ''
+        });
+    }
+
+    private clearDeletedCommercialDocumentSelection(commercialDocument: OpportunityCommercialDocumentViewModel): void {
+        if (commercialDocument.documentType === 'Agreement' && this.commercialForm.controls.agreementDocumentId.value === commercialDocument.id) {
+            this.commercialForm.patchValue({ agreementDocumentId: '', agreementDate: '', agreementExpiryDate: '' });
+        }
+
+        if (commercialDocument.documentType === 'PurchaseOrder' && this.commercialForm.controls.purchaseOrderDocumentId.value === commercialDocument.id) {
+            this.commercialForm.patchValue({ purchaseOrderDocumentId: '', purchaseOrderDate: '' });
+        }
+    }
+
+    private registerCommercialFormHandlers(): void {
+        const controls = this.commercialForm.controls;
+        this.subscriptions.add(
+            merge(
+                controls.subscriptionApplicable.valueChanges,
+                controls.subscriptionBillingFrequency.valueChanges,
+                controls.subscriptionStartDate.valueChanges
+            ).subscribe(() => this.updateNextSubscriptionBillingDate())
+        );
+    }
+
+    private updateNextSubscriptionBillingDate(): void {
+        const controls = this.commercialForm.controls;
+        if (!controls.subscriptionApplicable.value) {
+            if (controls.nextSubscriptionBillingDate.value) {
+                controls.nextSubscriptionBillingDate.patchValue('', { emitEvent: false });
+            }
+            return;
+        }
+
+        const nextBillingDate = this.calculateNextSubscriptionBillingDate(
+            controls.subscriptionStartDate.value,
+            controls.subscriptionBillingFrequency.value
+        );
+
+        if (controls.nextSubscriptionBillingDate.value !== nextBillingDate) {
+            controls.nextSubscriptionBillingDate.patchValue(nextBillingDate, { emitEvent: false });
+        }
+    }
+
+    private buildCommercialBreakdownRequest(): SaveOpportunityCommercialBreakdownRequest {
+        const value = this.commercialForm.getRawValue();
+        return {
+            currencyId: value.currencyId ?? '',
+            finalPayableAmount: value.finalPayableAmount ?? 0,
+            agreementDocumentId: value.agreementDocumentId || undefined,
+            agreementDate: this.toIsoDate(value.agreementDate),
+            agreementExpiryDate: this.toIsoDate(value.agreementExpiryDate),
+            purchaseOrderDocumentId: value.purchaseOrderDocumentId || undefined,
+            purchaseOrderDate: this.toIsoDate(value.purchaseOrderDate),
+            amcApplicable: value.amcApplicable ?? false,
+            amcAmount: value.amcApplicable ? (value.amcAmount ?? 0) : undefined,
+            amcStartDate: value.amcApplicable ? this.toIsoDate(value.amcStartDate) : undefined,
+            amcRenewalDate: value.amcApplicable ? this.toIsoDate(value.amcRenewalDate) : undefined,
+            amcExpiryDate: value.amcApplicable ? this.toIsoDate(value.amcExpiryDate) : undefined,
+            subscriptionApplicable: value.subscriptionApplicable ?? false,
+            subscriptionAmount: value.subscriptionApplicable ? (value.subscriptionAmount ?? 0) : undefined,
+            subscriptionBillingFrequency: value.subscriptionApplicable ? value.subscriptionBillingFrequency || undefined : undefined,
+            subscriptionStartDate: value.subscriptionApplicable ? this.toIsoDate(value.subscriptionStartDate) : undefined,
+            nextSubscriptionBillingDate: undefined,
+            remarks: value.remarks?.trim() || undefined
+        };
+    }
+
+    private validateCommercialBreakdownRequest(request: SaveOpportunityCommercialBreakdownRequest): string[] {
+        const errors: string[] = [];
+
+        if (!this.hasCommercialDocument) {
+            errors.push('Upload an Agreement or PO document before saving commercial breakdown.');
+        }
+
+        if (!request.agreementDocumentId && !request.purchaseOrderDocumentId) {
+            errors.push('Select at least one Agreement or PO document reference.');
+        }
+
+        if (request.agreementDocumentId && (!request.agreementDate || !request.agreementExpiryDate)) {
+            errors.push('Agreement date and expiry date are required.');
+        }
+
+        if (request.purchaseOrderDocumentId && !request.purchaseOrderDate) {
+            errors.push('PO date is required.');
+        }
+
+        if (request.amcApplicable && (request.amcAmount == null || !request.amcStartDate || !request.amcRenewalDate || !request.amcExpiryDate)) {
+            errors.push('AMC amount, start date, renewal date, and expiry date are required.');
+        }
+
+        if (request.subscriptionApplicable && (request.subscriptionAmount == null || !request.subscriptionBillingFrequency || !request.subscriptionStartDate)) {
+            errors.push('Subscription amount, billing frequency, and start date are required.');
+        }
+
+        return errors;
+    }
+
     private isValidProposalDocument(file: File): boolean {
         const extension = this.fileExtension(file.name);
         if (!this.allowedProposalDocumentExtensions.has(extension)) {
@@ -970,6 +1188,22 @@ export class OpportunityList implements OnInit {
         return true;
     }
 
+    private isValidCommercialDocument(file: File): boolean {
+        const extension = this.fileExtension(file.name);
+        if (!this.allowedCommercialDocumentExtensions.has(extension)) {
+            this.commercialDocumentError = 'Agreement or PO document must be a PDF, DOC, or DOCX file.';
+            return false;
+        }
+
+        if (file.size > this.maxCommercialDocumentBytes) {
+            this.commercialDocumentError = 'Agreement or PO document must be 10 MB or smaller.';
+            return false;
+        }
+
+        this.commercialDocumentError = '';
+        return true;
+    }
+
     private fileExtension(fileName: string): string {
         const index = fileName.lastIndexOf('.');
         return index >= 0 ? fileName.slice(index).toLowerCase() : '';
@@ -977,5 +1211,58 @@ export class OpportunityList implements OnInit {
 
     private normalizeStageName(value?: string): string {
         return (value ?? '').trim().toLowerCase();
+    }
+
+    private formatDateInput(value?: string): string {
+        return value ? new Date(value).toISOString().slice(0, 10) : '';
+    }
+
+    private toIsoDate(value?: string | null): string | undefined {
+        return value ? new Date(value).toISOString() : undefined;
+    }
+
+    private calculateNextSubscriptionBillingDate(startDate?: string | null, frequency?: string | null): string {
+        if (!startDate || !frequency) {
+            return '';
+        }
+
+        const months = this.billingFrequencyMonths(frequency);
+        if (!months) {
+            return '';
+        }
+
+        const parsedDate = this.parseDateOnly(startDate);
+        if (!parsedDate) {
+            return '';
+        }
+
+        const target = new Date(Date.UTC(parsedDate.getUTCFullYear(), parsedDate.getUTCMonth() + months, 1));
+        const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+        target.setUTCDate(Math.min(parsedDate.getUTCDate(), lastDay));
+        return target.toISOString().slice(0, 10);
+    }
+
+    private billingFrequencyMonths(frequency: string): number {
+        switch (frequency) {
+            case 'Monthly':
+                return 1;
+            case 'Quarterly':
+                return 3;
+            case 'SemiAnnual':
+                return 6;
+            case 'Annual':
+                return 12;
+            default:
+                return 0;
+        }
+    }
+
+    private parseDateOnly(value: string): Date | undefined {
+        const parts = value.split('-').map(Number);
+        if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
+            return undefined;
+        }
+
+        return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
     }
 }
