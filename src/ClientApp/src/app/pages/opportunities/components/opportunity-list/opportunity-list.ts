@@ -444,8 +444,6 @@ export class OpportunityList implements OnInit, OnDestroy {
             return;
         }
 
-        const opportunity = this.pendingStageOpportunity;
-        const value = this.stageChangeForm.getRawValue();
 
         console.log('Stage form value:', value);
 console.log('Estimated value:', value.estimatedValue);
