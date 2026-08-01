@@ -12,7 +12,8 @@ namespace Opportunities.Domain.Entities
         public DateTime? AgreementExpiryDate { get; set; }
         public Guid? PurchaseOrderDocumentId { get; set; }
         public DateTime? PurchaseOrderDate { get; set; }
-        public bool AmcApplicable { get; set; }
+        public bool LicenseApplicable { get; set; }
+        public decimal? LicenseAmount { get; set; }
         public decimal? AmcAmount { get; set; }
         public DateTime? AmcStartDate { get; set; }
         public DateTime? AmcRenewalDate { get; set; }
@@ -22,6 +23,7 @@ namespace Opportunities.Domain.Entities
         public string? SubscriptionBillingFrequency { get; set; }
         public DateTime? SubscriptionStartDate { get; set; }
         public DateTime? NextSubscriptionBillingDate { get; set; }
+        public bool IsFinal { get; set; }
         public string? Remarks { get; set; }
 
         public Opportunity? Opportunity { get; set; }

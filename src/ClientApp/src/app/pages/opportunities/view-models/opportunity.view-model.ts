@@ -191,7 +191,8 @@ export interface OpportunityCommercialBreakdownViewModel {
     purchaseOrderDocumentId?: string;
     purchaseOrderDocumentFileName?: string;
     purchaseOrderDate?: string;
-    amcApplicable: boolean;
+    licenseApplicable: boolean;
+    licenseAmount?: number;
     amcAmount?: number;
     amcStartDate?: string;
     amcRenewalDate?: string;
@@ -201,6 +202,7 @@ export interface OpportunityCommercialBreakdownViewModel {
     subscriptionBillingFrequency?: string;
     subscriptionStartDate?: string;
     nextSubscriptionBillingDate?: string;
+    isFinal: boolean;
     remarks?: string;
     updatedByUserId: string;
     updatedByUserName?: string;

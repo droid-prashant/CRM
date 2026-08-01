@@ -449,16 +449,18 @@ namespace Opportunities.Infrastructure.Repositories
             breakdown.AgreementExpiryDate = request.AgreementDocumentId.HasValue ? ToUtc(request.AgreementExpiryDate) : null;
             breakdown.PurchaseOrderDocumentId = request.PurchaseOrderDocumentId;
             breakdown.PurchaseOrderDate = request.PurchaseOrderDocumentId.HasValue ? ToUtc(request.PurchaseOrderDate) : null;
-            breakdown.AmcApplicable = request.AmcApplicable;
-            breakdown.AmcAmount = request.AmcApplicable ? request.AmcAmount : null;
-            breakdown.AmcStartDate = request.AmcApplicable ? ToUtc(request.AmcStartDate) : null;
-            breakdown.AmcRenewalDate = request.AmcApplicable ? ToUtc(request.AmcRenewalDate) : null;
-            breakdown.AmcExpiryDate = request.AmcApplicable ? ToUtc(request.AmcExpiryDate) : null;
+            breakdown.LicenseApplicable = request.LicenseApplicable;
+            breakdown.LicenseAmount = request.LicenseApplicable ? request.LicenseAmount : null;
+            breakdown.AmcAmount = request.LicenseApplicable ? request.AmcAmount : null;
+            breakdown.AmcStartDate = request.LicenseApplicable ? ToUtc(request.AmcStartDate) : null;
+            breakdown.AmcRenewalDate = request.LicenseApplicable ? ToUtc(request.AmcRenewalDate) : null;
+            breakdown.AmcExpiryDate = request.LicenseApplicable ? ToUtc(request.AmcExpiryDate) : null;
             breakdown.SubscriptionApplicable = request.SubscriptionApplicable;
             breakdown.SubscriptionAmount = request.SubscriptionApplicable ? request.SubscriptionAmount : null;
             breakdown.SubscriptionBillingFrequency = request.SubscriptionApplicable ? Clean(request.SubscriptionBillingFrequency) : null;
             breakdown.SubscriptionStartDate = request.SubscriptionApplicable ? ToUtc(request.SubscriptionStartDate) : null;
             breakdown.NextSubscriptionBillingDate = request.SubscriptionApplicable ? ToUtc(request.NextSubscriptionBillingDate) : null;
+            breakdown.IsFinal = request.IsFinal;
             breakdown.Remarks = Clean(request.Remarks);
 
             var activitySubject = isCreated ? "Commercial breakdown created." : "Commercial breakdown updated.";
@@ -928,7 +930,8 @@ namespace Opportunities.Infrastructure.Repositories
                 PurchaseOrderDocumentId = breakdown.PurchaseOrderDocumentId,
                 PurchaseOrderDocumentFileName = breakdown.PurchaseOrderDocument?.FileName,
                 PurchaseOrderDate = breakdown.PurchaseOrderDate,
-                AmcApplicable = breakdown.AmcApplicable,
+                LicenseApplicable = breakdown.LicenseApplicable,
+                LicenseAmount = breakdown.LicenseAmount,
                 AmcAmount = breakdown.AmcAmount,
                 AmcStartDate = breakdown.AmcStartDate,
                 AmcRenewalDate = breakdown.AmcRenewalDate,
@@ -938,6 +941,7 @@ namespace Opportunities.Infrastructure.Repositories
                 SubscriptionBillingFrequency = breakdown.SubscriptionBillingFrequency,
                 SubscriptionStartDate = breakdown.SubscriptionStartDate,
                 NextSubscriptionBillingDate = breakdown.NextSubscriptionBillingDate,
+                IsFinal = breakdown.IsFinal,
                 Remarks = breakdown.Remarks,
                 UpdatedByUserId = updatedBy,
                 UpdatedByUserName = await GetUserFullNameAsync(updatedBy),
@@ -1180,8 +1184,9 @@ namespace Opportunities.Infrastructure.Repositories
                 parts.Add($"PO Date: {FormatDate(breakdown.PurchaseOrderDate)}");
             }
 
-            if (breakdown.AmcApplicable)
+            if (breakdown.LicenseApplicable)
             {
+                parts.Add($"License Amount: {breakdown.LicenseAmount:0.##}");
                 parts.Add($"AMC Amount: {breakdown.AmcAmount:0.##}");
                 parts.Add($"AMC Renewal: {FormatDate(breakdown.AmcRenewalDate)}");
                 parts.Add($"AMC Expiry: {FormatDate(breakdown.AmcExpiryDate)}");

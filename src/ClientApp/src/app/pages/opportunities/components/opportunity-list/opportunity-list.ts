@@ -126,6 +126,7 @@ export class OpportunityList implements OnInit, OnDestroy {
 
     private readonly fb = inject(FormBuilder);
     private readonly subscriptions = new Subscription();
+    private isSyncingCommercialForm = false;
 
     filterForm = this.fb.group({
         searchTerm: [''],
@@ -184,12 +185,14 @@ export class OpportunityList implements OnInit, OnDestroy {
     commercialForm = this.fb.group({
         currencyId: ['', Validators.required],
         finalPayableAmount: [0, [Validators.required, Validators.min(0)]],
+        isFinal: [false],
         agreementDocumentId: [''],
         agreementDate: [''],
         agreementExpiryDate: [''],
         purchaseOrderDocumentId: [''],
         purchaseOrderDate: [''],
-        amcApplicable: [false],
+        licenseApplicable: [false],
+        licenseAmount: [0],
         amcAmount: [0],
         amcStartDate: [''],
         amcRenewalDate: [''],
@@ -881,8 +884,8 @@ export class OpportunityList implements OnInit, OnDestroy {
 
         const events = [
             { label: 'Agreement expiry', eventType: 'AgreementExpiry', dueDate: breakdown.agreementExpiryDate },
-            { label: 'AMC renewal', eventType: 'AmcRenewal', dueDate: breakdown.amcApplicable ? breakdown.amcRenewalDate : undefined },
-            { label: 'AMC expiry', eventType: 'AmcExpiry', dueDate: breakdown.amcApplicable ? breakdown.amcExpiryDate : undefined },
+            { label: 'AMC renewal', eventType: 'AmcRenewal', dueDate: breakdown.licenseApplicable ? breakdown.amcRenewalDate : undefined },
+            { label: 'AMC expiry', eventType: 'AmcExpiry', dueDate: breakdown.licenseApplicable ? breakdown.amcExpiryDate : undefined },
             { label: 'Subscription billing', eventType: 'SubscriptionBilling', dueDate: breakdown.subscriptionApplicable ? breakdown.nextSubscriptionBillingDate : undefined }
         ];
 
@@ -1182,48 +1185,56 @@ export class OpportunityList implements OnInit, OnDestroy {
     }
 
     private resetCommercialForm(opportunity: OpportunityListItemViewModel): void {
-        this.commercialForm.reset({
-            currencyId: opportunity.currencyId,
-            finalPayableAmount: opportunity.finalAmount ?? opportunity.estimatedValue ?? 0,
-            agreementDocumentId: '',
-            agreementDate: '',
-            agreementExpiryDate: '',
-            purchaseOrderDocumentId: '',
-            purchaseOrderDate: '',
-            amcApplicable: false,
-            amcAmount: 0,
-            amcStartDate: '',
-            amcRenewalDate: '',
-            amcExpiryDate: '',
-            subscriptionApplicable: false,
-            subscriptionAmount: 0,
-            subscriptionBillingFrequency: '',
-            subscriptionStartDate: '',
-            nextSubscriptionBillingDate: '',
-            remarks: ''
+        this.withCommercialFormSync(() => {
+            this.commercialForm.reset({
+                currencyId: opportunity.currencyId,
+                finalPayableAmount: opportunity.finalAmount ?? opportunity.estimatedValue ?? 0,
+                isFinal: false,
+                agreementDocumentId: '',
+                agreementDate: '',
+                agreementExpiryDate: '',
+                purchaseOrderDocumentId: '',
+                purchaseOrderDate: '',
+                licenseApplicable: false,
+                licenseAmount: 0,
+                amcAmount: 0,
+                amcStartDate: '',
+                amcRenewalDate: '',
+                amcExpiryDate: '',
+                subscriptionApplicable: false,
+                subscriptionAmount: 0,
+                subscriptionBillingFrequency: '',
+                subscriptionStartDate: '',
+                nextSubscriptionBillingDate: '',
+                remarks: ''
+            });
         });
     }
 
     private patchCommercialForm(breakdown: OpportunityCommercialBreakdownViewModel): void {
-        this.commercialForm.reset({
-            currencyId: breakdown.currencyId,
-            finalPayableAmount: breakdown.finalPayableAmount,
-            agreementDocumentId: breakdown.agreementDocumentId ?? '',
-            agreementDate: this.formatDateInput(breakdown.agreementDate),
-            agreementExpiryDate: this.formatDateInput(breakdown.agreementExpiryDate),
-            purchaseOrderDocumentId: breakdown.purchaseOrderDocumentId ?? '',
-            purchaseOrderDate: this.formatDateInput(breakdown.purchaseOrderDate),
-            amcApplicable: breakdown.amcApplicable,
-            amcAmount: breakdown.amcAmount ?? 0,
-            amcStartDate: this.formatDateInput(breakdown.amcStartDate),
-            amcRenewalDate: this.formatDateInput(breakdown.amcRenewalDate),
-            amcExpiryDate: this.formatDateInput(breakdown.amcExpiryDate),
-            subscriptionApplicable: breakdown.subscriptionApplicable,
-            subscriptionAmount: breakdown.subscriptionAmount ?? 0,
-            subscriptionBillingFrequency: breakdown.subscriptionBillingFrequency ?? '',
-            subscriptionStartDate: this.formatDateInput(breakdown.subscriptionStartDate),
-            nextSubscriptionBillingDate: this.formatDateInput(breakdown.nextSubscriptionBillingDate),
-            remarks: breakdown.remarks ?? ''
+        this.withCommercialFormSync(() => {
+            this.commercialForm.reset({
+                currencyId: breakdown.currencyId,
+                finalPayableAmount: breakdown.finalPayableAmount,
+                isFinal: breakdown.isFinal,
+                agreementDocumentId: breakdown.agreementDocumentId ?? '',
+                agreementDate: this.formatDateInput(breakdown.agreementDate),
+                agreementExpiryDate: this.formatDateInput(breakdown.agreementExpiryDate),
+                purchaseOrderDocumentId: breakdown.purchaseOrderDocumentId ?? '',
+                purchaseOrderDate: this.formatDateInput(breakdown.purchaseOrderDate),
+                licenseApplicable: breakdown.licenseApplicable,
+                licenseAmount: breakdown.licenseAmount ?? 0,
+                amcAmount: breakdown.amcAmount ?? 0,
+                amcStartDate: this.formatDateInput(breakdown.amcStartDate),
+                amcRenewalDate: this.formatDateInput(breakdown.amcRenewalDate),
+                amcExpiryDate: this.formatDateInput(breakdown.amcExpiryDate),
+                subscriptionApplicable: breakdown.subscriptionApplicable,
+                subscriptionAmount: breakdown.subscriptionAmount ?? 0,
+                subscriptionBillingFrequency: breakdown.subscriptionBillingFrequency ?? '',
+                subscriptionStartDate: this.formatDateInput(breakdown.subscriptionStartDate),
+                nextSubscriptionBillingDate: this.formatDateInput(breakdown.nextSubscriptionBillingDate),
+                remarks: breakdown.remarks ?? ''
+            });
         });
     }
 
@@ -1239,6 +1250,13 @@ export class OpportunityList implements OnInit, OnDestroy {
 
     private registerCommercialFormHandlers(): void {
         const controls = this.commercialForm.controls;
+        this.subscriptions.add(controls.licenseApplicable.valueChanges.subscribe((selected) => this.onLicenseApplicableChanged(selected ?? false)));
+        this.subscriptions.add(controls.subscriptionApplicable.valueChanges.subscribe((selected) => this.onSubscriptionApplicableChanged(selected ?? false)));
+        this.subscriptions.add(controls.isFinal.valueChanges.subscribe(() => this.syncCommercialAmounts('mode')));
+        this.subscriptions.add(controls.finalPayableAmount.valueChanges.subscribe(() => this.syncCommercialAmounts('final')));
+        this.subscriptions.add(controls.licenseAmount.valueChanges.subscribe(() => this.syncCommercialAmounts('license')));
+        this.subscriptions.add(controls.amcAmount.valueChanges.subscribe(() => this.syncCommercialAmounts('amc')));
+        this.subscriptions.add(controls.subscriptionAmount.valueChanges.subscribe(() => this.syncCommercialAmounts('subscription')));
         this.subscriptions.add(
             merge(
                 controls.subscriptionApplicable.valueChanges,
@@ -1246,6 +1264,112 @@ export class OpportunityList implements OnInit, OnDestroy {
                 controls.subscriptionStartDate.valueChanges
             ).subscribe(() => this.updateNextSubscriptionBillingDate())
         );
+    }
+
+    private onLicenseApplicableChanged(selected: boolean): void {
+        if (this.isSyncingCommercialForm) {
+            return;
+        }
+
+        if (selected) {
+            this.withCommercialFormSync(() => {
+                this.commercialForm.patchValue(
+                    {
+                        subscriptionApplicable: false,
+                        subscriptionAmount: 0,
+                        subscriptionBillingFrequency: '',
+                        subscriptionStartDate: '',
+                        nextSubscriptionBillingDate: ''
+                    },
+                    { emitEvent: false }
+                );
+            });
+        }
+
+        this.syncCommercialAmounts('mode');
+    }
+
+    private onSubscriptionApplicableChanged(selected: boolean): void {
+        if (this.isSyncingCommercialForm) {
+            return;
+        }
+
+        if (selected) {
+            this.withCommercialFormSync(() => {
+                this.commercialForm.patchValue(
+                    {
+                        licenseApplicable: false,
+                        licenseAmount: 0,
+                        amcAmount: 0,
+                        amcStartDate: '',
+                        amcRenewalDate: '',
+                        amcExpiryDate: ''
+                    },
+                    { emitEvent: false }
+                );
+            });
+        }
+
+        this.syncCommercialAmounts('mode');
+    }
+
+    private syncCommercialAmounts(source: 'mode' | 'final' | 'license' | 'amc' | 'subscription'): void {
+        if (this.isSyncingCommercialForm) {
+            return;
+        }
+
+        this.withCommercialFormSync(() => {
+            const controls = this.commercialForm.controls;
+            const isFinal = controls.isFinal.value === true;
+            const licenseApplicable = controls.licenseApplicable.value === true;
+            const subscriptionApplicable = controls.subscriptionApplicable.value === true;
+            const finalPayableAmount = this.commercialAmount(controls.finalPayableAmount.value);
+            const licenseAmount = this.commercialAmount(controls.licenseAmount.value);
+            const amcAmount = this.commercialAmount(controls.amcAmount.value);
+            const subscriptionAmount = this.commercialAmount(controls.subscriptionAmount.value);
+
+            if (licenseApplicable) {
+                if (isFinal) {
+                    if (source === 'amc') {
+                        const nextAmcAmount = Math.min(amcAmount, finalPayableAmount);
+                        controls.amcAmount.patchValue(nextAmcAmount, { emitEvent: false });
+                        controls.licenseAmount.patchValue(this.roundCommercialAmount(finalPayableAmount - nextAmcAmount), { emitEvent: false });
+                    } else {
+                        const nextLicenseAmount = Math.min(licenseAmount, finalPayableAmount);
+                        controls.licenseAmount.patchValue(nextLicenseAmount, { emitEvent: false });
+                        controls.amcAmount.patchValue(this.roundCommercialAmount(finalPayableAmount - nextLicenseAmount), { emitEvent: false });
+                    }
+                } else {
+                    controls.finalPayableAmount.patchValue(this.roundCommercialAmount(licenseAmount + amcAmount), { emitEvent: false });
+                }
+                return;
+            }
+
+            if (subscriptionApplicable) {
+                if (isFinal) {
+                    controls.subscriptionAmount.patchValue(finalPayableAmount, { emitEvent: false });
+                } else {
+                    controls.finalPayableAmount.patchValue(subscriptionAmount, { emitEvent: false });
+                }
+            }
+        });
+    }
+
+    private withCommercialFormSync(action: () => void): void {
+        this.isSyncingCommercialForm = true;
+        try {
+            action();
+        } finally {
+            this.isSyncingCommercialForm = false;
+        }
+    }
+
+    private commercialAmount(value?: number | null): number {
+        return this.roundCommercialAmount(Math.max(Number(value ?? 0), 0));
+    }
+
+    private roundCommercialAmount(value: number): number {
+        return Math.round((value + Number.EPSILON) * 100) / 100;
     }
 
     private updateNextSubscriptionBillingDate(): void {
@@ -1271,19 +1395,21 @@ export class OpportunityList implements OnInit, OnDestroy {
         const value = this.commercialForm.getRawValue();
         return {
             currencyId: value.currencyId ?? '',
-            finalPayableAmount: value.finalPayableAmount ?? 0,
+            finalPayableAmount: this.commercialAmount(value.finalPayableAmount),
+            isFinal: value.isFinal ?? false,
             agreementDocumentId: value.agreementDocumentId || undefined,
             agreementDate: this.toIsoDate(value.agreementDate),
             agreementExpiryDate: this.toIsoDate(value.agreementExpiryDate),
             purchaseOrderDocumentId: value.purchaseOrderDocumentId || undefined,
             purchaseOrderDate: this.toIsoDate(value.purchaseOrderDate),
-            amcApplicable: value.amcApplicable ?? false,
-            amcAmount: value.amcApplicable ? (value.amcAmount ?? 0) : undefined,
-            amcStartDate: value.amcApplicable ? this.toIsoDate(value.amcStartDate) : undefined,
-            amcRenewalDate: value.amcApplicable ? this.toIsoDate(value.amcRenewalDate) : undefined,
-            amcExpiryDate: value.amcApplicable ? this.toIsoDate(value.amcExpiryDate) : undefined,
+            licenseApplicable: value.licenseApplicable ?? false,
+            licenseAmount: value.licenseApplicable ? this.commercialAmount(value.licenseAmount) : undefined,
+            amcAmount: value.licenseApplicable ? this.commercialAmount(value.amcAmount) : undefined,
+            amcStartDate: value.licenseApplicable ? this.toIsoDate(value.amcStartDate) : undefined,
+            amcRenewalDate: value.licenseApplicable ? this.toIsoDate(value.amcRenewalDate) : undefined,
+            amcExpiryDate: value.licenseApplicable ? this.toIsoDate(value.amcExpiryDate) : undefined,
             subscriptionApplicable: value.subscriptionApplicable ?? false,
-            subscriptionAmount: value.subscriptionApplicable ? (value.subscriptionAmount ?? 0) : undefined,
+            subscriptionAmount: value.subscriptionApplicable ? this.commercialAmount(value.subscriptionAmount) : undefined,
             subscriptionBillingFrequency: value.subscriptionApplicable ? value.subscriptionBillingFrequency || undefined : undefined,
             subscriptionStartDate: value.subscriptionApplicable ? this.toIsoDate(value.subscriptionStartDate) : undefined,
             nextSubscriptionBillingDate: undefined,
@@ -1310,11 +1436,19 @@ export class OpportunityList implements OnInit, OnDestroy {
             errors.push('PO date is required.');
         }
 
-        if (request.amcApplicable && (request.amcAmount == null || !request.amcStartDate || !request.amcRenewalDate || !request.amcExpiryDate)) {
-            errors.push('AMC amount, start date, renewal date, and expiry date are required.');
+        if (request.licenseApplicable && request.subscriptionApplicable) {
+            errors.push('Select either License Applicable or Subscription Applicable, not both.');
         }
 
-        if (request.subscriptionApplicable && (request.subscriptionAmount == null || !request.subscriptionBillingFrequency || !request.subscriptionStartDate)) {
+        if (!request.licenseApplicable && !request.subscriptionApplicable) {
+            errors.push('Select License Applicable or Subscription Applicable.');
+        }
+
+        if (request.licenseApplicable && (request.licenseAmount == null || request.licenseAmount <= 0 || request.amcAmount == null || request.amcAmount <= 0 || !request.amcStartDate || !request.amcRenewalDate || !request.amcExpiryDate)) {
+            errors.push('License amount, AMC amount, start date, renewal date, and expiry date are required.');
+        }
+
+        if (request.subscriptionApplicable && (request.subscriptionAmount == null || request.subscriptionAmount <= 0 || !request.subscriptionBillingFrequency || !request.subscriptionStartDate)) {
             errors.push('Subscription amount, billing frequency, and start date are required.');
         }
 

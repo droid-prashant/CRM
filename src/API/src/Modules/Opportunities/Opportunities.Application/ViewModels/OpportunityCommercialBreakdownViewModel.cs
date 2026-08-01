@@ -14,7 +14,8 @@ namespace Opportunities.Application.ViewModels
         public Guid? PurchaseOrderDocumentId { get; set; }
         public string? PurchaseOrderDocumentFileName { get; set; }
         public DateTime? PurchaseOrderDate { get; set; }
-        public bool AmcApplicable { get; set; }
+        public bool LicenseApplicable { get; set; }
+        public decimal? LicenseAmount { get; set; }
         public decimal? AmcAmount { get; set; }
         public DateTime? AmcStartDate { get; set; }
         public DateTime? AmcRenewalDate { get; set; }
@@ -24,6 +25,7 @@ namespace Opportunities.Application.ViewModels
         public string? SubscriptionBillingFrequency { get; set; }
         public DateTime? SubscriptionStartDate { get; set; }
         public DateTime? NextSubscriptionBillingDate { get; set; }
+        public bool IsFinal { get; set; }
         public string? Remarks { get; set; }
         public Guid UpdatedByUserId { get; set; }
         public string? UpdatedByUserName { get; set; }

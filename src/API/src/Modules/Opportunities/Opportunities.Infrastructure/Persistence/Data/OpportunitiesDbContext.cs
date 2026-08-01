@@ -124,6 +124,7 @@ namespace Opportunities.Infrastructure.Persistence.Data
             {
                 entity.ToTable("OpportunityCommercialBreakdowns", "leads");
                 entity.Property(x => x.FinalPayableAmount).HasPrecision(18, 2);
+                entity.Property(x => x.LicenseAmount).HasPrecision(18, 2);
                 entity.Property(x => x.AmcAmount).HasPrecision(18, 2);
                 entity.Property(x => x.SubscriptionAmount).HasPrecision(18, 2);
                 entity.Property(x => x.SubscriptionBillingFrequency).HasMaxLength(50);

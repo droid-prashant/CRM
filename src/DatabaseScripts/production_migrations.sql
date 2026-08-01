@@ -1833,4 +1833,40 @@ BEGIN
 END
 $migration$;
 
+-- -------------------------------------------------------------------------
+-- 20260802100000_LicenseCommercialBreakdown
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260802100000_LicenseCommercialBreakdown') THEN
+        RETURN;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'leads'
+            AND table_name = 'OpportunityCommercialBreakdowns'
+            AND column_name = 'AmcApplicable'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'leads'
+            AND table_name = 'OpportunityCommercialBreakdowns'
+            AND column_name = 'LicenseApplicable'
+    ) THEN
+        ALTER TABLE "leads"."OpportunityCommercialBreakdowns"
+            RENAME COLUMN "AmcApplicable" TO "LicenseApplicable";
+    END IF;
+
+    ALTER TABLE "leads"."OpportunityCommercialBreakdowns"
+        ADD COLUMN IF NOT EXISTS "LicenseAmount" numeric(18,2) NULL,
+        ADD COLUMN IF NOT EXISTS "IsFinal" boolean NOT NULL DEFAULT false;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260802100000_LicenseCommercialBreakdown', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
 COMMIT;
