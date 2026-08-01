@@ -444,9 +444,9 @@ export class OpportunityList implements OnInit, OnDestroy {
             return;
         }
 
+        const opportunity = this.pendingStageOpportunity;
+        const value = this.stageChangeForm.getRawValue();
 
-        console.log('Stage form value:', value);
-console.log('Estimated value:', value.estimatedValue);
         this.isSaving = true;
         this.opportunityApiService.changeStage(opportunity.id, { stageId: this.pendingStageId, remarks: value.remarks?.trim() || undefined,  estimatedValue: value.estimatedValue, proposalDocument: this.selectedProposalDocument }).subscribe({
             next: () => {
