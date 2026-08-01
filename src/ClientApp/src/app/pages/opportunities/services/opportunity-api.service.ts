@@ -48,6 +48,13 @@ export class OpportunityApiService {
         formData.append('stageId', request.stageId);
         formData.append('remarks', request.remarks ?? '');
 
+        if (request.estimatedValue !== undefined && request.estimatedValue !== null) {
+            formData.append(
+                'estimatedValue',
+                request.estimatedValue.toString()
+            );
+        }
+
         if (request.proposalDocument) {
             formData.append('proposalDocument', request.proposalDocument);
         }

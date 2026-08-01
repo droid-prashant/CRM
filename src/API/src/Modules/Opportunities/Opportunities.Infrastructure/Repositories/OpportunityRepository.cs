@@ -229,6 +229,10 @@ namespace Opportunities.Infrastructure.Repositories
             Guid? fromStageId = opportunity.StageId == Guid.Empty ? null : opportunity.StageId;
             opportunity.StageId = targetStage.Id;
             opportunity.Stage = targetStage.Name;
+            if (request.EstimatedValue.HasValue)
+            {
+                opportunity.EstimatedValue = request.EstimatedValue.Value;
+            }
 
             _dbContext.OpportunityStageHistories.Add(new OpportunityStageHistory
             {

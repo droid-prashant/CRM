@@ -95,7 +95,8 @@ namespace ERP.API.Controllers.Opportunities
             var request = new ChangeOpportunityStageRequest
             {
                 StageId = form.StageId,
-                Remarks = form.Remarks
+                Remarks = form.Remarks,
+                EstimatedValue = form.EstimatedValue
             };
 
             if (form.ProposalDocument != null)
@@ -569,6 +570,7 @@ namespace ERP.API.Controllers.Opportunities
     {
         public Guid StageId { get; set; }
         public string? Remarks { get; set; }
+        public decimal? EstimatedValue { get; set; }
         public IFormFile? ProposalDocument { get; set; }
     }
 

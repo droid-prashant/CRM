@@ -32,6 +32,7 @@ export interface UpdateOpportunityRequest {
 export interface ChangeOpportunityStageRequest {
     stageId: string;
     remarks?: string;
+    estimatedValue?: number | null;
     proposalDocument?: File;
 }
 
