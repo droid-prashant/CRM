@@ -166,7 +166,8 @@ export class OpportunityList implements OnInit, OnDestroy {
     });
 
     stageChangeForm = this.fb.group({
-        remarks: ['', Validators.maxLength(1000)]
+        remarks: ['', Validators.maxLength(1000)],
+        estimatedValue: [0, [Validators.required, Validators.min(0)]]
     });
 
     closeForm = this.fb.group({
@@ -421,7 +422,10 @@ export class OpportunityList implements OnInit, OnDestroy {
         this.pendingStageName = targetStage?.name ?? 'selected stage';
         this.selectedProposalDocument = undefined;
         this.proposalDocumentError = '';
-        this.stageChangeForm.reset({ remarks: '' });
+        this.stageChangeForm.reset({
+             remarks: '',
+             estimatedValue: opportunity.estimatedValue
+             });
         this.stageChangeDialog = true;
     }
 
@@ -442,8 +446,9 @@ export class OpportunityList implements OnInit, OnDestroy {
 
         const opportunity = this.pendingStageOpportunity;
         const value = this.stageChangeForm.getRawValue();
+
         this.isSaving = true;
-        this.opportunityApiService.changeStage(opportunity.id, { stageId: this.pendingStageId, remarks: value.remarks?.trim() || undefined, proposalDocument: this.selectedProposalDocument }).subscribe({
+        this.opportunityApiService.changeStage(opportunity.id, { stageId: this.pendingStageId, remarks: value.remarks?.trim() || undefined,  estimatedValue: value.estimatedValue, proposalDocument: this.selectedProposalDocument }).subscribe({
             next: () => {
                 this.stageChangeDialog = false;
                 this.clearPendingStageChange();
