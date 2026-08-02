@@ -13,10 +13,12 @@ export interface SelectOption {
     clientId?: string;
     canOwnProducts?: boolean;
     canSellInHouseProducts?: boolean;
+    dialingCode?: string;
 }
 
 export type DynamicFieldRule = (formValue: Record<string, unknown>, mode: 'create' | 'update') => boolean;
 export type DynamicFieldOptionFilter = (option: SelectOption, formValue: Record<string, unknown>, mode: 'create' | 'update') => boolean;
+export type DynamicFieldTextResolver = (formValue: Record<string, unknown>, mode: 'create' | 'update') => string;
 
 export interface DynamicField {
     key: string;
@@ -32,6 +34,7 @@ export interface DynamicField {
     colSpan?: number;
     section?: string;
     placeholder?: string;
+    inputPrefix?: string | DynamicFieldTextResolver;
     defaultValue?: unknown;
     visibleOn?: 'create' | 'update' | 'both';
     visibleWhen?: DynamicFieldRule;

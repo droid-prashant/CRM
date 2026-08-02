@@ -28,6 +28,12 @@ const partnerTypeOrder = new Map<string, number>([
     ['OTHER', 110]
 ]);
 
+const countryDialingCodes = new Map<string, string>([
+    ['NP', '+977'],
+    ['US', '+1'],
+    ['IN', '+91']
+]);
+
 @Component({
     selector: 'app-partner-list',
     standalone: true,
@@ -210,6 +216,7 @@ export class PartnerList implements OnInit {
             label: value.name,
             value: value.id,
             code: value.code,
+            dialingCode: value.code ? countryDialingCodes.get(value.code.toUpperCase()) : undefined,
             partnerTypeCode: value.partnerTypeCode,
             canOwnProducts: value.canOwnProducts,
             canSellInHouseProducts: value.canSellInHouseProducts

@@ -386,6 +386,16 @@ export class Crud implements OnChanges, OnDestroy {
         return `${field.label} is invalid`;
     }
 
+    fieldInputPrefix(field: DynamicField): string {
+        if (!field.inputPrefix) {
+            return '';
+        }
+
+        return typeof field.inputPrefix === 'function'
+            ? field.inputPrefix(this.currentFormValue(), this.mode).trim()
+            : field.inputPrefix.trim();
+    }
+
     private buildForm(): FormGroup {
         const group: Record<string, unknown[]> = {};
 
