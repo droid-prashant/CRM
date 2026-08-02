@@ -715,9 +715,10 @@ namespace Opportunities.Infrastructure.Repositories
                 .Select(x => x.FullName)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            var leadNumber = opportunity.LeadId.HasValue
-                ? await _dbContext.Leads.Where(x => x.Id == opportunity.LeadId.Value).Select(x => x.LeadNumber).FirstOrDefaultAsync(cancellationToken)
-                : null;
+            var leadNumber = await _dbContext.Leads
+                .Where(x => x.Id == opportunity.LeadId)
+                .Select(x => x.LeadNumber)
+                .FirstOrDefaultAsync(cancellationToken);
 
             var stage = opportunity.CurrentStage ?? await _dbContext.OpportunityStages.AsNoTracking().FirstOrDefaultAsync(x => x.Id == opportunity.StageId, cancellationToken);
             var proposalDocument = await GetLatestProposalDocumentQuery(opportunity.Id).FirstOrDefaultAsync(cancellationToken);
@@ -818,7 +819,7 @@ namespace Opportunities.Infrastructure.Repositories
                     || matchingClientIds.Contains(x.ClientId)
                     || matchingProductIds.Contains(x.ProductId)
                     || matchingContactIds.Contains(x.ContactId)
-                    || (x.LeadId.HasValue && matchingLeadIds.Contains(x.LeadId.Value)));
+                    || matchingLeadIds.Contains(x.LeadId));
             }
 
             return queryable.Where(x => x.IsActive);
@@ -850,15 +851,13 @@ namespace Opportunities.Infrastructure.Repositories
             return user?.FullName;
         }
 
-        private async Task<string?> GetLeadStatusAsync(Guid? leadId, CancellationToken cancellationToken)
+        private async Task<string?> GetLeadStatusAsync(Guid leadId, CancellationToken cancellationToken)
         {
-            return leadId.HasValue
-                ? await _dbContext.Leads
-                    .AsNoTracking()
-                    .Where(x => x.Id == leadId.Value && x.IsActive)
-                    .Select(x => x.Status.ToString())
-                    .FirstOrDefaultAsync(cancellationToken)
-                : null;
+            return await _dbContext.Leads
+                .AsNoTracking()
+                .Where(x => x.Id == leadId && x.IsActive)
+                .Select(x => x.Status.ToString())
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         private async Task<OpportunityActivityViewModel> MapActivityAsync(OpportunityActivity activity)
@@ -1053,14 +1052,9 @@ namespace Opportunities.Infrastructure.Repositories
 
         private async Task AddProposalTimelineEntryAsync(Opportunity opportunity, OpportunityDocument document, CancellationToken cancellationToken)
         {
-            if (!opportunity.LeadId.HasValue)
-            {
-                return;
-            }
-
             var lead = await _dbContext.Leads
                 .Include(x => x.TimelineEntries)
-                .FirstOrDefaultAsync(x => x.Id == opportunity.LeadId.Value && x.IsActive && !x.IsDeleted, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == opportunity.LeadId && x.IsActive && !x.IsDeleted, cancellationToken);
 
             if (lead == null)
             {
@@ -1125,14 +1119,9 @@ namespace Opportunities.Infrastructure.Repositories
 
         private void AddLeadTimelineEntry(Opportunity opportunity, string eventType, string description)
         {
-            if (!opportunity.LeadId.HasValue)
-            {
-                return;
-            }
-
             _dbContext.LeadTimelineEntries.Add(new LeadTimelineEntry
             {
-                LeadId = opportunity.LeadId.Value,
+                LeadId = opportunity.LeadId,
                 EventType = eventType,
                 Description = description.Trim()
             });

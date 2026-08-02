@@ -1869,4 +1869,48 @@ BEGIN
 END
 $migration$;
 
+-- -------------------------------------------------------------------------
+-- 20260802110000_RequireOpportunityLead
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260802110000_RequireOpportunityLead') THEN
+        RETURN;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM "leads"."Opportunities"
+        WHERE "LeadId" IS NULL
+    ) THEN
+        RAISE EXCEPTION 'Cannot require Opportunities.LeadId while opportunities with null LeadId exist. Clean up or backfill those rows before applying 20260802110000_RequireOpportunityLead.';
+    END IF;
+
+    ALTER TABLE "leads"."Opportunities"
+        DROP CONSTRAINT IF EXISTS "FK_Opportunities_Leads_LeadId";
+
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'leads'
+            AND table_name = 'Opportunities'
+            AND column_name = 'LeadId'
+            AND is_nullable = 'YES'
+    ) THEN
+        ALTER TABLE "leads"."Opportunities"
+            ALTER COLUMN "LeadId" SET NOT NULL;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Opportunities_Leads_LeadId') THEN
+        ALTER TABLE "leads"."Opportunities"
+            ADD CONSTRAINT "FK_Opportunities_Leads_LeadId"
+            FOREIGN KEY ("LeadId") REFERENCES "leads"."Leads" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260802110000_RequireOpportunityLead', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
 COMMIT;

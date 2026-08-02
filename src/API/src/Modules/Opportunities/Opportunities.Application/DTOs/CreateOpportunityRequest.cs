@@ -3,7 +3,7 @@ namespace Opportunities.Application.DTOs
     public class CreateOpportunityRequest
     {
         public Guid ClientId { get; set; }
-        public Guid? LeadId { get; set; }
+        public Guid LeadId { get; set; }
         public Guid ProductId { get; set; }
         public Guid ContactId { get; set; }
         public string Title { get; set; } = string.Empty;

@@ -8,7 +8,7 @@ export interface OpportunityListItemViewModel {
     productName: string;
     contactId: string;
     contactName: string;
-    leadId?: string;
+    leadId: string;
     leadNumber?: string;
     stageId: string;
     stageName: string;

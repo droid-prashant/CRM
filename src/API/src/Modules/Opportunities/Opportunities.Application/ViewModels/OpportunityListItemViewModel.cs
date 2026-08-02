@@ -11,7 +11,7 @@ namespace Opportunities.Application.ViewModels
         public string ProductName { get; set; } = string.Empty;
         public Guid ContactId { get; set; }
         public string ContactName { get; set; } = string.Empty;
-        public Guid? LeadId { get; set; }
+        public Guid LeadId { get; set; }
         public string? LeadNumber { get; set; }
         public Guid StageId { get; set; }
         public string StageName { get; set; } = string.Empty;
