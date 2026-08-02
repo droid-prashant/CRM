@@ -7,6 +7,7 @@ namespace ERP.Identity.Model.Dtos
         [Required]
         public required string UsernameOrEmail { get; set; }
         [Required]
+       
         public required string Password { get; set; }
     }
 }

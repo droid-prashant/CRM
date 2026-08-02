@@ -339,6 +339,7 @@ export class Crud implements OnChanges, OnDestroy {
             return messages['minlength'] ?? `${field.label} must be at least ${control.errors['minlength'].requiredLength} characters`;
         }
 
+
         if (control.errors['maxlength']) {
             return messages['maxlength'] ?? `${field.label} must be at most ${control.errors['maxlength'].requiredLength} characters`;
         }
@@ -431,7 +432,11 @@ export class Crud implements OnChanges, OnDestroy {
             validators.push(Validators.pattern(field.pattern));
         }
 
-        return validators;
+         if (field.validators) {
+        validators.push(...field.validators);
+    }
+
+    return validators;
     }
 
     private clearUnavailableOptions(field: DynamicField, control: { value: unknown; reset: (value?: unknown, options?: { emitEvent?: boolean }) => void }): void {
