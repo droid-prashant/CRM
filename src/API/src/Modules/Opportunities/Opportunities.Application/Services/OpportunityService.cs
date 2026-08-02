@@ -71,19 +71,29 @@ namespace Opportunities.Application.Services
 
         public async Task<OpportunityResult> CreateOpportunityAsync(CreateOpportunityRequest request, CancellationToken cancellationToken)
         {
-            if (!CanAssignOwner(request.OwnerUserId))
-            {
-                return new OpportunityResult { Forbidden = true };
-            }
-
             var errors = await ValidateCreateRequestAsync(request, cancellationToken);
             if (errors.Count > 0)
             {
                 return new OpportunityResult { Errors = errors };
             }
 
+            if (!CanAssignOwner(request.OwnerUserId))
+            {
+                return new OpportunityResult { Forbidden = true };
+            }
+
             var opportunityNumber = await GenerateNextOpportunityNumberAsync(cancellationToken);
             var opportunity = await _opportunityRepository.CreateOpportunityAsync(request, opportunityNumber, cancellationToken);
+            if (opportunity == null)
+            {
+                return new OpportunityResult
+                {
+                    Errors =
+                    [
+                        "Lead cannot be converted to an opportunity. Select an allowed lead, a valid business owner, and a client that does not already have an opportunity for this lead."
+                    ]
+                };
+            }
 
             return new OpportunityResult { Opportunity = opportunity };
         }
@@ -427,8 +437,33 @@ namespace Opportunities.Application.Services
             if (!await _opportunityRepository.ProductExistsAsync(request.ProductId, cancellationToken)) errors.Add("ProductId is invalid.");
             if (!await _opportunityRepository.ContactBelongsToClientAsync(request.ContactId, request.ClientId, cancellationToken)) errors.Add("ContactId does not belong to the selected client.");
             if (!await _opportunityRepository.UserExistsAsync(request.OwnerUserId)) errors.Add("OwnerUserId is invalid.");
+            else if (!await _opportunityRepository.UserCanOwnOpportunityAsync(request.OwnerUserId)) errors.Add("Owner must be a valid business user. Admin and SuperAdmin users cannot own opportunities.");
             if (!SupportedCurrencyIds.Contains(request.CurrencyId)) errors.Add("CurrencyId is invalid.");
-            if (!await _opportunityRepository.LeadExistsAsync(request.LeadId, cancellationToken)) errors.Add("LeadId is invalid.");
+
+            var lead = await _opportunityRepository.GetLeadForOpportunityCreationAsync(request.LeadId, cancellationToken);
+            if (lead == null)
+            {
+                errors.Add("LeadId is invalid.");
+            }
+            else
+            {
+                if (!IsOpportunityCreationLeadStatus(lead.Status))
+                {
+                    errors.Add("Only New, Qualified, or already converted leads can be used for opportunity creation. Disqualified leads are not allowed.");
+                }
+
+                if (lead.AssignedToUserId.HasValue
+                    && lead.AssignedToUserId.Value != request.OwnerUserId
+                    && await _opportunityRepository.UserCanOwnOpportunityAsync(lead.AssignedToUserId.Value))
+                {
+                    errors.Add("Opportunity owner must match the selected lead owner.");
+                }
+
+                if (await _opportunityRepository.OpportunityExistsForLeadClientAsync(request.LeadId, request.ClientId, cancellationToken))
+                {
+                    errors.Add("An opportunity already exists for the selected lead and client.");
+                }
+            }
 
             return errors;
         }
@@ -453,6 +488,7 @@ namespace Opportunities.Application.Services
             }
 
             if (!await _opportunityRepository.UserExistsAsync(request.OwnerUserId)) errors.Add("OwnerUserId must be an active user.");
+            else if (!await _opportunityRepository.UserCanOwnOpportunityAsync(request.OwnerUserId)) errors.Add("Owner must be a valid business user. Admin and SuperAdmin users cannot own opportunities.");
 
             return errors;
         }
@@ -909,6 +945,13 @@ namespace Opportunities.Application.Services
         {
             query.PageNumber = Math.Max(1, query.PageNumber);
             query.PageSize = Math.Clamp(query.PageSize, 1, 100);
+        }
+
+        private static bool IsOpportunityCreationLeadStatus(string status)
+        {
+            return string.Equals(status, "New", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "Qualified", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "Converted", StringComparison.OrdinalIgnoreCase);
         }
 
         private void ApplyOwnerScope(OpportunityListQuery query)

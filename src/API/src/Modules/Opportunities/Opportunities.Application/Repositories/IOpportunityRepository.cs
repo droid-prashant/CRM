@@ -8,7 +8,7 @@ namespace Opportunities.Application.Repositories
         Task<PagedResultViewModel<OpportunityListItemViewModel>> GetOpportunityListAsync(OpportunityListQuery query, CancellationToken cancellationToken);
         Task<List<OpportunityPipelineStageViewModel>> GetPipelineAsync(OpportunityListQuery query, CancellationToken cancellationToken);
         Task<OpportunityLookupViewModel> GetOpportunityLookupsAsync(CancellationToken cancellationToken);
-        Task<OpportunityListItemViewModel> CreateOpportunityAsync(CreateOpportunityRequest request, string opportunityNumber, CancellationToken cancellationToken);
+        Task<OpportunityListItemViewModel?> CreateOpportunityAsync(CreateOpportunityRequest request, string opportunityNumber, CancellationToken cancellationToken);
         Task<OpportunityListItemViewModel?> UpdateOpportunityAsync(UpdateOpportunityRequest request, CancellationToken cancellationToken);
         Task<OpportunityListItemViewModel?> ChangeStageAsync(Guid id, ChangeOpportunityStageRequest request, CancellationToken cancellationToken);
         Task<OpportunityListItemViewModel?> CloseAsWonAsync(Guid id, CloseOpportunityRequest request, CancellationToken cancellationToken);
@@ -33,8 +33,11 @@ namespace Opportunities.Application.Repositories
         Task<bool> ClientExistsAsync(Guid clientId, CancellationToken cancellationToken);
         Task<bool> ProductExistsAsync(Guid productId, CancellationToken cancellationToken);
         Task<bool> LeadExistsAsync(Guid leadId, CancellationToken cancellationToken);
+        Task<OpportunityLeadLookupViewModel?> GetLeadForOpportunityCreationAsync(Guid leadId, CancellationToken cancellationToken);
+        Task<bool> OpportunityExistsForLeadClientAsync(Guid leadId, Guid clientId, CancellationToken cancellationToken);
         Task<bool> ContactBelongsToClientAsync(Guid contactId, Guid clientId, CancellationToken cancellationToken);
         Task<bool> UserExistsAsync(Guid userId);
+        Task<bool> UserCanOwnOpportunityAsync(Guid userId);
         Task<bool> StageExistsAsync(Guid stageId, CancellationToken cancellationToken);
         Task<bool> StageIsProposalSentAsync(Guid stageId, CancellationToken cancellationToken);
         Task<bool> OpportunityHasProposalDocumentAsync(Guid id, CancellationToken cancellationToken);
