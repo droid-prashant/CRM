@@ -1913,4 +1913,33 @@ BEGIN
 END
 $migration$;
 
+-- -------------------------------------------------------------------------
+-- 20260802120000_UniqueOpportunityLeadClient
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260802120000_UniqueOpportunityLeadClient') THEN
+        RETURN;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM "leads"."Opportunities"
+        WHERE "IsActive" = true
+        GROUP BY "LeadId", "ClientId"
+        HAVING COUNT(*) > 1
+    ) THEN
+        RAISE EXCEPTION 'Cannot add unique LeadId + ClientId rule while duplicate active opportunities exist. Clean up duplicate opportunities before applying 20260802120000_UniqueOpportunityLeadClient.';
+    END IF;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS "UX_Opportunities_LeadId_ClientId"
+        ON "leads"."Opportunities" ("LeadId", "ClientId")
+        WHERE "IsActive" = true;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260802120000_UniqueOpportunityLeadClient', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
 COMMIT;

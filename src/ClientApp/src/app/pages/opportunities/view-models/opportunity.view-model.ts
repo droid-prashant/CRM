@@ -77,6 +77,8 @@ export interface LeadLookupViewModel {
     companyName: string;
     contactPersonName: string;
     status: string;
+    assignedToUserId?: string;
+    convertedOpportunityId?: string;
 }
 
 export interface OpportunityUserLookupViewModel {

@@ -1,7 +1,10 @@
+using ERP.Identity.Constants;
 using ERP.Identity.Entities;
 using Leads.Domain.Entities;
+using Leads.Domain.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Opportunities.Application.DTOs;
 using Opportunities.Application.Repositories;
 using Opportunities.Application.ViewModels;
@@ -15,6 +18,7 @@ namespace Opportunities.Infrastructure.Repositories
         private const string ProposalDocumentType = "Proposal";
         private const string AgreementDocumentType = "Agreement";
         private const string PurchaseOrderDocumentType = "PurchaseOrder";
+        private const string UniqueLeadClientIndexName = "UX_Opportunities_LeadId_ClientId";
 
         private readonly OpportunitiesDbContext _dbContext;
         private readonly UserManager<ApplicationUser> _userManager;
@@ -112,7 +116,9 @@ namespace Opportunities.Infrastructure.Repositories
                     .ToListAsync(cancellationToken),
                 Leads = await _dbContext.Leads
                     .AsNoTracking()
-                    .Where(x => x.IsActive)
+                    .Where(x => x.IsActive
+                        && !x.IsDeleted
+                        && (x.Status == LeadStatus.New || x.Status == LeadStatus.Qualified || x.Status == LeadStatus.Converted))
                     .OrderBy(x => x.CompanyName)
                     .Select(x => new OpportunityLeadLookupViewModel
                     {
@@ -120,20 +126,13 @@ namespace Opportunities.Infrastructure.Repositories
                         LeadNumber = x.LeadNumber,
                         CompanyName = x.CompanyName,
                         ContactPersonName = x.ContactPersonName,
-                        Status = x.Status.ToString()
+                        Status = x.Status.ToString(),
+                        AssignedToUserId = x.AssignedToUserId,
+                        ConvertedOpportunityId = x.ConvertedOpportunityId
                     })
                     .ToListAsync(cancellationToken),
                 Currencies = GetCurrencyLookups(),
-                OwnerUsers = await _userManager.Users
-                    .AsNoTracking()
-                    .Where(x => x.IsActive)
-                    .OrderBy(x => x.FullName)
-                    .Select(x => new OpportunityUserLookupViewModel
-                    {
-                        Id = x.Id,
-                        FullName = x.FullName
-                    })
-                    .ToListAsync(cancellationToken),
+                OwnerUsers = await GetBusinessOwnerLookupsAsync(cancellationToken),
                 Stages = await GetActiveStagesQuery()
                     .OrderBy(x => x.Sequence)
                     .Select(x => new OpportunityLookupItemViewModel
@@ -151,11 +150,35 @@ namespace Opportunities.Infrastructure.Repositories
             };
         }
 
-        public async Task<OpportunityListItemViewModel> CreateOpportunityAsync(CreateOpportunityRequest request, string opportunityNumber, CancellationToken cancellationToken)
+        public async Task<OpportunityListItemViewModel?> CreateOpportunityAsync(CreateOpportunityRequest request, string opportunityNumber, CancellationToken cancellationToken)
         {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            var lead = await _dbContext.Leads
+                .FirstOrDefaultAsync(x => x.Id == request.LeadId && x.IsActive && !x.IsDeleted, cancellationToken);
+
+            if (lead == null
+                || (lead.Status != LeadStatus.New && lead.Status != LeadStatus.Qualified && lead.Status != LeadStatus.Converted)
+                || !await UserCanOwnOpportunityAsync(request.OwnerUserId))
+            {
+                return null;
+            }
+
+            if (await OpportunityExistsForLeadClientAsync(request.LeadId, request.ClientId, cancellationToken))
+            {
+                return null;
+            }
+
+            if (lead.AssignedToUserId.HasValue && lead.AssignedToUserId.Value != request.OwnerUserId
+                && await UserCanOwnOpportunityAsync(lead.AssignedToUserId.Value))
+            {
+                return null;
+            }
+
             var defaultStage = await GetDefaultStageAsync(cancellationToken);
             var opportunity = new Opportunity
             {
+                Id = Guid.NewGuid(),
                 OpportunityNumber = opportunityNumber,
                 LeadId = request.LeadId,
                 ProductId = request.ProductId,
@@ -172,15 +195,59 @@ namespace Opportunities.Infrastructure.Repositories
             };
 
             _dbContext.Opportunities.Add(opportunity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (IsLeadClientDuplicateViolation(ex))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return null;
+            }
 
             _dbContext.OpportunityStageHistories.Add(new OpportunityStageHistory
             {
                 OpportunityId = opportunity.Id,
                 ToStageId = defaultStage.Id,
-                Remarks = "Opportunity created."
+                Remarks = "Lead converted to opportunity."
             });
-            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            if (lead.Status == LeadStatus.New)
+            {
+                lead.Status = LeadStatus.Qualified;
+                lead.QualificationDate = DateTime.UtcNow;
+                AddLeadTimelineEntry(lead.Id, "LeadStatusChanged", BuildStatusChangeDescription(LeadStatus.New.ToString(), LeadStatus.Qualified.ToString(), "Lead qualified during opportunity creation."));
+            }
+
+            if (lead.AssignedToUserId != request.OwnerUserId)
+            {
+                lead.AssignedToUserId = request.OwnerUserId;
+                lead.AssignedAt = DateTime.UtcNow;
+                AddLeadTimelineEntry(lead.Id, "LeadAssigned", "Lead assigned during opportunity creation.");
+            }
+
+            if (lead.Status != LeadStatus.Converted)
+            {
+                var previousStatus = lead.Status.ToString();
+                lead.Status = LeadStatus.Converted;
+                AddLeadTimelineEntry(lead.Id, "LeadStatusChanged", BuildStatusChangeDescription(previousStatus, LeadStatus.Converted.ToString(), $"Lead converted to opportunity {opportunityNumber}."));
+            }
+
+            lead.ConvertedOpportunityId ??= opportunity.Id;
+            AddLeadTimelineEntry(lead.Id, "LeadConverted", $"Lead converted to opportunity {opportunityNumber}.");
+
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
 
             return await MapOpportunityAsync(opportunity, cancellationToken);
         }
@@ -567,7 +634,32 @@ namespace Opportunities.Infrastructure.Repositories
 
         public Task<bool> LeadExistsAsync(Guid leadId, CancellationToken cancellationToken)
         {
-            return _dbContext.Leads.AnyAsync(x => x.Id == leadId && x.IsActive, cancellationToken);
+            return _dbContext.Leads.AnyAsync(x => x.Id == leadId && x.IsActive && !x.IsDeleted, cancellationToken);
+        }
+
+        public Task<OpportunityLeadLookupViewModel?> GetLeadForOpportunityCreationAsync(Guid leadId, CancellationToken cancellationToken)
+        {
+            return _dbContext.Leads
+                .AsNoTracking()
+                .Where(x => x.Id == leadId && x.IsActive && !x.IsDeleted)
+                .Select(x => new OpportunityLeadLookupViewModel
+                {
+                    Id = x.Id,
+                    LeadNumber = x.LeadNumber,
+                    CompanyName = x.CompanyName,
+                    ContactPersonName = x.ContactPersonName,
+                    Status = x.Status.ToString(),
+                    AssignedToUserId = x.AssignedToUserId,
+                    ConvertedOpportunityId = x.ConvertedOpportunityId
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public Task<bool> OpportunityExistsForLeadClientAsync(Guid leadId, Guid clientId, CancellationToken cancellationToken)
+        {
+            return _dbContext.Opportunities
+                .AsNoTracking()
+                .AnyAsync(x => x.LeadId == leadId && x.ClientId == clientId && x.IsActive, cancellationToken);
         }
 
         public Task<bool> ContactBelongsToClientAsync(Guid contactId, Guid clientId, CancellationToken cancellationToken)
@@ -579,6 +671,23 @@ namespace Opportunities.Infrastructure.Repositories
         {
             var user = await _userManager.FindByIdAsync(userId.ToString());
             return user?.IsActive == true;
+        }
+
+        public async Task<bool> UserCanOwnOpportunityAsync(Guid userId)
+        {
+            if (userId == Guid.Empty)
+            {
+                return false;
+            }
+
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user?.IsActive != true)
+            {
+                return false;
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            return !roles.Any(IsProtectedOwnerRole);
         }
 
         public Task<bool> StageExistsAsync(Guid stageId, CancellationToken cancellationToken)
@@ -851,6 +960,49 @@ namespace Opportunities.Infrastructure.Repositories
             return user?.FullName;
         }
 
+        private async Task<List<OpportunityUserLookupViewModel>> GetBusinessOwnerLookupsAsync(CancellationToken cancellationToken)
+        {
+            var excludedUserIds = await GetProtectedOwnerUserIdsAsync();
+            return await _userManager.Users
+                .AsNoTracking()
+                .Where(x => x.IsActive && !excludedUserIds.Contains(x.Id))
+                .OrderBy(x => x.FullName)
+                .Select(x => new OpportunityUserLookupViewModel
+                {
+                    Id = x.Id,
+                    FullName = x.FullName
+                })
+                .ToListAsync(cancellationToken);
+        }
+
+        private async Task<HashSet<Guid>> GetProtectedOwnerUserIdsAsync()
+        {
+            var excludedUserIds = new HashSet<Guid>();
+            foreach (var role in new[] { DefaultRoles.Admin, DefaultRoles.SuperAdmin })
+            {
+                var users = await _userManager.GetUsersInRoleAsync(role);
+                foreach (var user in users)
+                {
+                    excludedUserIds.Add(user.Id);
+                }
+            }
+
+            return excludedUserIds;
+        }
+
+        private static bool IsProtectedOwnerRole(string role)
+        {
+            return string.Equals(role, DefaultRoles.Admin, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, DefaultRoles.SuperAdmin, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsLeadClientDuplicateViolation(DbUpdateException exception)
+        {
+            return exception.InnerException is PostgresException postgresException
+                && postgresException.SqlState == PostgresErrorCodes.UniqueViolation
+                && string.Equals(postgresException.ConstraintName, UniqueLeadClientIndexName, StringComparison.OrdinalIgnoreCase);
+        }
+
         private async Task<string?> GetLeadStatusAsync(Guid leadId, CancellationToken cancellationToken)
         {
             return await _dbContext.Leads
@@ -1119,9 +1271,14 @@ namespace Opportunities.Infrastructure.Repositories
 
         private void AddLeadTimelineEntry(Opportunity opportunity, string eventType, string description)
         {
+            AddLeadTimelineEntry(opportunity.LeadId, eventType, description);
+        }
+
+        private void AddLeadTimelineEntry(Guid leadId, string eventType, string description)
+        {
             _dbContext.LeadTimelineEntries.Add(new LeadTimelineEntry
             {
-                LeadId = opportunity.LeadId,
+                LeadId = leadId,
                 EventType = eventType,
                 Description = description.Trim()
             });
@@ -1209,6 +1366,11 @@ namespace Opportunities.Infrastructure.Repositories
             return string.Equals(documentType, PurchaseOrderDocumentType, StringComparison.OrdinalIgnoreCase)
                 ? "Purchase Order"
                 : "Agreement";
+        }
+
+        private static string BuildStatusChangeDescription(string previousStatus, string newStatus, string? remarks)
+        {
+            return $"PreviousStatus={previousStatus};NewStatus={newStatus};Remarks={Clean(remarks) ?? string.Empty}";
         }
 
         private static DateTime? ToUtc(DateTime? value)

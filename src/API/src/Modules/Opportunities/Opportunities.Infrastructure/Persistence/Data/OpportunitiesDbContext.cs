@@ -48,6 +48,7 @@ namespace Opportunities.Infrastructure.Persistence.Data
             {
                 entity.ToTable("Opportunities", "leads");
                 entity.HasIndex(x => x.OpportunityNumber).IsUnique();
+                entity.HasIndex(x => new { x.LeadId, x.ClientId }).IsUnique().HasDatabaseName("UX_Opportunities_LeadId_ClientId").HasFilter("\"IsActive\" = true");
                 entity.Property(x => x.OpportunityNumber).HasMaxLength(30).IsRequired();
                 entity.Property(x => x.Title).HasMaxLength(250).IsRequired();
                 entity.Property(x => x.EstimatedValue).HasPrecision(18, 2);

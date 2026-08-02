@@ -232,7 +232,6 @@ export class OpportunityList implements OnInit, OnDestroy {
 
     openCreateDialog(): void {
         const defaultCurrencyId = this.currencies[0]?.id ?? '';
-        const defaultOwnerUserId = this.users[0]?.id ?? '';
         this.contacts = [];
         this.selectedProduct = undefined;
         this.opportunityForm.reset({
@@ -244,7 +243,7 @@ export class OpportunityList implements OnInit, OnDestroy {
             estimatedValue: 0,
             currencyId: defaultCurrencyId,
             expectedCloseDate: '',
-            ownerUserId: defaultOwnerUserId,
+            ownerUserId: '',
             licenseFee: 0,
             amcFee: 0,
             implementationFee: 0,
@@ -317,6 +316,15 @@ export class OpportunityList implements OnInit, OnDestroy {
     onClientChange(clientId: string): void {
         this.opportunityForm.patchValue({ contactId: '' });
         this.contacts = clientId ? this.allContacts.filter((contact) => contact.clientId === clientId) : [];
+    }
+
+    onLeadChange(leadId: string): void {
+        const lead = this.leads.find((item) => item.id === leadId);
+        const ownerUserId = lead?.assignedToUserId && this.users.some((user) => user.id === lead.assignedToUserId)
+            ? lead.assignedToUserId
+            : '';
+
+        this.opportunityForm.patchValue({ ownerUserId });
     }
 
     selectedProduct: ProductLookupViewModel | undefined;
@@ -1118,7 +1126,7 @@ export class OpportunityList implements OnInit, OnDestroy {
         this.clients = lookups.clients;
         this.allContacts = lookups.contacts;
         this.products = lookups.products;
-        this.leads = lookups.leads.filter((lead) => lead.status.toLowerCase() !== 'converted');
+        this.leads = lookups.leads.filter((lead) => ['new', 'qualified', 'converted'].includes(lead.status.toLowerCase()));
         this.users = lookups.ownerUsers.filter((user) => user.isActive !== false);
         this.currencies = lookups.currencies;
         this.stages = lookups.stages;

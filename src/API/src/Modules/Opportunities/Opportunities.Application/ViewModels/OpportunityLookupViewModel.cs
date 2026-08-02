@@ -53,6 +53,8 @@ namespace Opportunities.Application.ViewModels
         public string CompanyName { get; set; } = string.Empty;
         public string ContactPersonName { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public Guid? AssignedToUserId { get; set; }
+        public Guid? ConvertedOpportunityId { get; set; }
     }
 
     public class OpportunityCurrencyLookupViewModel
