@@ -2,8 +2,11 @@ using ERP.API.Extensions;
 using ERP.API.Filters;
 using ERP.API.Infrastructure.Routing;
 using ERP.API.Middlewares;
+using ERP.Identity.Entities;
 using ERP.Identity.Extensions;
+using ERP.Identity.Persistance.Data;
 using ERP.Identity.Seed;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 
