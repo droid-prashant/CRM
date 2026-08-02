@@ -1343,14 +1343,13 @@ export class OpportunityList implements OnInit, OnDestroy {
 
             if (licenseApplicable) {
                 if (isFinal) {
-                    if (source === 'amc') {
-                        const nextAmcAmount = Math.min(amcAmount, finalPayableAmount);
-                        controls.amcAmount.patchValue(nextAmcAmount, { emitEvent: false });
-                        controls.licenseAmount.patchValue(this.roundCommercialAmount(finalPayableAmount - nextAmcAmount), { emitEvent: false });
-                    } else {
-                        const nextLicenseAmount = Math.min(licenseAmount, finalPayableAmount);
-                        controls.licenseAmount.patchValue(nextLicenseAmount, { emitEvent: false });
-                        controls.amcAmount.patchValue(this.roundCommercialAmount(finalPayableAmount - nextLicenseAmount), { emitEvent: false });
+                    if (source === 'license') {
+                        controls.finalPayableAmount.patchValue(licenseAmount, { emitEvent: false });
+                    } else if (source !== 'amc') {
+                        controls.licenseAmount.patchValue(finalPayableAmount, { emitEvent: false });
+                        if (source === 'mode') {
+                            controls.amcAmount.patchValue(0, { emitEvent: false });
+                        }
                     }
                 } else {
                     controls.finalPayableAmount.patchValue(this.roundCommercialAmount(licenseAmount + amcAmount), { emitEvent: false });
@@ -1457,8 +1456,12 @@ export class OpportunityList implements OnInit, OnDestroy {
             errors.push('Select License Applicable or Subscription Applicable.');
         }
 
-        if (request.licenseApplicable && (request.licenseAmount == null || request.licenseAmount <= 0 || request.amcAmount == null || request.amcAmount <= 0 || !request.amcStartDate || !request.amcRenewalDate || !request.amcExpiryDate)) {
-            errors.push('License amount, AMC amount, start date, renewal date, and expiry date are required.');
+        if (request.licenseApplicable && (request.licenseAmount == null || request.licenseAmount <= 0)) {
+            errors.push('License amount is required.');
+        }
+
+        if (request.licenseApplicable && request.amcAmount != null && request.amcAmount > 0 && (!request.amcStartDate || !request.amcRenewalDate || !request.amcExpiryDate)) {
+            errors.push('AMC start date, renewal date, and expiry date are required when AMC amount is entered.');
         }
 
         if (request.subscriptionApplicable && (request.subscriptionAmount == null || request.subscriptionAmount <= 0 || !request.subscriptionBillingFrequency || !request.subscriptionStartDate)) {
