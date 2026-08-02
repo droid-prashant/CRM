@@ -146,8 +146,8 @@ namespace Clients.Infrastructure.Repositories
 
             var leadIds = await _dbContext.Opportunities
                 .AsNoTracking()
-                .Where(opportunity => opportunity.ClientId == id && opportunity.IsActive && opportunity.LeadId.HasValue)
-                .Select(opportunity => opportunity.LeadId!.Value)
+                .Where(opportunity => opportunity.ClientId == id && opportunity.IsActive)
+                .Select(opportunity => opportunity.LeadId)
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
@@ -564,8 +564,7 @@ namespace Clients.Infrastructure.Repositories
 
             var opportunityIds = opportunityRows.Select(opportunity => opportunity.Id).ToList();
             var leadIds = opportunityRows
-                .Where(opportunity => opportunity.LeadId.HasValue)
-                .Select(opportunity => opportunity.LeadId!.Value)
+                .Select(opportunity => opportunity.LeadId)
                 .Distinct()
                 .ToList();
 

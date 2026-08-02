@@ -12,7 +12,7 @@ export interface OpportunityListQuery {
 
 export interface CreateOpportunityRequest {
     clientId: string;
-    leadId?: string;
+    leadId: string;
     productId: string;
     contactId: string;
     title: string;

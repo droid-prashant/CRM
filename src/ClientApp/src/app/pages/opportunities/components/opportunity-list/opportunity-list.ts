@@ -139,7 +139,7 @@ export class OpportunityList implements OnInit, OnDestroy {
     opportunityForm = this.fb.group({
         clientId: ['', Validators.required],
         contactId: ['', Validators.required],
-        leadId: [''],
+        leadId: ['', Validators.required],
         productId: ['', Validators.required],
         title: ['', [Validators.required, Validators.maxLength(250)]],
         estimatedValue: [0, [Validators.required, Validators.min(0)]],
@@ -1150,7 +1150,7 @@ export class OpportunityList implements OnInit, OnDestroy {
         return {
             clientId: value.clientId ?? '',
             contactId: value.contactId ?? '',
-            leadId: value.leadId || undefined,
+            leadId: value.leadId ?? '',
             productId: value.productId ?? '',
             title: value.title ?? '',
             estimatedValue: value.estimatedValue ?? 0,

@@ -405,6 +405,7 @@ namespace Opportunities.Application.Services
             var errors = new List<string>();
 
             if (request.ClientId == Guid.Empty) errors.Add("ClientId is required.");
+            if (request.LeadId == Guid.Empty) errors.Add("Lead is required.");
             if (request.ProductId == Guid.Empty) errors.Add("ProductId is required.");
             if (request.ContactId == Guid.Empty) errors.Add("ContactId is required.");
             if (request.OwnerUserId == Guid.Empty) errors.Add("OwnerUserId is required.");
@@ -427,7 +428,7 @@ namespace Opportunities.Application.Services
             if (!await _opportunityRepository.ContactBelongsToClientAsync(request.ContactId, request.ClientId, cancellationToken)) errors.Add("ContactId does not belong to the selected client.");
             if (!await _opportunityRepository.UserExistsAsync(request.OwnerUserId)) errors.Add("OwnerUserId is invalid.");
             if (!SupportedCurrencyIds.Contains(request.CurrencyId)) errors.Add("CurrencyId is invalid.");
-            if (request.LeadId.HasValue && !await _opportunityRepository.LeadExistsAsync(request.LeadId.Value, cancellationToken)) errors.Add("LeadId is invalid.");
+            if (!await _opportunityRepository.LeadExistsAsync(request.LeadId, cancellationToken)) errors.Add("LeadId is invalid.");
 
             return errors;
         }

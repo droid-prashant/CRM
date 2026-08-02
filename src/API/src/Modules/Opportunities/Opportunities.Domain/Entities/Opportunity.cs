@@ -5,7 +5,7 @@ namespace Opportunities.Domain.Entities
     public class Opportunity : BaseEntity
     {
         public string OpportunityNumber { get; set; } = string.Empty;
-        public Guid? LeadId { get; set; }
+        public Guid LeadId { get; set; }
         public Guid ProductId { get; set; }
         public Guid ClientId { get; set; }
         public Guid ContactId { get; set; }

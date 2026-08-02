@@ -56,7 +56,7 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Property(x => x.FinalAmount).HasPrecision(18, 2);
                 entity.Property(x => x.ClosingNote).HasMaxLength(1000);
                 entity.Property(x => x.LostReason).HasMaxLength(500);
-                entity.HasOne<Lead>().WithMany().HasForeignKey(x => x.LeadId);
+                entity.HasOne<Lead>().WithMany().HasForeignKey(x => x.LeadId).IsRequired().OnDelete(DeleteBehavior.Restrict);
                 entity.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId);
                 entity.HasOne<CrmClient>().WithMany().HasForeignKey(x => x.ClientId);
                 entity.HasOne<CrmClientContact>().WithMany().HasForeignKey(x => x.ContactId);

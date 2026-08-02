@@ -656,8 +656,11 @@
             }
         </div>
         <div class="col-span-12 md:col-span-6">
-            <label class="mb-2 block text-sm font-semibold">Related Lead</label>
+            <label class="mb-2 block text-sm font-semibold">Lead</label>
             <p-select [options]="leads" optionLabel="companyName" optionValue="id" appendTo="body" formControlName="leadId" class="w-full" />
+            @if (showCreateError('leadId', 'required')) {
+                <span class="mt-1 block text-sm text-red-600">Lead is required.</span>
+            }
         </div>
         <div class="col-span-12">
             <label class="mb-2 block text-sm font-semibold">Title</label>
