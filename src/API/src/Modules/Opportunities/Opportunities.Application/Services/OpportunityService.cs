@@ -791,14 +791,13 @@ namespace Opportunities.Application.Services
             if (request.LicenseApplicable)
             {
                 if (!licenseAmount.HasValue || licenseAmount <= 0) errors.Add("License Amount is required and must be greater than 0.");
-                if (!amcAmount.HasValue || amcAmount <= 0) errors.Add("AMC Amount is required and must be greater than 0.");
-                if (!request.AmcStartDate.HasValue) errors.Add("AMC Start Date is required.");
-                if (!request.AmcRenewalDate.HasValue) errors.Add("AMC Renewal Date is required.");
-                if (!request.AmcExpiryDate.HasValue) errors.Add("AMC Expiry Date is required.");
+                if (amcAmount.HasValue && amcAmount > 0 && !request.AmcStartDate.HasValue) errors.Add("AMC Start Date is required when AMC Amount is entered.");
+                if (amcAmount.HasValue && amcAmount > 0 && !request.AmcRenewalDate.HasValue) errors.Add("AMC Renewal Date is required when AMC Amount is entered.");
+                if (amcAmount.HasValue && amcAmount > 0 && !request.AmcExpiryDate.HasValue) errors.Add("AMC Expiry Date is required when AMC Amount is entered.");
                 if (request.AmcStartDate.HasValue && request.AmcExpiryDate.HasValue && request.AmcExpiryDate.Value < request.AmcStartDate.Value) errors.Add("AMC Expiry Date must be on or after AMC Start Date.");
-                if (request.IsFinal && licenseAmount.HasValue && amcAmount.HasValue && finalPayableAmount != RoundMoney(licenseAmount.Value + amcAmount.Value))
+                if (request.IsFinal && licenseAmount.HasValue && finalPayableAmount != licenseAmount.Value)
                 {
-                    errors.Add("FinalPayableAmount must equal License Amount plus AMC Amount.");
+                    errors.Add("FinalPayableAmount must equal License Amount.");
                 }
             }
 
@@ -838,8 +837,13 @@ namespace Opportunities.Application.Services
                 request.SubscriptionStartDate = null;
                 request.NextSubscriptionBillingDate = null;
 
-                if (!request.IsFinal && request.LicenseAmount.HasValue && request.AmcAmount.HasValue)
+                if (request.IsFinal)
                 {
+                    request.LicenseAmount = request.FinalPayableAmount;
+                }
+                else if (request.LicenseAmount.HasValue)
+                {
+                    request.AmcAmount ??= 0;
                     request.FinalPayableAmount = RoundMoney(request.LicenseAmount.Value + request.AmcAmount.Value);
                 }
             }
