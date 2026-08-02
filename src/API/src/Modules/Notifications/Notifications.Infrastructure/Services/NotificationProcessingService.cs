@@ -464,8 +464,8 @@ namespace Notifications.Infrastructure.Services
         {
             return eventType switch
             {
-                NotificationEventTypes.AmcRenewal => breakdown.AmcApplicable,
-                NotificationEventTypes.AmcExpiry => breakdown.AmcApplicable,
+                NotificationEventTypes.AmcRenewal => breakdown.LicenseApplicable,
+                NotificationEventTypes.AmcExpiry => breakdown.LicenseApplicable,
                 NotificationEventTypes.SubscriptionBilling => breakdown.SubscriptionApplicable,
                 _ => true
             };

@@ -70,7 +70,8 @@ export interface SaveOpportunityCommercialBreakdownRequest {
     agreementExpiryDate?: string;
     purchaseOrderDocumentId?: string;
     purchaseOrderDate?: string;
-    amcApplicable: boolean;
+    licenseApplicable: boolean;
+    licenseAmount?: number;
     amcAmount?: number;
     amcStartDate?: string;
     amcRenewalDate?: string;
@@ -80,5 +81,6 @@ export interface SaveOpportunityCommercialBreakdownRequest {
     subscriptionBillingFrequency?: string;
     subscriptionStartDate?: string;
     nextSubscriptionBillingDate?: string;
+    isFinal: boolean;
     remarks?: string;
 }

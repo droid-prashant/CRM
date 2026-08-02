@@ -472,7 +472,13 @@
                     </div>
                     <div class="col-span-12 md:col-span-6">
                         <label class="mb-2 block text-sm font-semibold">Final Payable Amount</label>
-                        <p-inputnumber formControlName="finalPayableAmount" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                        <p-inputnumber formControlName="finalPayableAmount" [readonly]="!commercialForm.controls.isFinal.value" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                    </div>
+                    <div class="col-span-12 md:col-span-6">
+                        <label class="mb-2 flex items-center gap-2 text-sm font-semibold">
+                            <input type="checkbox" formControlName="isFinal" class="h-4 w-4" />
+                            <span>Is Final</span>
+                        </label>
                     </div>
 
                     <div class="col-span-12 rounded-md border border-surface-200 p-3 dark:border-surface-700">
@@ -509,11 +515,15 @@
 
                     <div class="col-span-12 rounded-md border border-surface-200 p-3 dark:border-surface-700">
                         <label class="mb-3 flex items-center gap-2 text-sm font-semibold">
-                            <input type="checkbox" formControlName="amcApplicable" class="h-4 w-4" />
-                            <span>AMC Applicable</span>
+                            <input type="checkbox" formControlName="licenseApplicable" class="h-4 w-4" />
+                            <span>License Applicable</span>
                         </label>
-                        @if (commercialForm.controls.amcApplicable.value) {
+                        @if (commercialForm.controls.licenseApplicable.value) {
                             <div class="grid grid-cols-12 gap-3">
+                                <div class="col-span-12 md:col-span-6">
+                                    <label class="mb-2 block text-sm font-semibold">License Amount</label>
+                                    <p-inputnumber formControlName="licenseAmount" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                                </div>
                                 <div class="col-span-12 md:col-span-6">
                                     <label class="mb-2 block text-sm font-semibold">AMC Amount</label>
                                     <p-inputnumber formControlName="amcAmount" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
@@ -543,7 +553,7 @@
                             <div class="grid grid-cols-12 gap-3">
                                 <div class="col-span-12 md:col-span-6">
                                     <label class="mb-2 block text-sm font-semibold">Subscription Amount</label>
-                                    <p-inputnumber formControlName="subscriptionAmount" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
+                                    <p-inputnumber formControlName="subscriptionAmount" [readonly]="commercialForm.controls.isFinal.value" [min]="0" [minFractionDigits]="0" [maxFractionDigits]="2" class="w-full" />
                                 </div>
                                 <div class="col-span-12 md:col-span-6">
                                     <label class="mb-2 block text-sm font-semibold">Billing Frequency</label>

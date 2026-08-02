@@ -733,10 +733,15 @@ namespace Opportunities.Application.Services
                 errors.Add("CurrencyId is invalid.");
             }
 
-            if (request.FinalPayableAmount < 0)
-            {
-                errors.Add("FinalPayableAmount must be greater than or equal to 0.");
-            }
+            var finalPayableAmount = RoundMoney(request.FinalPayableAmount);
+            var licenseAmount = RoundMoney(request.LicenseAmount);
+            var amcAmount = RoundMoney(request.AmcAmount);
+            var subscriptionAmount = RoundMoney(request.SubscriptionAmount);
+
+            if (finalPayableAmount < 0) errors.Add("FinalPayableAmount must be greater than or equal to 0.");
+            if (licenseAmount < 0) errors.Add("License Amount must be greater than or equal to 0.");
+            if (amcAmount < 0) errors.Add("AMC Amount must be greater than or equal to 0.");
+            if (subscriptionAmount < 0) errors.Add("Subscription Amount must be greater than or equal to 0.");
 
             if (request.AgreementDocumentId.HasValue)
             {
@@ -773,23 +778,42 @@ namespace Opportunities.Application.Services
                 }
             }
 
-            if (request.AmcApplicable)
+            if (request.LicenseApplicable && request.SubscriptionApplicable)
             {
-                if (!request.AmcAmount.HasValue || request.AmcAmount < 0) errors.Add("AMC Amount is required and must be greater than or equal to 0.");
+                errors.Add("Select either License Applicable or Subscription Applicable, not both.");
+            }
+
+            if (!request.LicenseApplicable && !request.SubscriptionApplicable)
+            {
+                errors.Add("Select License Applicable or Subscription Applicable.");
+            }
+
+            if (request.LicenseApplicable)
+            {
+                if (!licenseAmount.HasValue || licenseAmount <= 0) errors.Add("License Amount is required and must be greater than 0.");
+                if (!amcAmount.HasValue || amcAmount <= 0) errors.Add("AMC Amount is required and must be greater than 0.");
                 if (!request.AmcStartDate.HasValue) errors.Add("AMC Start Date is required.");
                 if (!request.AmcRenewalDate.HasValue) errors.Add("AMC Renewal Date is required.");
                 if (!request.AmcExpiryDate.HasValue) errors.Add("AMC Expiry Date is required.");
                 if (request.AmcStartDate.HasValue && request.AmcExpiryDate.HasValue && request.AmcExpiryDate.Value < request.AmcStartDate.Value) errors.Add("AMC Expiry Date must be on or after AMC Start Date.");
+                if (request.IsFinal && licenseAmount.HasValue && amcAmount.HasValue && finalPayableAmount != RoundMoney(licenseAmount.Value + amcAmount.Value))
+                {
+                    errors.Add("FinalPayableAmount must equal License Amount plus AMC Amount.");
+                }
             }
 
             if (request.SubscriptionApplicable)
             {
-                if (!request.SubscriptionAmount.HasValue || request.SubscriptionAmount < 0) errors.Add("Subscription Amount is required and must be greater than or equal to 0.");
+                if (!subscriptionAmount.HasValue || subscriptionAmount <= 0) errors.Add("Subscription Amount is required and must be greater than 0.");
                 if (string.IsNullOrWhiteSpace(request.SubscriptionBillingFrequency)) errors.Add("Subscription Billing Frequency is required.");
                 else if (!AllowedSubscriptionBillingFrequencies.Contains(request.SubscriptionBillingFrequency.Trim())) errors.Add("Subscription Billing Frequency is invalid.");
                 if (!request.SubscriptionStartDate.HasValue) errors.Add("Subscription Start Date is required.");
                 if (!request.NextSubscriptionBillingDate.HasValue) errors.Add("Next Subscription Billing Date is required.");
                 if (request.SubscriptionStartDate.HasValue && request.NextSubscriptionBillingDate.HasValue && request.NextSubscriptionBillingDate.Value < request.SubscriptionStartDate.Value) errors.Add("Next Subscription Billing Date must be on or after Subscription Start Date.");
+                if (request.IsFinal && subscriptionAmount.HasValue && finalPayableAmount != subscriptionAmount.Value)
+                {
+                    errors.Add("FinalPayableAmount must equal Subscription Amount.");
+                }
             }
 
             if (request.Remarks?.Length > 1000)
@@ -802,6 +826,38 @@ namespace Opportunities.Application.Services
 
         private static void ApplyCommercialBreakdownDefaults(SaveOpportunityCommercialBreakdownRequest request)
         {
+            request.FinalPayableAmount = RoundMoney(request.FinalPayableAmount);
+            request.LicenseAmount = RoundMoney(request.LicenseAmount);
+            request.AmcAmount = RoundMoney(request.AmcAmount);
+            request.SubscriptionAmount = RoundMoney(request.SubscriptionAmount);
+
+            if (request.LicenseApplicable)
+            {
+                request.SubscriptionAmount = null;
+                request.SubscriptionBillingFrequency = null;
+                request.SubscriptionStartDate = null;
+                request.NextSubscriptionBillingDate = null;
+
+                if (!request.IsFinal && request.LicenseAmount.HasValue && request.AmcAmount.HasValue)
+                {
+                    request.FinalPayableAmount = RoundMoney(request.LicenseAmount.Value + request.AmcAmount.Value);
+                }
+            }
+
+            if (request.SubscriptionApplicable)
+            {
+                request.LicenseAmount = null;
+                request.AmcAmount = null;
+                request.AmcStartDate = null;
+                request.AmcRenewalDate = null;
+                request.AmcExpiryDate = null;
+
+                if (!request.IsFinal && request.SubscriptionAmount.HasValue)
+                {
+                    request.FinalPayableAmount = request.SubscriptionAmount.Value;
+                }
+            }
+
             if (!request.SubscriptionApplicable)
             {
                 request.NextSubscriptionBillingDate = null;
@@ -816,6 +872,16 @@ namespace Opportunities.Application.Services
             request.NextSubscriptionBillingDate = CalculateNextSubscriptionBillingDate(
                 request.SubscriptionStartDate.Value,
                 request.SubscriptionBillingFrequency.Trim());
+        }
+
+        private static decimal RoundMoney(decimal value)
+        {
+            return Math.Round(value, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static decimal? RoundMoney(decimal? value)
+        {
+            return value.HasValue ? RoundMoney(value.Value) : null;
         }
 
         private static DateTime CalculateNextSubscriptionBillingDate(DateTime startDate, string frequency)
