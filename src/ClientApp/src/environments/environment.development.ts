@@ -1,5 +1,5 @@
 export const environment = {
     production: false,
-    apiUrl: 'https://localhost:7094/api',
-    imageUrl: 'https://localhost:44385'
+    apiUrl: 'https://fr631p1j-7094.inc1.devtunnels.ms/api',
+    imageUrl: 'https://fr631p1j-7094.inc1.devtunnels.ms'
 };

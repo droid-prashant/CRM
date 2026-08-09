@@ -1,168 +1,932 @@
-# Code Review Standards
+# AI Code Review & Development Standard
 
-This document defines the standards and criteria reviewers should follow before approving changes to the IntelliSync CRM codebase.
+## 1. Purpose
 
-## Project Context
+This document defines the mandatory development and code review standards that must be followed by AI coding agents while working on .NET Core and Angular applications.
 
-- Backend: .NET 8 solution at `src/API/CRM.sln`
-- Frontend: Angular client at `src/ClientApp`
-- Primary domains: dashboard, leads, clients, opportunities, partners, and products
+The objective is to ensure that AI-generated code:
 
-## Approval Criteria
+- Follows the existing project architecture.
+- Uses the existing coding patterns and naming conventions.
+- Remains simple, readable, and maintainable.
+- Does not introduce unnecessary abstractions or complexity.
+- Can be easily understood and reviewed by human developers.
+- Does not create breaking changes without explicit approval.
+- Meets security, performance, validation, and testing expectations.
 
-A PR is ready to approve only when all required criteria are satisfied:
+---
 
-- The implementation matches the requirement, issue, or acceptance criteria.
-- The change is limited to the intended scope.
-- The coding approach is consistent with the existing architecture, naming, layering, and project conventions.
-- The code builds successfully.
-- Existing behavior is not broken unless the PR clearly documents the intentional change.
-- API contracts, DTOs, validation, and UI flows remain consistent.
-- Security and authorization rules are enforced server-side.
-- Tests are added or updated when the change affects business rules, user workflows, data access, or bug fixes.
-- No secrets, local machine paths, generated uploads, or unrelated files are committed.
 
-## Coding Approach Standard
+## 1.1 IntelliSync CRM Project Context
 
-Correct output alone is not enough for approval. A change must produce the expected application behavior using code that fits the project consistently and can be maintained safely.
+Unless a task explicitly targets another repository, AI agents must use the following CRM context:
 
-Reviewers should reject code that appears to be generated only to satisfy the visible output while ignoring established structure, naming, abstractions, validation, security, or long-term maintainability.
+- Backend: .NET 8 solution at `src/API/CRM.sln`.
+- Frontend: Angular client at `src/ClientApp`.
+- Production database script: `src/DatabaseScripts/production_migrations.sql`.
+- Primary domains include dashboard, leads, clients, opportunities, partners, products, users, roles, and permissions.
+- The implementation must follow the architecture, module boundaries, and conventions already established in the IntelliSync CRM repository.
+- The agent must inspect nearby files and at least one comparable existing feature before introducing a new implementation pattern.
 
-### Required Coding Approach
 
-- Follow the existing folder structure, module boundaries, naming conventions, and dependency direction.
-- Reuse existing patterns, helpers, services, DTOs, validators, components, and shared styles before introducing new ones.
-- Keep business rules in the application or domain layer, not in controllers, infrastructure classes, or UI components.
-- Keep controllers thin and focused on request handling, authorization, response shaping, and delegation.
-- Keep frontend components focused on presentation and interaction, with API and business workflow logic placed in the appropriate services or state layer.
-- Use typed models, DTOs, and interfaces instead of loosely shaped objects or duplicated ad hoc structures.
-- Validate input at the correct boundary and do not rely on frontend validation for server-side rules.
-- Handle errors through the project's existing error-handling pattern instead of swallowing exceptions or returning inconsistent responses.
-- Prefer small, readable changes over broad rewrites when the requirement is narrow.
-- Add new abstractions only when they remove real duplication or match an existing project pattern.
+## 2. Mandatory Instructions for AI Agents
 
-### AI-Generated Code Review Criteria
+Before writing or modifying any code, the AI agent must:
 
-When code is written with help from an AI agent, reviewers must evaluate the code itself, not only the final screen or API response.
+1. Inspect the existing project structure.
+2. Identify similar existing implementations.
+3. Follow the same architecture, folder structure, naming convention, and coding pattern.
+4. Reuse existing services, components, utilities, validators, models, helpers, and shared code where appropriate.
+5. Avoid introducing new frameworks, libraries, patterns, or architectural layers unless explicitly required.
+6. Prefer the simplest implementation that satisfies the requirement.
+7. Avoid overengineering.
+8. Avoid creating generic or reusable abstractions unless there is a confirmed repeated use case.
+9. Keep changes limited to the requested requirement.
+10. Do not refactor unrelated code.
+11. Do not rename existing files, classes, methods, variables, APIs, database objects, or routes unless explicitly required.
+12. Do not change public contracts without identifying the impact.
+13. Preserve backward compatibility whenever possible.
+14. Clearly mention assumptions where the requirement is unclear.
+15. Do not silently change business rules.
 
-- The solution must look like it belongs in this repository.
-- The code must be explainable by the developer who submits it.
-- The implementation must not introduce unused files, speculative helpers, dead code, or generic boilerplate.
-- The implementation must not bypass existing services, repositories, validators, authorization checks, or shared UI components.
-- The same rule must not be implemented differently in multiple places.
-- The code must not hard-code values that should come from configuration, constants, enums, database records, or API responses.
-- The solution must remain testable without depending on hidden timing, manual steps, or local machine state.
+---
 
-### Unacceptable Coding Approaches
+## 3. General Code Review Checklist
 
-Do not approve code that uses any of these approaches:
+### 3.1 Requirement Compliance
 
-- Large generated rewrites for a small requirement.
-- Copy-pasted logic from another module without adapting it to the correct domain model.
-- New patterns that conflict with nearby files or existing architecture.
-- Business rules duplicated in both frontend and backend as independent sources of truth.
-- Controllers or components that contain complex data access, calculations, or workflow decisions.
-- Hard-coded IDs, role names, status strings, URLs, file paths, dates, or magic numbers without a project-approved constant or configuration.
-- Silent failure handling, empty catch blocks, or generic success responses when an operation may fail.
-- Untyped or weakly typed data used where the project already has DTOs, models, or interfaces.
-- Code that only satisfies the visible happy path while leaving edge cases, permissions, or persistence behavior incorrect.
+- [ ] The implementation fully satisfies the stated requirement.
+- [ ] No unrelated functionality has been added.
+- [ ] Existing business rules have been preserved.
+- [ ] Edge cases have been considered.
+- [ ] Error scenarios have been handled.
+- [ ] Acceptance criteria have been implemented.
+- [ ] Assumptions are documented.
+- [ ] Breaking changes are clearly identified.
 
-## Review Standards
+### 3.2 Simplicity and Maintainability
 
-### Correctness Standard
+- [ ] The implementation uses the simplest reasonable solution.
+- [ ] The code is easy for another developer to understand.
+- [ ] There is no unnecessary abstraction.
+- [ ] There is no unnecessary inheritance.
+- [ ] There are no unnecessary design patterns.
+- [ ] There are no unnecessary helper classes or wrapper services.
+- [ ] Duplicate logic has been avoided where practical.
+- [ ] Existing shared logic has been reused.
+- [ ] Methods and components have a clear responsibility.
+- [ ] Complex logic is broken into understandable units.
+- [ ] Magic numbers and unexplained string values are avoided.
+- [ ] Comments explain business reasons, not obvious code behavior.
 
-Code must solve the stated problem completely and handle realistic edge cases. Reviewers should check empty data, missing records, invalid IDs, duplicate requests, permission failures, and error responses.
+### 3.3 Naming and Formatting
 
-### Architecture Standard
+- [ ] Existing project naming conventions are followed.
+- [ ] Class, method, property, variable, file, and folder names are meaningful.
+- [ ] Names clearly describe business purpose.
+- [ ] Abbreviations are avoided unless already standard in the project.
+- [ ] Formatting matches the existing codebase.
+- [ ] No unused imports, using statements, variables, methods, or files remain.
+- [ ] No commented-out code remains.
+- [ ] No temporary debugging code remains.
+- [ ] No unnecessary console logs remain.
 
-Code must follow the existing project structure. Business rules should live in the application or domain layer, not inside controllers or UI components. Infrastructure code should not leak into domain models.
+### 3.4 Security
 
-### API Standard
+- [ ] Authentication requirements are enforced.
+- [ ] Authorization and permission checks are enforced.
+- [ ] Sensitive data is not logged.
+- [ ] Passwords, tokens, secrets, and connection strings are not hardcoded.
+- [ ] User input is validated.
+- [ ] Database queries are protected against injection.
+- [ ] APIs do not expose unnecessary internal information.
+- [ ] Error responses do not reveal stack traces or sensitive details.
+- [ ] File uploads validate file type, size, and name.
+- [ ] Business-level access checks are performed, not only UI-level checks.
 
-APIs must use stable DTOs, clear route names, appropriate HTTP status codes, and consistent response shapes. Controllers should not expose database entities directly.
+### 3.5 Performance
 
-### Frontend Standard
+- [ ] Database queries retrieve only required data.
+- [ ] Unnecessary loops and repeated calculations are avoided.
+- [ ] Repeated API calls are avoided.
+- [ ] Large collections are paginated where applicable.
+- [ ] Long-running operations are asynchronous where applicable.
+- [ ] UI rendering avoids unnecessary repeated work.
+- [ ] No obvious memory leaks are introduced.
+- [ ] No unnecessary object mapping or data transformation is introduced.
 
-Angular components must follow existing structure, styling, and state-management patterns. Screens must handle loading, empty, success, validation error, and server error states where relevant.
+### 3.6 Error Handling
 
-### Security Standard
+- [ ] Expected errors are handled.
+- [ ] Error messages are meaningful and user-friendly.
+- [ ] Exceptions are not silently ignored.
+- [ ] Logging is added where operationally useful.
+- [ ] Validation errors are distinguishable from system errors.
+- [ ] The implementation does not use exceptions for normal control flow.
+- [ ] Existing centralized error-handling mechanisms are used.
 
-Authentication, authorization, input validation, file handling, and sensitive data protection must be reviewed carefully. Never rely only on frontend checks for security.
+### 3.7 Testing
 
-### Data Standard
+- [ ] Existing tests remain valid.
+- [ ] New business logic has relevant unit or integration tests.
+- [ ] Positive scenarios are tested.
+- [ ] Validation failures are tested.
+- [ ] Authorization failures are tested where applicable.
+- [ ] Edge cases are tested.
+- [ ] Tests follow the existing naming and arrangement pattern.
+- [ ] Tests do not depend on execution order.
+- [ ] Mocking is limited to appropriate boundaries.
 
-Database and model changes must preserve existing data unless migration or cleanup behavior is explicitly planned. New statuses, enum values, or required fields must be handled everywhere they are read or displayed.
+---
 
-When a database change is introduced through an EF migration, `src/DatabaseScripts/production_migrations.sql` must be updated in the same PR. A migration is not complete for review until both the EF migration and the production migration script are present and aligned.
+# 4. .NET Core Development and Review Standard
 
-Production migration SQL must be deployment-safe and reviewable. Do not approve arbitrary SQL just because it creates the expected table or column.
+## 4.1 Architecture
 
-Required rules for `production_migrations.sql` changes:
+The AI agent must:
 
-- Add a clearly separated migration block near the end of the file, before the final `COMMIT;`.
-- Insert the matching migration ID into `__EFMigrationsHistory` with `ON CONFLICT ("MigrationId") DO NOTHING`.
-- Use idempotent statements such as `CREATE SCHEMA IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, guarded `ALTER TABLE`, and conflict-safe seed inserts.
-- Guard constraints, foreign keys, columns, and indexes so the script can run safely more than once or against a partially updated database.
-- Keep schema, table, column, index, constraint, precision, nullability, defaults, and seed data consistent with the EF migration.
-- For new required columns on existing tables, include a safe default or backfill strategy before enforcing `NOT NULL`.
-- For data changes, make the target rows explicit and reversible by review; avoid broad updates without filters.
-- Avoid destructive operations such as dropping columns, truncating tables, deleting data, or changing column types in a lossy way unless the PR documents the data impact and approval plan.
-- Do not include local database names, machine paths, credentials, environment-specific values, or manual one-off SQL.
-- Keep seed data deterministic and conflict-safe, especially IDs, codes, names, and unique keys.
+- Follow the existing architecture, such as layered architecture, clean architecture, modular monolith, vertical slice, or another established pattern.
+- Place code in the same module and layer used by similar features.
+- Respect project references and dependency direction.
+- Avoid adding a new layer merely for one small requirement.
+- Avoid moving existing code across layers unless explicitly requested.
+- Reuse existing command, query, handler, repository, service, specification, or mediator patterns where already used.
+- Avoid introducing CQRS, MediatR, repositories, specifications, or unit-of-work patterns if the project does not already use them.
 
-### Testing Standard
+### Review Checklist
 
-Tests should cover the main success path and the highest-risk failure paths. A PR can be approved without new tests only when the change is low risk, clearly mechanical, or covered by existing tests.
+- [ ] Code is placed in the correct project, module, and folder.
+- [ ] Dependency direction is respected.
+- [ ] Domain logic is not incorrectly placed in controllers.
+- [ ] Infrastructure concerns are not leaked into the domain layer.
+- [ ] Existing architectural patterns are followed.
+- [ ] No new architecture pattern has been introduced unnecessarily.
 
-### Maintainability Standard
+---
 
-Code should be readable, consistent with nearby files, and simple enough to change later. Avoid unnecessary abstractions, unrelated refactors, duplicated business logic, and unclear naming.
+## 4.2 Controllers and API Endpoints
 
-## Before Reviewing
+- Controllers must remain thin.
+- Controllers should handle routing, request binding, authorization, and response creation.
+- Business logic must be delegated to the appropriate application or domain service.
+- Existing route naming and API versioning conventions must be followed.
+- HTTP status codes must accurately represent the result.
+- API responses must follow the existing response format.
+- Request and response contracts must not expose database entities directly unless the existing project explicitly follows that approach.
 
-1. Read the PR description, linked issue, and acceptance criteria.
-2. Identify the changed modules and whether the change affects API contracts, persistence, authentication, authorization, or user-facing workflows.
-3. Check whether tests, migrations, DTOs, validation rules, and UI states were updated where needed.
+### Review Checklist
 
-## Suggested Local Checks
+- [ ] Endpoint route follows existing conventions.
+- [ ] Correct HTTP method is used.
+- [ ] Correct status codes are returned.
+- [ ] Authorization attributes or permission checks are present.
+- [ ] Request models are validated.
+- [ ] Controller contains no unnecessary business logic.
+- [ ] Response model does not expose sensitive fields.
+- [ ] Existing API response wrapper is used where applicable.
+- [ ] CancellationToken is passed where supported.
 
-Run the checks that match the files changed by the PR.
+---
 
-## Using This With An AI Agent
+## 4.3 Application and Business Logic
 
-This file is not executed directly. It must be given to the AI agent as review instructions.
+- Business rules must be explicit and readable.
+- Existing services and handlers must be extended rather than duplicated.
+- Large methods must be split only where doing so improves clarity.
+- Avoid creating interfaces that have only one implementation unless the existing architecture requires it.
+- Avoid excessive mapping layers.
+- Avoid unnecessary factories, strategies, builders, and generic services.
+- Do not make a method generic without an actual reusable requirement.
 
-Use this prompt when asking an agent to review current local changes:
+### Review Checklist
 
-```text
-Read CODE_REVIEW.md first.
-Review the current git changes against those standards.
-Focus on correctness, coding approach, architecture consistency, security, data handling, tests, and maintainability.
-Do not only check whether the output works.
-List findings first, ordered by severity.
-For each finding, include the file path, line number, impact, and suggested fix.
-If there are no blocking issues, say that clearly and mention any remaining risks or missing tests.
-Do not modify code during the review.
+- [ ] Business rules are implemented in the appropriate layer.
+- [ ] Logic matches the acceptance criteria.
+- [ ] Existing business logic is reused.
+- [ ] Duplicate validations are avoided.
+- [ ] Method names clearly describe behavior.
+- [ ] No hidden side effects exist.
+- [ ] Transactions are used where multiple related writes must succeed together.
+- [ ] CancellationToken is propagated through asynchronous operations.
+
+---
+
+## 4.4 Entity Framework Core and Database Access
+
+- Use asynchronous EF Core methods for database operations.
+- Use `AsNoTracking()` for read-only queries where appropriate.
+- Avoid loading entire tables into memory.
+- Avoid N+1 query problems.
+- Select only required fields for list and report queries.
+- Use pagination for potentially large result sets.
+- Follow existing repository or DbContext access patterns.
+- Do not add a repository layer if the project directly uses DbContext.
+- Do not execute raw SQL unless necessary and justified.
+- Database changes must include proper EF Core migrations.
+- Migrations must not contain unrelated schema changes.
+- Foreign keys, indexes, nullability, lengths, and delete behaviors must be reviewed.
+
+### Review Checklist
+
+- [ ] Query uses async execution.
+- [ ] Read-only query uses `AsNoTracking()` where appropriate.
+- [ ] Query avoids N+1 problems.
+- [ ] Query retrieves only required data.
+- [ ] Pagination is used where appropriate.
+- [ ] Null values are safely handled.
+- [ ] Database constraints support the business rule.
+- [ ] Required indexes are considered.
+- [ ] Migration contains only intended changes.
+- [ ] Migration has a clear and meaningful name.
+- [ ] Delete behavior is explicitly reviewed.
+- [ ] Concurrency risk is considered where applicable.
+- [ ] Transactions are used for related writes.
+- [ ] Database-generated values and timestamps are handled consistently.
+
+---
+
+## 4.5 DTOs, Models, and Mapping
+
+- Use existing request, response, DTO, and mapping patterns.
+- Do not expose EF Core entities directly unless that is the established project convention.
+- Avoid creating multiple DTOs with identical fields without a real reason.
+- Map only required fields.
+- Validation belongs in the appropriate request validator, model, or business layer.
+- Response models must not expose audit, security, or internal fields unless required.
+
+### Review Checklist
+
+- [ ] Request and response models are clearly separated where required.
+- [ ] DTO names follow existing conventions.
+- [ ] Mapping is simple and readable.
+- [ ] No sensitive fields are exposed.
+- [ ] Nullable properties match business and database requirements.
+- [ ] Date, time, currency, and decimal types are appropriate.
+
+---
+
+## 4.6 Validation
+
+- Use the existing validation mechanism, such as FluentValidation, data annotations, or custom validators.
+- Validate required fields, ranges, lengths, formats, and relationships.
+- Do not depend only on frontend validation.
+- Business validations requiring database access must be performed in the backend.
+- Duplicate record checks must consider concurrency and database constraints.
+
+### Review Checklist
+
+- [ ] Required fields are validated.
+- [ ] String length limits are validated.
+- [ ] Numeric ranges are validated.
+- [ ] Date rules are validated.
+- [ ] Email, phone, and other formats are validated.
+- [ ] Related entity IDs are verified.
+- [ ] Duplicate conditions are handled.
+- [ ] Validation messages are understandable.
+- [ ] Backend validation exists even when frontend validation is present.
+
+---
+
+## 4.7 Async and Threading
+
+- Use `async` and `await` for I/O-bound operations.
+- Do not use `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()` in application code.
+- Avoid `Task.Run()` for normal database or HTTP operations.
+- Pass CancellationToken where available.
+- Do not mark methods async without awaiting asynchronous work.
+
+### Review Checklist
+
+- [ ] Async methods are truly asynchronous.
+- [ ] No blocking async calls exist.
+- [ ] CancellationToken is propagated.
+- [ ] Parallel execution is used only when safe and beneficial.
+- [ ] Shared mutable state is avoided.
+
+---
+
+## 4.8 Dependency Injection
+
+- Use the existing dependency registration structure.
+- Choose the correct service lifetime.
+- Avoid service locator patterns.
+- Avoid injecting unnecessary dependencies.
+- Avoid circular dependencies.
+- Do not create static service access for convenience.
+
+### Review Checklist
+
+- [ ] Dependency is registered.
+- [ ] Lifetime is correct.
+- [ ] Constructor has only necessary dependencies.
+- [ ] No circular dependency exists.
+- [ ] Existing registration extension methods are followed.
+
+---
+
+## 4.9 Logging and Auditing
+
+- Use the existing logging framework.
+- Use structured logging.
+- Do not log secrets, tokens, passwords, or sensitive personal information.
+- Log meaningful operational events and failures.
+- Avoid excessive logs inside loops.
+- Audit user actions where the business requirement requires traceability.
+
+### Review Checklist
+
+- [ ] Structured log placeholders are used.
+- [ ] Sensitive information is excluded.
+- [ ] Log level is appropriate.
+- [ ] Errors include useful context.
+- [ ] User/action auditing is added where required.
+- [ ] No duplicate logging occurs across layers.
+
+---
+
+## 4.10 .NET Code Quality
+
+### Required Practices
+
+- Follow existing C# language and style conventions.
+- Use nullable reference types consistently with the project.
+- Prefer guard clauses for invalid conditions when they improve readability.
+- Use constants or enums for stable business values where appropriate.
+- Avoid excessive use of reflection or dynamic types.
+- Avoid deeply nested conditions.
+- Avoid large service classes with unrelated responsibilities.
+- Do not suppress compiler warnings without justification.
+- Do not use the null-forgiving operator merely to hide a possible null issue.
+
+### Review Checklist
+
+- [ ] Nullable values are handled correctly.
+- [ ] No warning is hidden without justification.
+- [ ] Methods are focused and readable.
+- [ ] Pattern matching and LINQ are used only where readable.
+- [ ] LINQ queries do not perform hidden expensive operations.
+- [ ] Enums and constants are used consistently.
+- [ ] No unnecessary region blocks exist.
+- [ ] Public methods have clear behavior.
+
+---
+
+# 5. Angular Development and Review Standard
+
+## 5.1 Angular Architecture
+
+The AI agent must:
+
+- Follow the existing Angular version and project structure.
+- Follow the existing standalone component or NgModule pattern.
+- Follow the existing feature module and shared module structure.
+- Reuse existing common components, services, pipes, directives, validators, guards, interceptors, and utilities.
+- Avoid introducing a state-management library unless already used or explicitly required.
+- Avoid creating a shared component for a one-time use case.
+- Avoid changing the entire application structure for one feature.
+
+### Review Checklist
+
+- [ ] Code is placed in the correct feature folder.
+- [ ] Existing Angular architecture is followed.
+- [ ] Standalone and module patterns are not mixed incorrectly.
+- [ ] Shared code is reused where appropriate.
+- [ ] No unnecessary library or architecture has been introduced.
+- [ ] Feature remains isolated from unrelated modules.
+
+---
+
+## 5.2 Components
+
+- Components must focus on presentation and user interaction.
+- Complex business logic should be placed in services or dedicated utilities where appropriate.
+- Avoid very large components.
+- Avoid duplicating API, form, or grid logic already available in the project.
+- Use meaningful input and output names.
+- Manage component state explicitly and clearly.
+- Do not directly manipulate the DOM unless necessary.
+- Follow the existing component naming and file naming convention.
+
+### Review Checklist
+
+- [ ] Component has a clear responsibility.
+- [ ] Component does not contain unnecessary business logic.
+- [ ] Inputs and outputs are typed.
+- [ ] Public and private members follow project conventions.
+- [ ] Template logic is not overly complex.
+- [ ] Repeated template expressions are avoided.
+- [ ] Direct DOM manipulation is avoided.
+- [ ] Lifecycle hooks contain only appropriate logic.
+- [ ] Subscriptions are cleaned up.
+- [ ] Loading, empty, success, and error states are handled.
+
+---
+
+## 5.3 Services and API Integration
+
+- Reuse the existing API service pattern.
+- API URLs must use environment configuration and existing route constants where applicable.
+- Do not hardcode server URLs.
+- Return typed observables.
+- Centralized interceptors must handle cross-cutting concerns such as authentication and common errors.
+- Avoid subscribing inside services unless the service is intentionally managing state or side effects.
+- Components should not duplicate HTTP request construction.
+
+### Review Checklist
+
+- [ ] Service follows existing naming and folder conventions.
+- [ ] API methods are strongly typed.
+- [ ] URLs are not hardcoded.
+- [ ] HTTP parameters are constructed correctly.
+- [ ] Subscription responsibility is appropriate.
+- [ ] Errors are handled consistently.
+- [ ] Duplicate API methods are avoided.
+- [ ] Cancellation or request replacement is considered for searches and filters.
+
+---
+
+## 5.4 Reactive Forms and Validation
+
+- Follow the existing form strategy.
+- Prefer reactive forms when the application already uses them.
+- Use typed forms where supported by the project.
+- Reuse existing validators.
+- Apply frontend validation for user experience and backend validation for security.
+- Show clear validation messages.
+- Prevent submission while invalid or already submitting.
+- Properly mark controls as touched when validation must be displayed.
+
+### Review Checklist
+
+- [ ] Form model matches the API request.
+- [ ] Required validators are applied.
+- [ ] Length, range, pattern, and custom rules are applied.
+- [ ] Validation messages match the actual validation rule.
+- [ ] Form submission handles invalid state.
+- [ ] Double submission is prevented.
+- [ ] Disabled fields are intentionally included or excluded.
+- [ ] Reset and edit-mode behavior work correctly.
+- [ ] Server-side validation errors are displayed appropriately.
+
+---
+
+## 5.5 RxJS
+
+- Use RxJS operators only where they improve clarity.
+- Avoid deeply nested subscriptions.
+- Prefer `switchMap`, `concatMap`, `mergeMap`, or `forkJoin` only when their behavior is understood and appropriate.
+- Use `takeUntilDestroyed`, async pipe, or the project's established cleanup pattern.
+- Avoid unnecessary Subjects and BehaviorSubjects.
+- Do not use a state stream where a simple component property is sufficient.
+- Debounce search input where appropriate.
+- Handle errors without terminating important long-lived streams unexpectedly.
+
+### Review Checklist
+
+- [ ] No nested subscription exists without justification.
+- [ ] Subscription cleanup is implemented.
+- [ ] Correct mapping operator is used.
+- [ ] Search input is debounced where appropriate.
+- [ ] Duplicate API calls are avoided.
+- [ ] Async pipe is used where appropriate.
+- [ ] Error handling does not break required streams.
+- [ ] Subjects are used only when necessary.
+
+---
+
+## 5.6 Templates and UI
+
+- Follow the existing UI library and design system.
+- Do not introduce a new UI library for a single feature.
+- Maintain consistent spacing, typography, buttons, forms, dialogs, grids, colors, and responsive behavior.
+- Avoid complex expressions in templates.
+- Use Angular structural and control-flow syntax consistent with the project version.
+- Include loading, no-data, error, and permission-denied states where applicable.
+- Ensure buttons and form controls have understandable labels.
+- Ensure accessibility basics are maintained.
+
+### Review Checklist
+
+- [ ] UI matches the existing application.
+- [ ] Existing components and CSS classes are reused.
+- [ ] No inline style is added unless consistent with the project.
+- [ ] Template expressions are simple.
+- [ ] Loading state is displayed.
+- [ ] Empty state is displayed.
+- [ ] Error state is displayed.
+- [ ] Responsive behavior is considered.
+- [ ] Labels are connected to inputs.
+- [ ] Buttons have meaningful text or accessible labels.
+- [ ] Permission-based visibility is not the only authorization control.
+
+---
+
+## 5.7 TypeScript Quality
+
+- Avoid `any` unless there is a documented reason.
+- Use interfaces, types, or classes consistently with the project.
+- Use strict null handling.
+- Use enums or constants where the project uses them.
+- Avoid non-null assertions that hide real nullability problems.
+- Avoid unnecessary type casting.
+- Keep models aligned with backend contracts.
+- Do not duplicate interface definitions across multiple features.
+
+### Review Checklist
+
+- [ ] No avoidable `any` type exists.
+- [ ] API response types are defined.
+- [ ] Null and undefined cases are handled.
+- [ ] Type assertions are justified.
+- [ ] Models follow existing naming conventions.
+- [ ] Shared models are reused where appropriate.
+- [ ] Enum values match backend values.
+- [ ] Date and numeric values are handled consistently.
+
+---
+
+## 5.8 Angular Performance
+
+- Use track expressions or `trackBy` for repeated lists where appropriate.
+- Avoid calling expensive methods from templates.
+- Avoid unnecessary change detection triggers.
+- Use lazy loading where already supported by the project.
+- Avoid loading large datasets without pagination.
+- Avoid repeated API calls during component initialization.
+- Use caching only when there is a clear requirement and invalidation strategy.
+
+### Review Checklist
+
+- [ ] Large lists use pagination or virtual scrolling where required.
+- [ ] Repeated lists have stable tracking.
+- [ ] Template does not call expensive functions.
+- [ ] API calls are not duplicated.
+- [ ] Lazy loading pattern is preserved.
+- [ ] Change detection strategy is not changed without reason.
+- [ ] Images and attachments are handled efficiently.
+
+---
+
+## 5.9 Angular Security
+
+- Do not trust frontend authorization alone.
+- Avoid bypassing Angular sanitization.
+- Avoid rendering untrusted HTML.
+- Do not store sensitive information unnecessarily in localStorage or sessionStorage.
+- Do not log tokens or personal data.
+- Use the existing authentication and authorization guards.
+- Ensure route guards and menu visibility follow the same permission rules.
+- File uploads must validate client-side, while backend validation remains mandatory.
+
+### Review Checklist
+
+- [ ] No unsafe HTML rendering exists.
+- [ ] No sanitization bypass exists without justification.
+- [ ] Sensitive data is not stored unnecessarily.
+- [ ] Permission checks follow existing patterns.
+- [ ] Route access is protected where applicable.
+- [ ] UI restriction is backed by server-side authorization.
+- [ ] No secret or environment-specific credential is included in source code.
+
+---
+
+## 5.10 Styling
+
+- Follow the existing SCSS, CSS, or utility-class approach.
+- Reuse existing theme variables and shared styles.
+- Avoid global style changes for a feature-specific requirement.
+- Avoid `!important` unless unavoidable and documented.
+- Avoid duplicate CSS.
+- Keep selectors scoped and understandable.
+- Ensure styles do not break other screens.
+
+### Review Checklist
+
+- [ ] Existing theme variables are used.
+- [ ] Styles are properly scoped.
+- [ ] Global CSS changes are justified.
+- [ ] No avoidable `!important` exists.
+- [ ] Responsive styles are included where necessary.
+- [ ] No unrelated UI is affected.
+
+---
+
+# 6. API Contract Review
+
+When both .NET Core and Angular are modified, verify the complete contract.
+
+### Review Checklist
+
+- [ ] Endpoint route matches frontend usage.
+- [ ] HTTP method matches frontend usage.
+- [ ] Request property names match.
+- [ ] Response property names match.
+- [ ] Data types match.
+- [ ] Nullable fields match.
+- [ ] Enum values match.
+- [ ] Date and time formats match.
+- [ ] Pagination format matches.
+- [ ] Validation errors can be displayed by the frontend.
+- [ ] Authorization requirements are handled.
+- [ ] File upload and download contracts match.
+- [ ] Backward compatibility has been considered.
+
+---
+
+# 7. Database Change Review
+
+For every database change:
+
+- [ ] Entity configuration is updated.
+- [ ] Database migration is created.
+- [ ] Migration contains only intended changes.
+- [ ] Column type is appropriate.
+- [ ] String length is defined where appropriate.
+- [ ] Required and nullable behavior is correct.
+- [ ] Foreign keys are defined.
+- [ ] Delete behavior is reviewed.
+- [ ] Unique constraints are added where required.
+- [ ] Indexes are added where query patterns require them.
+- [ ] Existing data migration is considered.
+- [ ] Rollback impact is understood.
+- [ ] Seed data is updated where applicable.
+- [ ] Frontend and backend models are updated.
+- [ ] Production deployment impact is identified.
+
+---
+
+
+## 7.1 IntelliSync CRM Production Migration SQL Standard
+
+For the IntelliSync CRM project, an EF Core migration is incomplete unless the same pull request also updates:
+
+`src/DatabaseScripts/production_migrations.sql`
+
+The EF migration and production SQL must remain aligned.
+
+### Mandatory Rules
+
+- Add a clearly separated migration block near the end of the script and before the final `COMMIT;`.
+- Insert the corresponding migration ID into `__EFMigrationsHistory`.
+- Use `ON CONFLICT ("MigrationId") DO NOTHING` when inserting migration history.
+- Prefer deployment-safe and idempotent statements, including:
+  - `CREATE SCHEMA IF NOT EXISTS`
+  - `CREATE TABLE IF NOT EXISTS`
+  - `CREATE INDEX IF NOT EXISTS`
+  - Guarded `ALTER TABLE`
+  - Conflict-safe seed inserts
+- Guard columns, constraints, foreign keys, and indexes so the script can run safely more than once or against a partially updated database.
+- Keep schema, table, column, index, constraint, precision, nullability, default, and seed-data definitions consistent with the EF migration.
+- When adding a required column to an existing table, provide a safe default or backfill strategy before enforcing `NOT NULL`.
+- Data update statements must identify the exact target records and use appropriate filters.
+- Avoid destructive operations such as dropping columns, truncating tables, deleting records, or lossy type conversions unless the pull request documents:
+  - Data impact
+  - Backup or rollback approach
+  - Product or technical approval
+  - Deployment sequence
+- Do not include local database names, local file paths, credentials, environment-specific values, or manual one-time commands.
+- Seed data must be deterministic and conflict-safe, especially for IDs, codes, names, and unique keys.
+
+### Review Checklist
+
+- [ ] EF migration is included.
+- [ ] `production_migrations.sql` is updated.
+- [ ] EF migration and SQL script are aligned.
+- [ ] Migration history entry is included.
+- [ ] Script is idempotent.
+- [ ] Existing data is protected.
+- [ ] Required-column backfill is safe.
+- [ ] Constraints and indexes are guarded.
+- [ ] No environment-specific values are included.
+- [ ] Destructive changes have an approved data plan.
+
+
+# 8. Pull Request Review Standard
+
+Every pull request created or reviewed by an AI agent must include:
+
+## 8.1 Summary
+
+- What was changed?
+- Why was it changed?
+- Which requirement or issue does it address?
+
+## 8.2 Scope
+
+- Backend changes.
+- Frontend changes.
+- Database changes.
+- Configuration changes.
+- Dependency changes.
+
+## 8.3 Testing Performed
+
+- Unit tests.
+- Integration tests.
+- Manual test scenarios.
+- Validation scenarios.
+- Permission scenarios.
+- Browser or responsive checks where applicable.
+
+## 8.4 Risk and Impact
+
+- Possible regression areas.
+- Breaking changes.
+- Database migration risk.
+- Security impact.
+- Performance impact.
+- Deployment considerations.
+
+## 8.5 Reviewer Checklist
+
+- [ ] Requirement is fully implemented.
+- [ ] Code follows the existing architecture.
+- [ ] Code is simple and understandable.
+- [ ] No unrelated refactoring is included.
+- [ ] Backend validation is present.
+- [ ] Authorization is enforced.
+- [ ] Error handling is appropriate.
+- [ ] Database changes are safe.
+- [ ] Angular subscriptions are handled.
+- [ ] API contracts match.
+- [ ] Tests are sufficient.
+- [ ] No secrets or sensitive data are committed.
+- [ ] No debug code remains.
+- [ ] Build succeeds.
+- [ ] Existing tests pass.
+
+---
+
+
+# 8.6 AI Review Workflow
+
+When an AI agent is asked to review code, it must review the diff rather than only inspecting the final screen or API response.
+
+The agent must:
+
+1. Read this standard before reviewing.
+2. Read the linked issue, requirement, and acceptance criteria.
+3. Inspect the complete Git diff.
+4. Identify affected modules and contracts.
+5. Check backend, frontend, database, configuration, tests, security, and deployment impact.
+6. List findings before any summary.
+7. Order findings by severity.
+8. Include the file path and line number for each finding.
+9. Explain the impact, not only the coding preference.
+10. Provide a concrete suggested fix.
+11. Clearly state when no blocking issue is found.
+12. Mention remaining risks and missing tests.
+13. Not modify code when the request is review-only.
+
+## 8.7 Finding Severity
+
+Use the following severity levels:
+
+- **Critical:** Security exposure, data loss, authentication bypass, authorization bypass, production outage, or irreversible corruption.
+- **High:** Likely functional failure, broken business workflow, invalid persistence, major API mismatch, or unsafe migration.
+- **Medium:** Edge-case defect, incomplete validation, performance problem, maintainability risk, or missing high-value test.
+- **Low:** Readability, naming, minor consistency, or cleanup issue that does not block approval.
+- **Suggestion:** Optional improvement that should not block the pull request.
+
+## 8.8 Review Finding Format
+
+```markdown
+### [Severity] Brief finding title
+
+**Issue:** Describe the specific problem.
+
+**Impact:** Explain what can go wrong for users, data, security, performance, deployment, or maintainability.
+
+**Location:** `path/to/file.ext:line`
+
+**Suggestion:** Provide a concrete correction or implementation direction.
 ```
 
-If using Codex from a terminal, the request can be written like this:
+## 8.9 Approval Decision
 
-```powershell
-codex "Read CODE_REVIEW.md first. Review the current git changes against those standards. List findings first with file path, line number, impact, and suggested fix. Do not modify code."
+The AI reviewer must finish with one of these decisions:
+
+- **Approve:** No blocking issue exists, and risk-appropriate validation is complete.
+- **Approve with comments:** Only non-blocking improvements remain.
+- **Request changes:** One or more correctness, security, data, compatibility, or required-testing issues must be fixed.
+- **Unable to verify:** Required code, diff, build output, environment, or test evidence was unavailable.
+
+
+# 9. AI Agent Self-Review Before Completion
+
+Before presenting the final implementation, the AI agent must perform a self-review and report:
+
+## 9.1 Files Changed
+
+List every file created, modified, or deleted.
+
+## 9.2 Existing Pattern Followed
+
+Mention the existing file, module, service, component, handler, endpoint, or feature used as the reference pattern.
+
+## 9.3 Requirement Coverage
+
+Map each implemented change to the corresponding requirement or acceptance criterion.
+
+## 9.4 Validation Performed
+
+Describe:
+
+- Input validation.
+- Business validation.
+- Authorization validation.
+- Null and edge-case handling.
+
+## 9.5 Testing Performed
+
+Report:
+
+- Build result.
+- Test result.
+- Manual scenarios checked.
+- Scenarios not tested.
+
+## 9.6 Risks and Assumptions
+
+Clearly state:
+
+- Assumptions made.
+- Known limitations.
+- Possible regression areas.
+- Required migration or deployment steps.
+- Any part requiring human review.
+
+---
+
+# 10. Required AI Agent Completion Format
+
+The AI agent must use the following format after completing development:
+
+```markdown
+## Implementation Summary
+
+### Requirement
+- [Brief description of the implemented requirement]
+
+### Files Changed
+- `path/to/file1`
+- `path/to/file2`
+
+### Existing Pattern Followed
+- [Mention the existing feature or file used as reference]
+
+### Backend Changes
+- [Summary of .NET Core changes]
+
+### Frontend Changes
+- [Summary of Angular changes]
+
+### Database Changes
+- [Migration or schema changes, or "None"]
+
+### Validation and Security
+- [Validation, authorization, and security checks]
+
+### Testing Performed
+- [Build, tests, and manual scenarios]
+
+### Risks and Assumptions
+- [Known risks, assumptions, or limitations]
+
+### Deployment Notes
+- [Migration, configuration, or deployment steps]
+
+### Final Self-Review
+- [ ] Existing architecture followed
+- [ ] Existing naming conventions followed
+- [ ] No unnecessary complexity introduced
+- [ ] No unrelated code modified
+- [ ] Backend validation implemented
+- [ ] Authorization verified
+- [ ] API contract verified
+- [ ] Error handling verified
+- [ ] Build successful
+- [ ] Tests passed
+- [ ] No secrets or debug code included
 ```
 
-If reviewing a specific branch or PR, make sure the agent has access to the diff before running the review.
+---
 
-### Backend
+
+# 10.1 Suggested Local Verification Commands
+
+Run only the checks relevant to the changed files, but do not claim success unless the commands were actually executed.
+
+## Backend
 
 ```powershell
 dotnet restore src/API/CRM.sln
 dotnet build src/API/CRM.sln --no-restore
 ```
 
-If backend tests are added later, run them before approving API or domain changes.
+Run applicable backend tests using the repository's existing test projects. If no test project exists for the affected module, explicitly report that limitation.
 
-### Frontend
+## Frontend
 
 ```powershell
 cd src/ClientApp
@@ -171,102 +935,102 @@ npm run build
 npm test
 ```
 
-## Review Checklist
+Use `npm ci` instead of `npm install` when the repository and environment support a valid lockfile-based clean installation.
 
-### Correctness
+## Git and Scope Review
 
-- The implementation satisfies the stated requirement without introducing unrelated behavior.
-- Edge cases are handled, including empty data, missing records, invalid IDs, duplicate requests, and permission failures.
-- Public API responses use stable DTOs and do not expose internal entities or sensitive fields.
-- Error handling is clear and returns appropriate status codes or UI messages.
-- Date, time, currency, and numeric calculations are handled consistently.
-
-### Backend
-
-- Domain rules live in the appropriate application/domain layer rather than being hidden in controllers.
-- Commands and queries validate inputs before changing state.
-- Entity relationships, includes, filters, and projections avoid accidental over-fetching.
-- Async database calls use cancellation tokens where the surrounding code supports them.
-- New endpoints follow existing route, naming, response, and authorization patterns.
-- Configuration and secrets are not hard-coded or committed.
-
-### Frontend
-
-- Components follow existing Angular structure, naming, and styling conventions.
-- Inline CSS is not acceptable in frontend templates or components. Styles must be placed in the appropriate existing CSS/SCSS file for the component or shared style layer.
-- Forms validate required fields, invalid formats, loading states, and submit errors.
-- API calls have clear success, empty, loading, and failure states.
-- State updates do not rely on stale data after create, update, delete, or navigation flows.
-- UI text is concise and user-facing labels are consistent across the app.
-- Responsive layouts remain usable on narrow screens.
-
-### Security
-
-- Authentication and authorization are enforced server-side.
-- Users cannot access or mutate records outside their allowed scope.
-- File uploads, if touched, validate size, type, path, and storage behavior.
-- User input is validated and encoded before display.
-- Logs do not include passwords, tokens, secrets, or sensitive customer data.
-
-### Data And Compatibility
-
-- Database schema changes are backwards-compatible or clearly coordinated.
-- EF migrations that change the database also update `src/DatabaseScripts/production_migrations.sql`.
-- Production migration SQL is idempotent, guarded, and aligned with the EF migration.
-- Existing records remain valid after the change.
-- API changes do not break existing frontend consumers unless the PR explicitly includes the matching update.
-- New enum values, statuses, or constants are handled everywhere they are displayed or processed.
-
-### Maintainability
-
-- The change is small enough to understand and avoids unrelated refactoring.
-- Names describe business meaning rather than implementation details.
-- Shared behavior is reused through existing helpers or patterns.
-- Comments explain non-obvious decisions, not routine code.
-- New dependencies are justified and fit the existing stack.
-
-### Tests
-
-- Tests cover the main success path and the highest-risk failure paths.
-- Business rules are tested close to where they are implemented.
-- UI changes include component or workflow coverage where practical.
-- Test data is clear and does not depend on execution order.
-
-## Avoid Approving When
-
-Do not approve a PR when any of the following are present:
-
-- The code does not build.
-- The PR includes unrelated changes that are not explained.
-- A user can access, update, or delete data they should not control.
-- The backend trusts client-side validation for important rules.
-- A database migration is added without the matching `src/DatabaseScripts/production_migrations.sql` update.
-- The production migration script is not idempotent, is not aligned with the EF migration, or contains unsafe destructive SQL without an approved data plan.
-- API changes are not reflected in the frontend or dependent consumers.
-- Error cases fail silently or expose technical details to users.
-- File uploads accept unsafe file types, paths, or sizes.
-- Secrets, credentials, tokens, generated files, or local configuration are committed.
-- The change duplicates existing business logic instead of using the established pattern.
-- Required tests are missing for risky business logic, data access, or bug fixes.
-
-## Findings Template
-
-Use this format for review comments:
-
-```markdown
-**Issue:** Briefly describe the problem.
-
-**Impact:** Explain what can go wrong for users, data, security, or maintainability.
-
-**Location:** `path/to/file.ext:line`
-
-**Suggestion:** Provide a concrete fix or direction.
+```powershell
+git status
+git diff --stat
+git diff
 ```
 
-## Approval Guidance
+For staged changes:
 
-Approve when the change is correct, scoped, tested appropriately for its risk, and consistent with the project patterns.
+```powershell
+git diff --cached
+```
 
-Request changes when there is a likely bug, security issue, broken workflow, missing validation, data loss risk, or an API/frontend mismatch.
+The agent must inspect generated files, package-lock changes, migrations, configuration files, and deleted files before reporting completion.
 
-Leave non-blocking comments for readability improvements, naming suggestions, or cleanup that would be helpful but should not hold the PR.
+
+# 11. Prohibited AI Agent Behavior
+
+The AI agent must not:
+
+- Rewrite an entire module for a small requirement.
+- Replace existing architecture with a preferred architecture.
+- Introduce unnecessary generic repositories.
+- Introduce unnecessary base classes.
+- Introduce unnecessary interfaces.
+- Introduce unnecessary design patterns.
+- Add a new frontend state-management library without approval.
+- Add a new UI library without approval.
+- Add third-party packages without approval.
+- Modify unrelated files.
+- Rename existing public contracts without approval.
+- Remove existing validation or authorization.
+- Hardcode credentials, URLs, IDs, roles, or environment values.
+- Hide errors with empty catch blocks.
+- Suppress warnings instead of solving the cause.
+- Use `any` unnecessarily in Angular.
+- Use `.Result` or `.Wait()` in .NET async code.
+- Create migrations with unrelated schema changes.
+- Mark work complete without reviewing build and test results.
+- Claim tests passed when they were not executed.
+- Claim a requirement is complete when any acceptance criterion is missing.
+
+---
+
+# 12. Final Approval Rule
+
+AI-generated code must not be considered approved only because it builds successfully.
+
+Approval requires confirmation that:
+
+1. The requirement is correctly implemented.
+2. Existing architecture and coding patterns are followed.
+3. The solution is understandable by the development team.
+4. Security and authorization are correctly enforced.
+5. Validation exists in both the appropriate frontend and backend layers.
+6. Database changes are safe.
+7. API contracts are aligned.
+8. Tests and manual verification are sufficient.
+9. No unnecessary complexity has been introduced.
+10. A human reviewer has completed the final review.
+
+# 13. Using This Standard With an AI Agent
+
+This file is an instruction and review standard. It is not executed automatically.
+
+## Development Prompt
+
+```text
+Read AI_CODE_REVIEW_AND_DEVELOPMENT_STANDARD.md before making changes.
+
+Implement the provided requirement using the existing .NET Core and Angular architecture, patterns, naming conventions, validation approach, authorization model, API response format, UI components, and styles.
+
+Inspect similar existing implementations before writing code. Keep the change limited to the requested scope. Prefer the simplest maintainable solution. Do not introduce new libraries, architectural patterns, generic abstractions, or unrelated refactoring without explicit approval.
+
+After implementation, build and test the affected projects where possible. Then provide the required implementation summary, list every changed file, identify the existing pattern followed, report tests actually executed, and disclose assumptions, limitations, risks, and deployment steps.
+```
+
+## Review-Only Prompt
+
+```text
+Read AI_CODE_REVIEW_AND_DEVELOPMENT_STANDARD.md first.
+
+Review the current Git changes against the standard. Inspect the full diff and the linked requirement or acceptance criteria.
+
+Focus on correctness, scope, architecture consistency, security, authorization, validation, API contracts, data handling, EF migrations, production_migrations.sql, Angular state and subscription handling, tests, performance, deployment safety, and maintainability.
+
+List findings first, ordered by severity. For every finding include the file path, line number, impact, and concrete suggested fix.
+
+Do not modify code. If no blocking issue exists, state that clearly and identify remaining risks or missing tests.
+```
+
+## Codex Terminal Example
+
+```powershell
+codex "Read AI_CODE_REVIEW_AND_DEVELOPMENT_STANDARD.md first. Review the current git changes against the standard. Inspect the complete diff. List findings first by severity with file path, line number, impact, and suggested fix. Do not modify code."
+```
