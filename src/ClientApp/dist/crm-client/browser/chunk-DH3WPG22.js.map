@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/shared/validation/nepal-contact-number.validation.ts"],
+  "sourcesContent": ["export const NEPAL_CONTACT_NUMBER_PATTERN = /^\\d{10}$/;\r\nexport const NEPAL_CONTACT_NUMBER_MESSAGE = 'Contact number must be exactly 10 digits.';\r\n"],
+  "mappings": ";AAAO,IAAM,+BAA+B;AACrC,IAAM,+BAA+B;",
+  "names": []
+}
