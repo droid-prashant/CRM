@@ -1097,28 +1097,6 @@ namespace Leads.Infrastructure.Repositories
             return $"{interaction.InteractionType} logged: {subject}.{followUp}";
         }
 
-        private static Client CreateClient(NewClientRequest request)
-        {
-            return new Client
-            {
-                Name = request.Name.Trim(),
-                CountryId = request.CountryId,
-                IndustryId = request.IndustryId
-            };
-        }
-
-        private static ClientContact CreateContact(Client client, NewContactRequest request)
-        {
-            return new ClientContact
-            {
-                Client = client,
-                FirstName = request.FirstName.Trim(),
-                LastName = request.LastName.Trim(),
-                Email = Clean(request.Email),
-                Phone = Clean(request.Phone)
-            };
-        }
-
         private static Guid? FindMatchingClientId(string companyName, IEnumerable<ClientLookupViewModel> clients)
         {
             var normalizedCompanyName = Normalize(companyName);

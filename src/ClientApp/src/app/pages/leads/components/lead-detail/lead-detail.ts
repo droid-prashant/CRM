@@ -114,11 +114,7 @@ export class LeadDetail implements OnInit, OnDestroy {
 
     conversionForm = this.fb.group({
         productId: ['', Validators.required],
-        clientMode: ['new', Validators.required],
         clientId: [''],
-        newClientName: [''],
-        newClientCountryId: [''],
-        newClientIndustryId: [''],
         contactMode: ['new', Validators.required],
         contactId: [''],
         newContactFirstName: [''],
@@ -394,11 +390,7 @@ export class LeadDetail implements OnInit, OnDestroy {
                 const selectedContactId = this.resolveConversionContactId(conversion, selectedClientId);
                 this.conversionForm.reset({
                     productId: firstProduct,
-                    clientMode: selectedClientId ? 'existing' : 'new',
                     clientId: selectedClientId,
-                    newClientName: conversion.companyName,
-                    newClientCountryId: conversion.countries[0]?.id ?? '',
-                    newClientIndustryId: '',
                     contactMode: selectedContactId ? 'existing' : 'new',
                     contactId: selectedContactId,
                     newContactFirstName: this.firstName(conversion.contactPersonName),
@@ -621,8 +613,15 @@ export class LeadDetail implements OnInit, OnDestroy {
         return this.conversion?.existingContacts.filter((contact) => contact.clientId === clientId) ?? [];
     }
 
-    get useExistingClient(): boolean {
-        return this.conversionForm.controls.clientMode.value === 'existing';
+    get conversionClientName(): string {
+        const clientId = this.conversionForm.controls.clientId.value;
+        const client = this.conversion?.existingClients.find((item) => item.id === clientId);
+        return client?.name ?? this.conversion?.companyName ?? 'Not set';
+    }
+
+    get conversionClientCountry(): string {
+        const clientId = this.conversionForm.controls.clientId.value;
+        return this.conversion?.existingClients.find((item) => item.id === clientId)?.country ?? '';
     }
 
     get useExistingContact(): boolean {

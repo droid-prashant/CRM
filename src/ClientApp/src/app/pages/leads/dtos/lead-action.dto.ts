@@ -9,12 +9,6 @@ export interface DisqualifyLeadRequest {
 
 export interface ConvertLeadRequest {
     productId: string;
-    clientId?: string;
-    newClient?: {
-        name: string;
-        countryId: string;
-        industryId?: string;
-    };
     contactId?: string;
     newContact?: {
         firstName: string;
