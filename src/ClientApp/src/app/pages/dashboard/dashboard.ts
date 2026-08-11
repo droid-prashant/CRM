@@ -246,7 +246,7 @@ import { ChartPointViewModel, CurrencyAmountViewModel, DashboardViewModel, Month
                     }
                 </div>
 
-                <div class="card dashboard-panel col-span-12 xl:col-span-6">
+                <div class="card dashboard-panel col-span-12">
                     <div class="mb-4 flex items-center justify-between">
                         <h2 class="m-0 text-base font-semibold text-surface-950 dark:text-surface-0">Closing Soon</h2>
                         <button type="button" class="text-sm font-semibold text-blue-600" (click)="navigate('/pages/opportunities')">View Opportunities</button>
@@ -272,37 +272,6 @@ import { ChartPointViewModel, CurrencyAmountViewModel, DashboardViewModel, Month
                                 } @empty {
                                     <tr>
                                         <td class="py-4 text-sm text-surface-500" colspan="4">No upcoming closes.</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="card dashboard-panel col-span-12 xl:col-span-6">
-                    <div class="mb-4 flex items-center justify-between">
-                        <h2 class="m-0 text-base font-semibold text-surface-950 dark:text-surface-0">Client Attention</h2>
-                        <button type="button" class="text-sm font-semibold text-blue-600" (click)="navigate('/pages/clients')">View Clients</button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="data-table w-full min-w-[32rem] border-separate border-spacing-0 text-sm">
-                            <thead>
-                                <tr class="text-left text-xs font-semibold text-surface-500">
-                                    <th class="border-b border-surface-100 py-3 dark:border-surface-800">Client</th>
-                                    <th class="border-b border-surface-100 py-3 dark:border-surface-800">Reason</th>
-                                    <th class="border-b border-surface-100 py-3 text-right dark:border-surface-800">Created</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @for (client of dashboard.clientAnalytics.clientsWithoutRecentActivity; track client.id) {
-                                    <tr class="transition">
-                                        <td class="border-b border-surface-100 py-3 pr-4 font-semibold text-surface-950 dark:border-surface-800 dark:text-surface-0">{{ client.label }}</td>
-                                        <td class="border-b border-surface-100 py-3 pr-4 text-surface-500 dark:border-surface-800">{{ client.subtitle || 'No recent activity' }}</td>
-                                        <td class="border-b border-surface-100 py-3 text-right text-surface-500 dark:border-surface-800">{{ formatDate(client.date) }}</td>
-                                    </tr>
-                                } @empty {
-                                    <tr>
-                                        <td class="py-4 text-sm text-surface-500" colspan="3">All visible clients have recent activity.</td>
                                     </tr>
                                 }
                             </tbody>

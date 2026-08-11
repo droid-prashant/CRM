@@ -57,7 +57,6 @@ export interface ClientAnalyticsViewModel {
     inactiveClients: number;
     clientsByProduct: ChartPointViewModel[];
     recentlyAddedClients: DashboardEntityLinkViewModel[];
-    clientsWithoutRecentActivity: DashboardEntityLinkViewModel[];
     clientGrowthTrend: MonthlyTrendViewModel[];
 }
 
