@@ -522,26 +522,10 @@
                 <div class="col-span-12 md:col-span-6">
                     <section class="rounded-md border border-surface-200 p-4 dark:border-surface-700">
                         <h3 class="mt-0 text-base">Client</h3>
-                        <p-select [options]="conversionModeOptions" optionLabel="label" optionValue="value" appendTo="body" formControlName="clientMode" class="mb-3 w-full" />
-
-                        @if (useExistingClient) {
-                            <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Existing Client</label>
-                            <p-select [options]="conversion.existingClients" optionLabel="name" optionValue="id" appendTo="body" formControlName="clientId" class="w-full" />
-                        } @else {
-                            <div class="flex flex-col gap-3">
-                                <div>
-                                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Client Name</label>
-                                    <input pInputText formControlName="newClientName" class="w-full" />
-                                </div>
-                                <div>
-                                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Country</label>
-                                    <p-select [options]="conversion.countries" optionLabel="name" optionValue="id" appendTo="body" formControlName="newClientCountryId" class="w-full" />
-                                </div>
-                                <div>
-                                    <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Industry</label>
-                                    <p-select [options]="conversion.industries" optionLabel="name" optionValue="id" appendTo="body" formControlName="newClientIndustryId" class="w-full" />
-                                </div>
-                            </div>
+                        <div class="text-xs font-semibold uppercase text-surface-500">Client</div>
+                        <div class="mt-1 font-medium text-surface-900 dark:text-surface-0">{{ conversionClientName }}</div>
+                        @if (conversionClientCountry) {
+                            <div class="mt-1 text-sm text-surface-500">{{ conversionClientCountry }}</div>
                         }
                     </section>
                 </div>
