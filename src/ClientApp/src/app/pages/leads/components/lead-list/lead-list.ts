@@ -279,7 +279,7 @@ export class LeadList implements OnInit {
             code: value.code,
             partnerTypeCode: value.partnerTypeCode,
             productIds: value.productIds,
-            ownershipType: value.ownershipType,
+            ownershipTypeCode: value.ownershipTypeCode,
             ownerPartnerId: value.ownerPartnerId
         }));
     }

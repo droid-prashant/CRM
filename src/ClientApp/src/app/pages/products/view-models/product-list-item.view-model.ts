@@ -2,9 +2,11 @@ export interface ProductListItemViewModel {
     id: string;
     code: string;
     name: string;
-    productType: number;
-    deploymentType: number;
-    ownershipType: number;
+    productTypeId: string;
+    productTypeName: string;
+    deploymentTypeId: string;
+    deploymentTypeName: string;
+    ownershipTypeId: string;
     ownershipTypeName: string;
     ownerPartnerId?: string | null;
     ownerPartnerName?: string | null;

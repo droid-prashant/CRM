@@ -8,14 +8,18 @@ export interface ProductFieldOptions {
 }
 
 export function buildProductFields(options: ProductFieldOptions): DynamicField[] {
-    const isPartnerOwned = (formValue: Record<string, unknown>): boolean => Number(formValue['ownershipType']) === 2;
+    const isPartnerOwned = (formValue: Record<string, unknown>): boolean => {
+        const selected = options.ownershipTypes.find((option) => option.value === formValue['ownershipTypeId']);
+        return selected?.code === 'PartnerOwned';
+    };
+    const defaultOwnershipTypeId = options.ownershipTypes.find((option) => option.code === 'InHouse')?.value;
 
     return [
         { key: 'code', label: 'Product Code', type: 'text', required: true, colSpan: 4, section: 'Product', placeholder: 'CRM-CORE' },
         { key: 'name', label: 'Product Name', type: 'text', required: true, colSpan: 4, section: 'Product', placeholder: 'Product or service name' },
-        { key: 'productType', label: 'Product Type', type: 'select', required: true, options: options.productTypes, colSpan: 4, section: 'Product', placeholder: 'Select type' },
-        { key: 'deploymentType', label: 'Deployment Type', type: 'select', required: true, options: options.deploymentTypes, colSpan: 4, section: 'Delivery', placeholder: 'Select deployment' },
-        { key: 'ownershipType', label: 'Ownership', type: 'select', required: true, options: options.ownershipTypes, colSpan: 4, section: 'Ownership', placeholder: 'Select ownership', defaultValue: 1 },
+        { key: 'productTypeId', label: 'Product Type', type: 'select', required: true, options: options.productTypes, colSpan: 4, section: 'Product', placeholder: 'Select type' },
+        { key: 'deploymentTypeId', label: 'Deployment Type', type: 'select', required: true, options: options.deploymentTypes, colSpan: 4, section: 'Delivery', placeholder: 'Select deployment' },
+        { key: 'ownershipTypeId', label: 'Ownership', type: 'select', required: true, options: options.ownershipTypes, colSpan: 4, section: 'Ownership', placeholder: 'Select ownership', defaultValue: defaultOwnershipTypeId },
         { key: 'ownerPartnerId', label: 'Owner Partner', type: 'select', options: options.ownerPartners, colSpan: 4, section: 'Ownership', placeholder: 'Select owner partner', visibleWhen: isPartnerOwned, requiredWhen: isPartnerOwned },
         { key: 'description', label: 'Description', type: 'textarea', colSpan: 8, section: 'Delivery', placeholder: 'Short product description' },
         {

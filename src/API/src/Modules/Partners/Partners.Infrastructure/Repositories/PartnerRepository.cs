@@ -1,3 +1,4 @@
+using ERP.Core.Constants;
 using Microsoft.EntityFrameworkCore;
 using Partners.Application.DTOs;
 using Partners.Application.Repositories;
@@ -37,7 +38,7 @@ namespace Partners.Infrastructure.Repositories
             return new PartnerLookupBundleViewModel
             {
                 PartnerTypes = await GetPartnerTypeLookupsAsync(cancellationToken),
-                Countries = await ToLookupsAsync(_dbContext.Countries, cancellationToken)
+                Countries = await GetLookupDetailsAsync(LookUpTypeEnum.Country, cancellationToken)
             };
         }
 
@@ -52,7 +53,10 @@ namespace Partners.Infrastructure.Repositories
                     Id = x.Id,
                     Name = x.Name,
                     Code = x.Code,
-                    PartnerTypeCode = x.PartnerType != null ? x.PartnerType.Code : null,
+                    PartnerTypeCode = _dbContext.LookupDetails
+                        .Where(l => l.LookupId == LookUpTypeEnum.PartnerType && l.Id == x.PartnerTypeId)
+                        .Select(l => l.Code)
+                        .FirstOrDefault(),
                     ProductIds = x.PartnerProducts
                         .Where(product => product.IsActive)
                         .Select(product => product.ProductId)
@@ -110,9 +114,9 @@ namespace Partners.Infrastructure.Repositories
 
         public Task<bool> ActivatePartnerAsync(Guid id, CancellationToken cancellationToken) => SetActiveAsync(id, true, cancellationToken);
         public Task<bool> DeactivatePartnerAsync(Guid id, CancellationToken cancellationToken) => SetActiveAsync(id, false, cancellationToken);
-        public Task<bool> PartnerTypeExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.PartnerTypes.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
-        public Task<string?> GetPartnerTypeCodeAsync(Guid id, CancellationToken cancellationToken) => _dbContext.PartnerTypes.AsNoTracking().Where(x => x.Id == id && x.IsActive).Select(x => x.Code).FirstOrDefaultAsync(cancellationToken);
-        public Task<bool> CountryExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Countries.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
+        public Task<bool> PartnerTypeExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.PartnerType && x.Id == id && x.IsActive, cancellationToken);
+        public Task<string?> GetPartnerTypeCodeAsync(Guid id, CancellationToken cancellationToken) => _dbContext.LookupDetails.AsNoTracking().Where(x => x.LookupId == LookUpTypeEnum.PartnerType && x.Id == id && x.IsActive).Select(x => x.Code).FirstOrDefaultAsync(cancellationToken);
+        public Task<bool> CountryExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.Country && x.Id == id && x.IsActive, cancellationToken);
         public Task<bool> PartnerExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Partners.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
         public Task<string?> GetPartnerNameAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Partners.AsNoTracking().Where(x => x.Id == id && x.IsActive).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken);
         public Task<string?> GetPartnerTypeCodeForPartnerAsync(Guid id, CancellationToken cancellationToken)
@@ -120,7 +124,10 @@ namespace Partners.Infrastructure.Repositories
             return _dbContext.Partners
                 .AsNoTracking()
                 .Where(x => x.Id == id && x.IsActive)
-                .Select(x => x.PartnerType != null ? x.PartnerType.Code : null)
+                .Select(x => _dbContext.LookupDetails
+                    .Where(l => l.LookupId == LookUpTypeEnum.PartnerType && l.Id == x.PartnerTypeId)
+                    .Select(l => l.Code)
+                    .FirstOrDefault())
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
@@ -163,7 +170,6 @@ namespace Partners.Infrastructure.Repositories
         {
             return _dbContext.Partners
                 .AsNoTracking()
-                .Include(x => x.PartnerType)
                 .Include(x => x.PartnerProducts);
         }
 
@@ -202,22 +208,38 @@ namespace Partners.Infrastructure.Repositories
         private async Task<List<PartnerListItemViewModel>> MapListAsync(List<Partner> partners, CancellationToken cancellationToken)
         {
             var countryIds = partners.Select(x => x.CountryId).Distinct().ToList();
-            var countries = await _dbContext.Countries
+            var countries = await _dbContext.LookupDetails
                 .AsNoTracking()
-                .Where(x => countryIds.Contains(x.Id))
+                .Where(x => x.LookupId == LookUpTypeEnum.Country && countryIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
 
-            return partners.Select(partner => MapList(partner, countries.GetValueOrDefault(partner.CountryId) ?? string.Empty)).ToList();
+            var partnerTypeIds = partners.Select(x => x.PartnerTypeId).Distinct().ToList();
+            var partnerTypes = await _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == LookUpTypeEnum.PartnerType && partnerTypeIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+
+            return partners
+                .Select(partner => MapList(
+                    partner,
+                    countries.GetValueOrDefault(partner.CountryId) ?? string.Empty,
+                    partnerTypes.GetValueOrDefault(partner.PartnerTypeId) ?? string.Empty))
+                .ToList();
         }
 
         private async Task<PartnerDetailViewModel> MapDetailAsync(Partner partner, CancellationToken cancellationToken)
         {
-            var countryName = await _dbContext.Countries
+            var countryName = await _dbContext.LookupDetails
                 .AsNoTracking()
-                .Where(x => x.Id == partner.CountryId)
+                .Where(x => x.LookupId == LookUpTypeEnum.Country && x.Id == partner.CountryId)
                 .Select(x => x.Name)
                 .FirstOrDefaultAsync(cancellationToken);
-            var item = MapList(partner, countryName ?? string.Empty);
+            var partnerTypeName = await _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == LookUpTypeEnum.PartnerType && x.Id == partner.PartnerTypeId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+            var item = MapList(partner, countryName ?? string.Empty, partnerTypeName ?? string.Empty);
 
             return new PartnerDetailViewModel
             {
@@ -242,7 +264,7 @@ namespace Partners.Infrastructure.Repositories
             };
         }
 
-        private static PartnerListItemViewModel MapList(Partner partner, string countryName)
+        private static PartnerListItemViewModel MapList(Partner partner, string countryName, string partnerTypeName)
         {
             return new PartnerListItemViewModel
             {
@@ -250,7 +272,7 @@ namespace Partners.Infrastructure.Repositories
                 Code = partner.Code,
                 Name = partner.Name,
                 PartnerTypeId = partner.PartnerTypeId,
-                PartnerTypeName = partner.PartnerType?.Name ?? string.Empty,
+                PartnerTypeName = partnerTypeName,
                 CountryId = partner.CountryId,
                 CountryName = countryName,
                 ContactPerson = partner.ContactPerson,
@@ -262,6 +284,16 @@ namespace Partners.Infrastructure.Repositories
                 IsActive = partner.IsActive,
                 CreatedAt = partner.CreatedOn
             };
+        }
+
+        private Task<List<LookupViewModel>> GetLookupDetailsAsync(LookUpTypeEnum lookupId, CancellationToken cancellationToken)
+        {
+            return _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == lookupId && x.IsActive)
+                .OrderBy(x => x.Order).ThenBy(x => x.Name)
+                .Select(x => new LookupViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
+                .ToListAsync(cancellationToken);
         }
 
         private static Task<List<LookupViewModel>> ToLookupsAsync<T>(DbSet<T> dbSet, CancellationToken cancellationToken) where T : ERP.Core.Entities.BaseEntity
@@ -281,9 +313,9 @@ namespace Partners.Infrastructure.Repositories
 
         private async Task<List<LookupViewModel>> GetPartnerTypeLookupsAsync(CancellationToken cancellationToken)
         {
-            var partnerTypes = await _dbContext.PartnerTypes
+            var partnerTypes = await _dbContext.LookupDetails
                 .AsNoTracking()
-                .Where(x => x.IsActive)
+                .Where(x => x.LookupId == LookUpTypeEnum.PartnerType && x.IsActive)
                 .Select(x => new
                 {
                     Id = x.Id,

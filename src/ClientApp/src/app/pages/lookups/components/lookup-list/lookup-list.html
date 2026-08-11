@@ -1,0 +1,39 @@
+<p-toast position="bottom-right"></p-toast>
+
+<div class="mb-4 flex items-center gap-3">
+    <label for="lookupTypeFilter" class="font-semibold text-sm">Lookup Type</label>
+    <p-select
+        id="lookupTypeFilter"
+        [options]="lookupTypeOptions"
+        optionLabel="label"
+        optionValue="value"
+        [(ngModel)]="selectedLookupId"
+        (onChange)="onLookupTypeChange()"
+        placeholder="Select lookup type"
+        [style]="{ 'min-width': '220px' }"
+    />
+</div>
+
+@if (!isLoading) {
+    <app-crud
+        [columns]="columns"
+        [data]="data"
+        [fields]="fields"
+        [title]="title"
+        [dataNotFound]="dataNotFound"
+        [errorMessage]="errorMessage"
+        [bulkActionLabel]="'Deactivate'"
+        [rowActionLabel]="rowActionLabel"
+        [rowActionIcon]="rowActionIcon"
+        [rowActionLabelResolver]="rowActionLabelResolver"
+        [rowActionIconResolver]="rowActionIconResolver"
+        [canCreate]="canManage"
+        [canEdit]="canManage"
+        [canRowAction]="canManage"
+        [canBulkAction]="canManage"
+        [canExport]="canManage"
+        (save)="saveLookup($event)"
+        (delete)="toggleLookupStatus($event)"
+        (bulkDelete)="deactivateLookups($event)"
+    />
+}
