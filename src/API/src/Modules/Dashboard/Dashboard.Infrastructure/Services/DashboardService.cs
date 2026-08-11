@@ -2,6 +2,7 @@ using Dashboard.Application.DTOs;
 using Dashboard.Application.Services;
 using Dashboard.Application.ViewModels;
 using Dashboard.Infrastructure.Persistence;
+using ERP.Core.Constants;
 using ERP.Identity.Constants;
 using ERP.Identity.Services.Interfaces;
 using Leads.Domain.Entities;
@@ -51,9 +52,9 @@ namespace Dashboard.Infrastructure.Services
 
             return new DashboardFilterOptionsViewModel
             {
-                LeadSources = await _dbContext.LeadSources
+                LeadSources = await _dbContext.LookupDetails
                     .AsNoTracking()
-                    .Where(x => x.IsActive)
+                    .Where(x => x.LookupId == LookUpTypeEnum.LeadSource && x.IsActive)
                     .OrderBy(x => x.Name)
                     .Select(x => new DashboardLookupViewModel { Id = x.Id, Name = x.Name })
                     .ToListAsync(cancellationToken),
@@ -238,9 +239,9 @@ namespace Dashboard.Infrastructure.Services
                 .OrderByDescending(x => x.Count)
                 .ToListAsync(cancellationToken);
             var sourceIds = sourceRows.Select(x => x.SourceId).ToList();
-            var sources = await _dbContext.LeadSources
+            var sources = await _dbContext.LookupDetails
                 .AsNoTracking()
-                .Where(x => sourceIds.Contains(x.Id))
+                .Where(x => x.LookupId == LookUpTypeEnum.LeadSource && sourceIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
 
             var monthlyRows = await leads

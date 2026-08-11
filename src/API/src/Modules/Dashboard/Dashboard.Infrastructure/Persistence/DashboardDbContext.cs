@@ -18,7 +18,6 @@ namespace Dashboard.Infrastructure.Persistence
         }
 
         public DbSet<Lead> Leads { get; set; }
-        public DbSet<LeadSource> LeadSources { get; set; }
         public DbSet<LeadTimelineEntry> LeadTimelineEntries { get; set; }
         public DbSet<LeadInteraction> LeadInteractions { get; set; }
         public DbSet<CrmClient> Clients { get; set; }
@@ -30,6 +29,7 @@ namespace Dashboard.Infrastructure.Persistence
         public DbSet<OpportunityActivity> OpportunityActivities { get; set; }
         public DbSet<Product> Products { get; set; }
         public DbSet<ApplicationUser> Users { get; set; }
+        public DbSet<LookupDetail> LookupDetails { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -39,20 +39,15 @@ namespace Dashboard.Infrastructure.Persistence
             {
                 entity.ToTable("Leads", "leads");
                 entity.Property(x => x.Status).HasConversion<int>();
-                entity.Ignore(x => x.Source);
-                entity.Ignore(x => x.Category);
-                entity.Ignore(x => x.Country);
-                entity.Ignore(x => x.Industry);
                 entity.Ignore(x => x.ProductInterests);
                 entity.Ignore(x => x.TimelineEntries);
                 entity.Ignore(x => x.Interactions);
             });
 
-            modelBuilder.Entity<LeadSource>(entity =>
+            modelBuilder.Entity<LookupDetail>(entity =>
             {
-                entity.ToTable("LeadSources", "leads");
-                entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
-                entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
+                entity.ToTable("LookupDetails", "lookups", table => table.ExcludeFromMigrations());
+                entity.Property(x => x.LookupId).HasConversion<int>();
             });
 
             modelBuilder.Entity<LeadTimelineEntry>(entity =>
@@ -72,7 +67,6 @@ namespace Dashboard.Infrastructure.Persistence
             {
                 entity.ToTable("Clients", "clients");
                 entity.Property(x => x.Status).HasConversion<int>().HasDefaultValue(ClientStatus.Active);
-                entity.Ignore(x => x.ClientType);
                 entity.Ignore(x => x.Contacts);
                 entity.Ignore(x => x.Products);
                 entity.Ignore(x => x.TimelineEntries);
@@ -122,9 +116,6 @@ namespace Dashboard.Infrastructure.Persistence
             modelBuilder.Entity<Product>(entity =>
             {
                 entity.ToTable("Products", "products");
-                entity.Property(x => x.ProductType).HasConversion<int>();
-                entity.Property(x => x.DeploymentType).HasConversion<int>();
-                entity.Property(x => x.OwnershipType).HasConversion<int>();
             });
 
             modelBuilder.Entity<ApplicationUser>(entity =>

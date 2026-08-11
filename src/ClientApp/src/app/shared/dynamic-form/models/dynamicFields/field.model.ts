@@ -8,7 +8,7 @@ export interface SelectOption {
     code?: string;
     partnerTypeCode?: string;
     productIds?: string[];
-    ownershipType?: number;
+    ownershipTypeCode?: string;
     ownerPartnerId?: string | null;
     clientId?: string;
     canOwnProducts?: boolean;

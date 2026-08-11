@@ -1,3 +1,4 @@
+using ERP.Core.Constants;
 using ERP.Identity.Constants;
 using ERP.Identity.Entities;
 using Leads.Domain.Entities;
@@ -131,7 +132,7 @@ namespace Opportunities.Infrastructure.Repositories
                         ConvertedOpportunityId = x.ConvertedOpportunityId
                     })
                     .ToListAsync(cancellationToken),
-                Currencies = GetCurrencyLookups(),
+                Currencies = await GetCurrencyLookupsAsync(cancellationToken),
                 OwnerUsers = await GetBusinessOwnerLookupsAsync(cancellationToken),
                 Stages = await GetActiveStagesQuery()
                     .OrderBy(x => x.Sequence)
@@ -537,8 +538,9 @@ namespace Opportunities.Infrastructure.Repositories
             var activitySubject = isCreated ? "Commercial breakdown created." : "Commercial breakdown updated.";
             var activityType = isCreated ? "CommercialCreated" : "CommercialUpdated";
             var leadStatus = await GetLeadStatusAsync(opportunity.LeadId, cancellationToken);
-            AddOpportunityActivity(opportunity, "CommercialBreakdown", activitySubject, BuildCommercialBreakdownActivityNotes(opportunity.Status, leadStatus, breakdown, request.Remarks));
-            AddLeadTimelineEntry(opportunity, activityType, BuildCommercialBreakdownTimelineDescription(opportunity, leadStatus, activitySubject, breakdown));
+            var currencyCode = await GetCurrencyCodeAsync(breakdown.CurrencyId);
+            AddOpportunityActivity(opportunity, "CommercialBreakdown", activitySubject, BuildCommercialBreakdownActivityNotes(opportunity.Status, leadStatus, breakdown, request.Remarks, currencyCode));
+            AddLeadTimelineEntry(opportunity, activityType, BuildCommercialBreakdownTimelineDescription(opportunity, leadStatus, activitySubject, breakdown, currencyCode));
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -693,6 +695,11 @@ namespace Opportunities.Infrastructure.Repositories
         public Task<bool> StageExistsAsync(Guid stageId, CancellationToken cancellationToken)
         {
             return GetActiveStagesQuery().AnyAsync(x => x.Id == stageId, cancellationToken);
+        }
+
+        public Task<bool> CurrencyExistsAsync(Guid currencyId, CancellationToken cancellationToken)
+        {
+            return _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.Currency && x.Id == currencyId && x.IsActive, cancellationToken);
         }
 
         public Task<bool> StageIsProposalSentAsync(Guid stageId, CancellationToken cancellationToken)
@@ -851,7 +858,7 @@ namespace Opportunities.Infrastructure.Repositories
                 IsFinalStage = stage?.IsFinal == true,
                 EstimatedValue = opportunity.EstimatedValue,
                 CurrencyId = opportunity.CurrencyId,
-                CurrencyCode = GetCurrencyCode(opportunity.CurrencyId),
+                CurrencyCode = await GetCurrencyCodeAsync(opportunity.CurrencyId),
                 OwnerUserId = opportunity.OwnerUserId,
                 OwnerUserName = await GetUserFullNameAsync(opportunity.OwnerUserId),
                 ExpectedCloseDate = opportunity.ExpectedCloseDate,
@@ -1076,7 +1083,7 @@ namespace Opportunities.Infrastructure.Repositories
                 Id = breakdown.Id,
                 OpportunityId = breakdown.OpportunityId,
                 CurrencyId = breakdown.CurrencyId,
-                CurrencyCode = GetCurrencyCode(breakdown.CurrencyId),
+                CurrencyCode = await GetCurrencyCodeAsync(breakdown.CurrencyId),
                 FinalPayableAmount = breakdown.FinalPayableAmount,
                 AgreementDocumentId = breakdown.AgreementDocumentId,
                 AgreementDocumentFileName = breakdown.AgreementDocument?.FileName,
@@ -1291,9 +1298,9 @@ namespace Opportunities.Infrastructure.Repositories
             return string.IsNullOrWhiteSpace(cleanedRemarks) ? notes : $"{notes}\nRemarks: {cleanedRemarks}";
         }
 
-        private static string BuildCommercialBreakdownActivityNotes(string opportunityStatus, string? leadStatus, OpportunityCommercialBreakdown breakdown, string? remarks)
+        private static string BuildCommercialBreakdownActivityNotes(string opportunityStatus, string? leadStatus, OpportunityCommercialBreakdown breakdown, string? remarks, string currencyCode)
         {
-            var notes = $"Opportunity Status: {opportunityStatus}\nLead Status: {FormatStatus(leadStatus)}\n{BuildCommercialBreakdownSummary(breakdown)}";
+            var notes = $"Opportunity Status: {opportunityStatus}\nLead Status: {FormatStatus(leadStatus)}\n{BuildCommercialBreakdownSummary(breakdown, currencyCode)}";
             var cleanedRemarks = Clean(remarks);
             return string.IsNullOrWhiteSpace(cleanedRemarks) ? notes : $"{notes}\nRemarks: {cleanedRemarks}";
         }
@@ -1310,16 +1317,16 @@ namespace Opportunities.Infrastructure.Repositories
             return $"{FormatCommercialDocumentType(documentType)} deleted for {opportunity.OpportunityNumber}. Opportunity Status: {opportunity.Status}. Lead Status: {FormatStatus(leadStatus)}.";
         }
 
-        private static string BuildCommercialBreakdownTimelineDescription(Opportunity opportunity, string? leadStatus, string activitySubject, OpportunityCommercialBreakdown breakdown)
+        private static string BuildCommercialBreakdownTimelineDescription(Opportunity opportunity, string? leadStatus, string activitySubject, OpportunityCommercialBreakdown breakdown, string currencyCode)
         {
-            return $"{activitySubject} Opportunity {opportunity.OpportunityNumber}. Opportunity Status: {opportunity.Status}. Lead Status: {FormatStatus(leadStatus)}. {BuildCommercialBreakdownSummary(breakdown)}";
+            return $"{activitySubject} Opportunity {opportunity.OpportunityNumber}. Opportunity Status: {opportunity.Status}. Lead Status: {FormatStatus(leadStatus)}. {BuildCommercialBreakdownSummary(breakdown, currencyCode)}";
         }
 
-        private static string BuildCommercialBreakdownSummary(OpportunityCommercialBreakdown breakdown)
+        private static string BuildCommercialBreakdownSummary(OpportunityCommercialBreakdown breakdown, string currencyCode)
         {
             var parts = new List<string>
             {
-                $"Currency: {GetCurrencyCode(breakdown.CurrencyId)}",
+                $"Currency: {currencyCode}",
                 $"Final Payable Amount: {breakdown.FinalPayableAmount:0.##}"
             };
 
@@ -1388,23 +1395,25 @@ namespace Opportunities.Infrastructure.Repositories
             return string.IsNullOrWhiteSpace(value) ? "Not linked" : value;
         }
 
-        private static string GetCurrencyCode(Guid currencyId)
+        private async Task<string> GetCurrencyCodeAsync(Guid currencyId)
         {
-            if (currencyId == Guid.Parse("70000000-0000-0000-0000-000000000001")) return "NPR";
-            if (currencyId == Guid.Parse("70000000-0000-0000-0000-000000000002")) return "USD";
-            if (currencyId == Guid.Parse("70000000-0000-0000-0000-000000000003")) return "INR";
+            var name = await _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == LookUpTypeEnum.Currency && x.Id == currencyId)
+                .Select(x => x.Code)
+                .FirstOrDefaultAsync();
 
-            return string.Empty;
+            return name ?? string.Empty;
         }
 
-        private static List<OpportunityCurrencyLookupViewModel> GetCurrencyLookups()
+        private Task<List<OpportunityCurrencyLookupViewModel>> GetCurrencyLookupsAsync(CancellationToken cancellationToken)
         {
-            return new List<OpportunityCurrencyLookupViewModel>
-            {
-                new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000001"), Code = "NPR", Name = "Nepalese Rupee" },
-                new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000002"), Code = "USD", Name = "US Dollar" },
-                new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000003"), Code = "INR", Name = "Indian Rupee" }
-            };
+            return _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == LookUpTypeEnum.Currency && x.IsActive)
+                .OrderBy(x => x.Order).ThenBy(x => x.Name)
+                .Select(x => new OpportunityCurrencyLookupViewModel { Id = x.Id, Code = x.Code ?? string.Empty, Name = x.Name })
+                .ToListAsync(cancellationToken);
         }
 
         private static List<OpportunityLookupItemViewModel> GetStatusLookups()

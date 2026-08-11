@@ -1,9 +1,9 @@
 export interface CreateProductRequest {
     code: string;
     name: string;
-    productType: number;
-    deploymentType: number;
-    ownershipType: number;
+    productTypeId: string;
+    deploymentTypeId: string;
+    ownershipTypeId: string;
     ownerPartnerId?: string | null;
     description?: string | null;
     isSubscriptionBased: boolean;
