@@ -771,6 +771,62 @@ namespace Leads.Infrastructure.Repositories
             return await MapInteractionAsync(interaction);
         }
 
+        public async Task<LeadInteractionViewModel?> UpdateLeadInteractionAsync(Guid leadId, Guid interactionId, UpdateLeadInteractionRequest request, CancellationToken cancellationToken)
+        {
+            var lead = await _dbContext.Leads
+                .Include(x => x.Interactions)
+                .Include(x => x.TimelineEntries)
+                .FirstOrDefaultAsync(x => x.Id == leadId && x.IsActive && !x.IsDeleted, cancellationToken);
+
+            var interaction = lead?.Interactions.FirstOrDefault(x => x.Id == interactionId && x.IsActive);
+            if (lead == null || interaction == null)
+            {
+                return null;
+            }
+
+            interaction.InteractionType = Enum.Parse<LeadInteractionType>(request.InteractionType, true);
+            interaction.Subject = Clean(request.Subject);
+            interaction.Notes = request.Notes.Trim();
+            interaction.InteractionDate = request.InteractionDate?.ToUniversalTime() ?? interaction.InteractionDate;
+            interaction.NextFollowUpDate = request.NextFollowUpDate?.ToUniversalTime();
+
+            lead.TimelineEntries.Add(new LeadTimelineEntry
+            {
+                EventType = "LeadInteractionUpdated",
+                Description = BuildInteractionDescription(interaction)
+            });
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return await MapInteractionAsync(interaction);
+        }
+
+        public async Task<bool> DeleteLeadInteractionAsync(Guid leadId, Guid interactionId, CancellationToken cancellationToken)
+        {
+            var lead = await _dbContext.Leads
+                .Include(x => x.Interactions)
+                .Include(x => x.TimelineEntries)
+                .FirstOrDefaultAsync(x => x.Id == leadId && x.IsActive && !x.IsDeleted, cancellationToken);
+
+            var interaction = lead?.Interactions.FirstOrDefault(x => x.Id == interactionId && x.IsActive);
+            if (lead == null || interaction == null)
+            {
+                return false;
+            }
+
+            interaction.IsActive = false;
+            interaction.DeletedBy = _userContextService.GetUserId();
+            interaction.DeletedOn = DateTime.UtcNow;
+
+            lead.TimelineEntries.Add(new LeadTimelineEntry
+            {
+                EventType = "LeadInteractionDeleted",
+                Description = BuildInteractionDescription(interaction)
+            });
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
         public Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken)
         {
             return _dbContext.CrmClients

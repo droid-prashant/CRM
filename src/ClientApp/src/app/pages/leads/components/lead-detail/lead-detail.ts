@@ -2,8 +2,9 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { MessageService } from 'primeng/api';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DatePicker, DatePickerModule } from 'primeng/datepicker';
 import { DialogModule } from 'primeng/dialog';
 import { InputNumberModule } from 'primeng/inputnumber';
@@ -29,9 +30,9 @@ import { LeadDetailViewModel } from '../../view-models/lead-detail.view-model';
 @Component({
     selector: 'app-lead-detail',
     standalone: true,
-    imports: [ButtonModule, CommonModule, DatePickerModule, DialogModule, InputNumberModule, InputTextModule, MultiSelectModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, TextareaModule, ToastModule],
+    imports: [ButtonModule, CommonModule, ConfirmDialogModule, DatePickerModule, DialogModule, InputNumberModule, InputTextModule, MultiSelectModule, ReactiveFormsModule, SelectModule, TableModule, TagModule, TextareaModule, ToastModule],
     templateUrl: './lead-detail.html',
-    providers: [MessageService]
+    providers: [ConfirmationService, MessageService]
 })
 export class LeadDetail implements OnInit, OnDestroy {
     private readonly nonEditableStatuses = new Set(['assigned', 'converted']);
@@ -44,6 +45,7 @@ export class LeadDetail implements OnInit, OnDestroy {
     isConverting = false;
     isSavingLead = false;
     isSavingInteraction = false;
+    isDeletingInteraction = false;
     errorMessage = '';
     canEditLead = false;
     canApproveLead = false;
@@ -55,6 +57,7 @@ export class LeadDetail implements OnInit, OnDestroy {
     interactionDialog = false;
     conversion?: LeadConversionViewModel;
     interactions: LeadInteractionViewModel[] = [];
+    editingInteractionId: string | null = null;
     leadLookups?: LeadLookupBundle;
     users: UserListItemViewModel[] = [];
     readonly interactionTypeOptions = [
@@ -70,6 +73,7 @@ export class LeadDetail implements OnInit, OnDestroy {
 
     private readonly fb = inject(FormBuilder);
     private readonly messageService = inject(MessageService);
+    private readonly confirmationService = inject(ConfirmationService);
     private sourceSubscription?: Subscription;
     private partnerSubscription?: Subscription;
     private clientSubscription?: Subscription;
@@ -363,15 +367,22 @@ export class LeadDetail implements OnInit, OnDestroy {
         });
     }
 
-    openInteractionDialog(): void {
+    openInteractionDialog(interaction?: LeadInteractionViewModel): void {
+        this.editingInteractionId = interaction?.id ?? null;
         this.interactionForm.reset({
-            interactionType: 'Call',
-            subject: '',
-            notes: '',
-            interactionDate: new Date(),
-            nextFollowUpDate: null
+            interactionType: interaction?.interactionType ?? 'Call',
+            subject: interaction?.subject ?? '',
+            notes: interaction?.notes ?? '',
+            interactionDate: interaction ? new Date(interaction.interactionDate) : new Date(),
+            nextFollowUpDate: interaction?.nextFollowUpDate ? new Date(interaction.nextFollowUpDate) : null
         });
         this.interactionDialog = true;
+    }
+
+    get todayStart(): Date {
+        const date = new Date();
+        date.setHours(0, 0, 0, 0);
+        return date;
     }
 
     openConversionDialog(): void {
@@ -496,7 +507,7 @@ export class LeadDetail implements OnInit, OnDestroy {
             });
     }
 
-    addInteraction(): void {
+    saveInteraction(): void {
         if (!this.lead) {
             return;
         }
@@ -506,17 +517,53 @@ export class LeadDetail implements OnInit, OnDestroy {
             return;
         }
 
+        const request = this.buildInteractionRequest();
+        const isEditing = !!this.editingInteractionId;
+        const save$ = isEditing
+            ? this.leadApiService.updateLeadInteraction(this.lead.id, this.editingInteractionId!, request)
+            : this.leadApiService.createLeadInteraction(this.lead.id, request);
+
         this.isSavingInteraction = true;
-        this.leadApiService.createLeadInteraction(this.lead.id, this.buildInteractionRequest()).subscribe({
+        save$.subscribe({
             next: () => {
                 this.interactionDialog = false;
-                this.messageService.add({ severity: 'success', summary: 'Interaction saved', detail: 'The interaction was added to the lead timeline.', life: 4000 });
+                const summary = isEditing ? 'Interaction updated' : 'Interaction saved';
+                const detail = isEditing ? 'The interaction was updated.' : 'The interaction was added to the lead timeline.';
+                this.messageService.add({ severity: 'success', summary, detail, life: 4000 });
                 this.loadLead();
                 this.isSavingInteraction = false;
             },
             error: (error) => {
                 this.handleActionError(error, 'Interaction failed', 'Lead interaction could not be saved.');
                 this.isSavingInteraction = false;
+            }
+        });
+    }
+
+    confirmDeleteInteraction(interaction: LeadInteractionViewModel): void {
+        this.confirmationService.confirm({
+            message: 'Are you sure you want to delete this interaction?',
+            header: 'Confirm',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => this.deleteInteraction(interaction.id)
+        });
+    }
+
+    private deleteInteraction(interactionId: string): void {
+        if (!this.lead) {
+            return;
+        }
+
+        this.isDeletingInteraction = true;
+        this.leadApiService.deleteLeadInteraction(this.lead.id, interactionId).subscribe({
+            next: () => {
+                this.messageService.add({ severity: 'success', summary: 'Interaction deleted', detail: 'The interaction was removed from the lead timeline.', life: 4000 });
+                this.loadLead();
+                this.isDeletingInteraction = false;
+            },
+            error: (error) => {
+                this.handleActionError(error, 'Delete failed', 'Lead interaction could not be deleted.');
+                this.isDeletingInteraction = false;
             }
         });
     }
