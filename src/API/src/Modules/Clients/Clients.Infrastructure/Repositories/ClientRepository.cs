@@ -942,7 +942,7 @@ namespace Clients.Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(x => x.LookupId == lookupId && x.IsActive)
                 .OrderBy(x => x.Order).ThenBy(x => x.Name)
-                .Select(x => new LookupViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
+                .Select(x => new LookupViewModel { Id = x.Id, Name = x.Name, Code = x.Code, DialingCode = x.DialingCode })
                 .ToListAsync(cancellationToken);
         }
 

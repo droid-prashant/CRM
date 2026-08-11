@@ -517,14 +517,24 @@
             </div>
             <div class="col-span-12 md:col-span-4">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Phone</label>
-                <input pInputText formControlName="phone" inputmode="numeric" maxlength="10" class="w-full" (input)="normalizeContactNumber('phone', $event)" />
+                <div class="flex">
+                    @if (contactPhonePrefix) {
+                        <span class="inline-flex items-center rounded-l-md border border-r-0 border-surface-300 bg-surface-100 px-3 text-sm text-surface-600 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-300">{{ contactPhonePrefix }}</span>
+                    }
+                    <input pInputText formControlName="phone" inputmode="numeric" maxlength="10" class="w-full" [ngClass]="{ 'rounded-l-none': contactPhonePrefix }" (input)="normalizeContactNumber('phone', $event)" />
+                </div>
                 @if (contactForm.get('phone')?.hasError('pattern') && contactForm.get('phone')?.touched) {
                     <span class="p-error mt-1 block text-sm text-red-600">{{ contactNumberValidationMessage }}</span>
                 }
             </div>
             <div class="col-span-12 md:col-span-4">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Mobile</label>
-                <input pInputText formControlName="mobile" inputmode="numeric" maxlength="10" class="w-full" (input)="normalizeContactNumber('mobile', $event)" />
+                <div class="flex">
+                    @if (contactPhonePrefix) {
+                        <span class="inline-flex items-center rounded-l-md border border-r-0 border-surface-300 bg-surface-100 px-3 text-sm text-surface-600 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-300">{{ contactPhonePrefix }}</span>
+                    }
+                    <input pInputText formControlName="mobile" inputmode="numeric" maxlength="10" class="w-full" [ngClass]="{ 'rounded-l-none': contactPhonePrefix }" (input)="normalizeContactNumber('mobile', $event)" />
+                </div>
                 @if (contactForm.get('mobile')?.hasError('pattern') && contactForm.get('mobile')?.touched) {
                     <span class="p-error mt-1 block text-sm text-red-600">{{ contactNumberValidationMessage }}</span>
                 }

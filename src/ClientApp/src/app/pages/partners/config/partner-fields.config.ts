@@ -47,7 +47,8 @@ export function buildPartnerFields(options: PartnerFieldOptions): DynamicField[]
             patternMessage: NEPAL_CONTACT_NUMBER_MESSAGE,
             digitsOnly: true,
             maxLength: 10,
-            inputMode: 'numeric'
+            inputMode: 'numeric',
+            prefixFrom: (formValue) => options.countries.find((country) => country.value === formValue['countryId'])?.dialingCode
         },
         { key: 'email', label: 'Email', type: 'email', colSpan: 4, section: 'Contact', placeholder: 'name@example.com' },
         { key: 'address', label: 'Address', type: 'textarea', colSpan: 6, section: 'Additional Details' },

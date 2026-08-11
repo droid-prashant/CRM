@@ -369,6 +369,10 @@ export class Crud implements OnChanges, OnDestroy {
         return field.optionFilter ? options.filter((option) => field.optionFilter?.(option, this.currentFormValue(), this.mode) === true) : options;
     }
 
+    fieldPrefix(field: DynamicField): string | null {
+        return field.prefixFrom ? field.prefixFrom(this.currentFormValue(), this.mode) ?? null : null;
+    }
+
     fieldErrorMessage(field: DynamicField): string {
         const control = this.form.get(field.key);
         if (!control?.errors || (!control.touched && !this.submitted)) {

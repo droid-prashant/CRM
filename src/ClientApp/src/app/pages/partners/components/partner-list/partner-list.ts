@@ -210,6 +210,7 @@ export class PartnerList implements OnInit {
             label: value.name,
             value: value.id,
             code: value.code,
+            dialingCode: value.dialingCode,
             partnerTypeCode: value.partnerTypeCode,
             canOwnProducts: value.canOwnProducts,
             canSellInHouseProducts: value.canSellInHouseProducts
