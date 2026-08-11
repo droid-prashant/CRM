@@ -1,3 +1,4 @@
+using ERP.Core.Constants;
 using ERP.Identity.Entities;
 using ERP.Identity.Services.Interfaces;
 using Leads.Application.DTOs;
@@ -35,9 +36,6 @@ namespace Leads.Infrastructure.Repositories
         {
             var leads = await _dbContext.Leads
                 .AsNoTracking()
-                .Include(x => x.Source)
-                .Include(x => x.Category)
-                .Include(x => x.Country)
                 .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
                 .Where(x => x.IsActive && !x.IsDeleted && (!assignedToUserId.HasValue || x.AssignedToUserId == assignedToUserId.Value))
                 .OrderByDescending(x => x.CreatedOn)
@@ -55,6 +53,9 @@ namespace Leads.Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(x => contactIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, cancellationToken);
+            var countryNames = await GetCountryNamesAsync(leads.Select(x => x.CountryId), cancellationToken);
+            var sourceNames = await GetLookupNamesAsync(LookUpTypeEnum.LeadSource, leads.Select(x => x.SourceId), cancellationToken);
+            var categoryNames = await GetLookupNamesAsync(LookUpTypeEnum.LeadCategory, leads.Select(x => x.CategoryId), cancellationToken);
 
             return leads.Select(x =>
             {
@@ -92,9 +93,9 @@ namespace Leads.Infrastructure.Repositories
                     Notes = x.Notes,
                     LeadScore = x.LeadScore,
                     ProductIds = x.ProductInterests.Where(p => p.IsActive).Select(p => p.ProductId).ToList(),
-                    SourceName = x.Source?.Name ?? string.Empty,
-                    CategoryName = x.Category?.Name ?? string.Empty,
-                    CountryName = x.Country?.Name ?? string.Empty,
+                    SourceName = sourceNames.GetValueOrDefault(x.SourceId) ?? string.Empty,
+                    CategoryName = categoryNames.GetValueOrDefault(x.CategoryId) ?? string.Empty,
+                    CountryName = countryNames.GetValueOrDefault(x.CountryId) ?? string.Empty,
                     Status = x.Status.ToString(),
                     ProductNames = string.Join(", ", x.ProductInterests.Where(p => p.IsActive).Select(p => p.Product?.Name).Where(p => !string.IsNullOrWhiteSpace(p))),
                     CreatedAt = x.CreatedOn
@@ -106,13 +107,14 @@ namespace Leads.Infrastructure.Repositories
         {
             var leads = await _dbContext.Leads
                 .AsNoTracking()
-                .Include(x => x.Source)
-                .Include(x => x.Category)
-                .Include(x => x.Country)
                 .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
                 .Where(x => x.IsDeleted)
                 .OrderByDescending(x => x.DeletedOn ?? x.UpdatedOn ?? x.CreatedOn)
                 .ToListAsync(cancellationToken);
+
+            var countryNames = await GetCountryNamesAsync(leads.Select(x => x.CountryId), cancellationToken);
+            var sourceNames = await GetLookupNamesAsync(LookUpTypeEnum.LeadSource, leads.Select(x => x.SourceId), cancellationToken);
+            var categoryNames = await GetLookupNamesAsync(LookUpTypeEnum.LeadCategory, leads.Select(x => x.CategoryId), cancellationToken);
 
             var deletedByIds = leads
                 .Select(x => x.DeletedBy)
@@ -134,9 +136,9 @@ namespace Leads.Infrastructure.Repositories
                 ContactPersonName = x.ContactPersonName,
                 Email = x.Email,
                 Phone = x.Phone,
-                SourceName = x.Source?.Name ?? string.Empty,
-                CategoryName = x.Category?.Name ?? string.Empty,
-                CountryName = x.Country?.Name ?? string.Empty,
+                SourceName = sourceNames.GetValueOrDefault(x.SourceId) ?? string.Empty,
+                CategoryName = categoryNames.GetValueOrDefault(x.CategoryId) ?? string.Empty,
+                CountryName = countryNames.GetValueOrDefault(x.CountryId) ?? string.Empty,
                 Status = x.Status.ToString(),
                 ProductNames = string.Join(", ", x.ProductInterests.Select(p => p.Product?.Name).Where(p => !string.IsNullOrWhiteSpace(p))),
                 CreatedAt = x.CreatedOn,
@@ -151,10 +153,6 @@ namespace Leads.Infrastructure.Repositories
         {
             var lead = await _dbContext.Leads
                 .AsNoTracking()
-                .Include(x => x.Source)
-                .Include(x => x.Category)
-                .Include(x => x.Country)
-                .Include(x => x.Industry)
                 .Include(x => x.ProductInterests).ThenInclude(x => x.Product)
                 .Include(x => x.TimelineEntries)
                 .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && !x.IsDeleted, cancellationToken);
@@ -164,7 +162,23 @@ namespace Leads.Infrastructure.Repositories
                 return null;
             }
 
-            var detail = MapDetail(lead);
+            var sourceName = await _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == LookUpTypeEnum.LeadSource && x.Id == lead.SourceId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+            var categoryName = await _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == LookUpTypeEnum.LeadCategory && x.Id == lead.CategoryId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+            var productTypeNames = await GetLookupNamesAsync(
+                LookUpTypeEnum.ProductType,
+                lead.ProductInterests.Where(x => x.Product != null).Select(x => x.Product!.ProductTypeId),
+                cancellationToken);
+
+            var detail = MapDetail(lead, sourceName, categoryName, productTypeNames);
+            await PopulateLeadCountryIndustryFieldsAsync(detail, cancellationToken);
             await PopulateLeadClientFieldsAsync(detail, cancellationToken);
             if (lead.PartnerId.HasValue)
             {
@@ -232,8 +246,8 @@ namespace Leads.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public Task<List<LookupViewModel>> GetLeadSourceLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.LeadSources, cancellationToken);
-        public Task<List<LookupViewModel>> GetLeadCategoryLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.LeadCategories, cancellationToken);
+        public Task<List<LookupViewModel>> GetLeadSourceLookupsAsync(CancellationToken cancellationToken) => GetLookupDetailsAsync(LookUpTypeEnum.LeadSource, cancellationToken);
+        public Task<List<LookupViewModel>> GetLeadCategoryLookupsAsync(CancellationToken cancellationToken) => GetLookupDetailsAsync(LookUpTypeEnum.LeadCategory, cancellationToken);
         public Task<List<LookupViewModel>> GetProductLookupsAsync(CancellationToken cancellationToken)
         {
             return _dbContext.Products
@@ -245,24 +259,22 @@ namespace Leads.Infrastructure.Repositories
                     Id = x.Id,
                     Name = x.Name,
                     Code = x.Code,
-                    OwnershipType = (int)x.OwnershipType,
+                    OwnershipTypeCode = _dbContext.LookupDetails
+                        .Where(l => l.LookupId == LookUpTypeEnum.OwnershipType && l.Id == x.OwnershipTypeId)
+                        .Select(l => l.Code)
+                        .FirstOrDefault(),
                     OwnerPartnerId = x.OwnerPartnerId
                 })
                 .ToListAsync(cancellationToken);
         }
-        public Task<List<LookupViewModel>> GetCountryLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.Countries, cancellationToken);
-        public Task<List<LookupViewModel>> GetIndustryLookupsAsync(CancellationToken cancellationToken) => GetLookupsAsync(_dbContext.Industries, cancellationToken);
-
-        public Task<bool> SourceRequiresPartnerAsync(Guid sourceId, CancellationToken cancellationToken)
-        {
-            return _dbContext.LeadSources.AnyAsync(x => x.Id == sourceId && x.IsActive && x.RequiresPartner, cancellationToken);
-        }
+        public Task<List<LookupViewModel>> GetCountryLookupsAsync(CancellationToken cancellationToken) => GetLookupDetailsAsync(LookUpTypeEnum.Country, cancellationToken);
+        public Task<List<LookupViewModel>> GetIndustryLookupsAsync(CancellationToken cancellationToken) => GetLookupDetailsAsync(LookUpTypeEnum.Industry, cancellationToken);
 
         public Task<string?> GetLeadSourceCodeAsync(Guid sourceId, CancellationToken cancellationToken)
         {
-            return _dbContext.LeadSources
+            return _dbContext.LookupDetails
                 .AsNoTracking()
-                .Where(x => x.Id == sourceId && x.IsActive)
+                .Where(x => x.LookupId == LookUpTypeEnum.LeadSource && x.Id == sourceId && x.IsActive)
                 .Select(x => x.Code)
                 .FirstOrDefaultAsync(cancellationToken);
         }
@@ -287,10 +299,10 @@ namespace Leads.Infrastructure.Repositories
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
-        public Task<bool> SourceExistsAsync(Guid sourceId, CancellationToken cancellationToken) => _dbContext.LeadSources.AnyAsync(x => x.Id == sourceId && x.IsActive, cancellationToken);
-        public Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken) => _dbContext.LeadCategories.AnyAsync(x => x.Id == categoryId && x.IsActive, cancellationToken);
-        public Task<bool> CountryExistsAsync(Guid countryId, CancellationToken cancellationToken) => _dbContext.Countries.AnyAsync(x => x.Id == countryId && x.IsActive, cancellationToken);
-        public Task<bool> IndustryExistsAsync(Guid industryId, CancellationToken cancellationToken) => _dbContext.Industries.AnyAsync(x => x.Id == industryId && x.IsActive, cancellationToken);
+        public Task<bool> SourceExistsAsync(Guid sourceId, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.LeadSource && x.Id == sourceId && x.IsActive, cancellationToken);
+        public Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.LeadCategory && x.Id == categoryId && x.IsActive, cancellationToken);
+        public Task<bool> CountryExistsAsync(Guid countryId, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.Country && x.Id == countryId && x.IsActive, cancellationToken);
+        public Task<bool> IndustryExistsAsync(Guid industryId, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.Industry && x.Id == industryId && x.IsActive, cancellationToken);
 
         public Task<List<Guid>> GetActiveProductIdsAsync(IEnumerable<Guid> productIds, CancellationToken cancellationToken)
         {
@@ -305,7 +317,7 @@ namespace Leads.Infrastructure.Repositories
                 .Where(x => ids.Contains(x.Id)
                     && x.IsActive
                     && !x.IsDeleted
-                    && x.OwnershipType == Products.Domain.Enums.ProductOwnershipType.InHouse)
+                    && _dbContext.LookupDetails.Any(l => l.LookupId == LookUpTypeEnum.OwnershipType && l.Id == x.OwnershipTypeId && l.Code == "InHouse"))
                 .Select(x => x.Id)
                 .ToListAsync(cancellationToken);
         }
@@ -317,7 +329,7 @@ namespace Leads.Infrastructure.Repositories
                 .Where(x => ids.Contains(x.Id)
                     && x.IsActive
                     && !x.IsDeleted
-                    && x.OwnershipType == Products.Domain.Enums.ProductOwnershipType.PartnerOwned
+                    && _dbContext.LookupDetails.Any(l => l.LookupId == LookUpTypeEnum.OwnershipType && l.Id == x.OwnershipTypeId && l.Code == "PartnerOwned")
                     && x.OwnerPartnerId == ownerPartnerId)
                 .Select(x => x.Id)
                 .ToListAsync(cancellationToken);
@@ -432,7 +444,11 @@ namespace Leads.Infrastructure.Repositories
             }
 
             var assignedToUserName = await GetUserFullNameAsync(lead.AssignedToUserId);
-            return MapQualification(lead, assignedToUserName);
+            var productTypeNames = await GetLookupNamesAsync(
+                LookUpTypeEnum.ProductType,
+                lead.ProductInterests.Where(x => x.Product != null).Select(x => x.Product!.ProductTypeId),
+                cancellationToken);
+            return MapQualification(lead, assignedToUserName, productTypeNames);
         }
 
         public async Task<LeadQualificationResultViewModel?> UpdateLeadStatusAsync(Guid id, string status, string? disqualificationReason, string? remarks, CancellationToken cancellationToken)
@@ -526,6 +542,10 @@ namespace Leads.Infrastructure.Repositories
 
             var existingClients = await GetClientLookupsAsync(cancellationToken);
             var existingContacts = await GetContactLookupsAsync(cancellationToken);
+            var productTypeNames = await GetLookupNamesAsync(
+                LookUpTypeEnum.ProductType,
+                lead.ProductInterests.Where(x => x.Product != null).Select(x => x.Product!.ProductTypeId),
+                cancellationToken);
 
             return new LeadConversionViewModel
             {
@@ -544,7 +564,7 @@ namespace Leads.Infrastructure.Repositories
                         ProductId = x.ProductId,
                         ProductCode = x.Product?.Code ?? string.Empty,
                         ProductName = x.Product?.Name ?? string.Empty,
-                        ProductCategoryName = x.Product?.ProductType.ToString()
+                        ProductCategoryName = x.Product != null ? productTypeNames.GetValueOrDefault(x.Product.ProductTypeId) : null
                     }).ToList(),
                 ExistingClients = existingClients,
                 ExistingContacts = existingContacts,
@@ -846,31 +866,26 @@ namespace Leads.Infrastructure.Repositories
             return true;
         }
 
-        private static Task<List<LookupViewModel>> GetLookupsAsync<T>(DbSet<T> dbSet, CancellationToken cancellationToken) where T : ERP.Core.Entities.BaseEntity
+        private Task<List<LookupViewModel>> GetLookupDetailsAsync(LookUpTypeEnum lookupId, CancellationToken cancellationToken)
         {
-            return dbSet
+            return _dbContext.LookupDetails
                 .AsNoTracking()
-                .Where(x => x.IsActive)
-                .OrderBy(x => EF.Property<string>(x, "Name"))
-                .Select(x => new LookupViewModel
-                {
-                    Id = x.Id,
-                    Name = EF.Property<string>(x, "Name"),
-                    Code = EF.Property<string>(x, "Code")
-                })
+                .Where(x => x.LookupId == lookupId && x.IsActive)
+                .OrderBy(x => x.Order).ThenBy(x => x.Name)
+                .Select(x => new LookupViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
                 .ToListAsync(cancellationToken);
         }
 
-        private static LeadDetailViewModel MapDetail(Lead lead)
+        private static LeadDetailViewModel MapDetail(Lead lead, string sourceName, string categoryName, IReadOnlyDictionary<Guid, string> productTypeNames)
         {
             return new LeadDetailViewModel
             {
                 Id = lead.Id,
                 LeadNumber = lead.LeadNumber,
                 SourceId = lead.SourceId,
-                SourceName = lead.Source?.Name ?? string.Empty,
+                SourceName = sourceName,
                 CategoryId = lead.CategoryId,
-                CategoryName = lead.Category?.Name ?? string.Empty,
+                CategoryName = categoryName,
                 PartnerId = lead.PartnerId,
                 CampaignName = lead.CampaignName,
                 SourceStartDate = lead.SourceStartDate,
@@ -885,10 +900,10 @@ namespace Leads.Infrastructure.Repositories
                 Phone = lead.Phone,
                 AlternatePhone = lead.AlternatePhone,
                 CountryId = lead.CountryId,
-                CountryName = lead.Country?.Name ?? string.Empty,
+                CountryName = string.Empty,
                 Address = lead.Address,
                 IndustryId = lead.IndustryId,
-                IndustryName = lead.Industry?.Name,
+                IndustryName = null,
                 Notes = lead.Notes,
                 LeadScore = lead.LeadScore,
                 Status = lead.Status.ToString(),
@@ -908,7 +923,7 @@ namespace Leads.Infrastructure.Repositories
                         ProductId = x.ProductId,
                         ProductCode = x.Product?.Code ?? string.Empty,
                         ProductName = x.Product?.Name ?? string.Empty,
-                        ProductCategoryName = x.Product?.ProductType.ToString()
+                        ProductCategoryName = x.Product != null ? productTypeNames.GetValueOrDefault(x.Product.ProductTypeId) : null
                     }).ToList(),
                 TimelineEntries = lead.TimelineEntries
                     .Where(x => x.IsActive)
@@ -958,6 +973,41 @@ namespace Leads.Infrastructure.Repositories
             lead.IndustryId = client.IndustryId;
         }
 
+        private async Task PopulateLeadCountryIndustryFieldsAsync(LeadDetailViewModel detail, CancellationToken cancellationToken)
+        {
+            detail.CountryName = await _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == LookUpTypeEnum.Country && x.Id == detail.CountryId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+
+            detail.IndustryName = detail.IndustryId.HasValue
+                ? await _dbContext.LookupDetails
+                    .AsNoTracking()
+                    .Where(x => x.LookupId == LookUpTypeEnum.Industry && x.Id == detail.IndustryId.Value)
+                    .Select(x => x.Name)
+                    .FirstOrDefaultAsync(cancellationToken)
+                : null;
+        }
+
+        private Task<Dictionary<Guid, string>> GetLookupNamesAsync(LookUpTypeEnum lookupId, IEnumerable<Guid> ids, CancellationToken cancellationToken)
+        {
+            var distinctIds = ids.Distinct().ToList();
+            return _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == lookupId && distinctIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+        }
+
+        private Task<Dictionary<Guid, string>> GetCountryNamesAsync(IEnumerable<Guid> countryIds, CancellationToken cancellationToken)
+        {
+            var ids = countryIds.Distinct().ToList();
+            return _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == LookUpTypeEnum.Country && ids.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+        }
+
         private async Task PopulateLeadClientFieldsAsync(LeadDetailViewModel detail, CancellationToken cancellationToken)
         {
             var client = detail.ClientId.HasValue
@@ -984,7 +1034,7 @@ namespace Leads.Infrastructure.Repositories
                 : null;
         }
 
-        private static LeadQualificationViewModel MapQualification(Lead lead, string? assignedToUserName)
+        private static LeadQualificationViewModel MapQualification(Lead lead, string? assignedToUserName, IReadOnlyDictionary<Guid, string> productTypeNames)
         {
             return new LeadQualificationViewModel
             {
@@ -1000,7 +1050,7 @@ namespace Leads.Infrastructure.Repositories
                         ProductId = x.ProductId,
                         ProductCode = x.Product?.Code ?? string.Empty,
                         ProductName = x.Product?.Name ?? string.Empty,
-                        ProductCategoryName = x.Product?.ProductType.ToString()
+                        ProductCategoryName = x.Product != null ? productTypeNames.GetValueOrDefault(x.Product.ProductTypeId) : null
                     }).ToList(),
                 AssignedToUserId = lead.AssignedToUserId,
                 AssignedToUserName = assignedToUserName,

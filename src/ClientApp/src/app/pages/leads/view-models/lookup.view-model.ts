@@ -4,7 +4,7 @@ export interface LookupViewModel {
     code?: string;
     partnerTypeCode?: string;
     productIds?: string[];
-    ownershipType?: number;
+    ownershipTypeCode?: string;
     ownerPartnerId?: string | null;
     canOwnProducts?: boolean;
     canSellInHouseProducts?: boolean;

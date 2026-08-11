@@ -1,3 +1,4 @@
+using ERP.Core.Constants;
 using Microsoft.EntityFrameworkCore;
 using Products.Application.DTOs;
 using Products.Application.Repositories;
@@ -28,14 +29,14 @@ namespace Products.Infrastructure.Repositories
                     || (x.Description != null && x.Description.ToLower().Contains(search)));
             }
 
-            if (request.ProductType.HasValue)
+            if (request.ProductTypeId.HasValue)
             {
-                query = query.Where(x => x.ProductType == request.ProductType.Value);
+                query = query.Where(x => x.ProductTypeId == request.ProductTypeId.Value);
             }
 
-            if (request.DeploymentType.HasValue)
+            if (request.DeploymentTypeId.HasValue)
             {
-                query = query.Where(x => x.DeploymentType == request.DeploymentType.Value);
+                query = query.Where(x => x.DeploymentTypeId == request.DeploymentTypeId.Value);
             }
 
             if (request.IsActive.HasValue)
@@ -55,9 +56,21 @@ namespace Products.Infrastructure.Repositories
                     Id = x.Id,
                     Code = x.Code,
                     Name = x.Name,
-                    ProductType = x.ProductType,
-                    DeploymentType = x.DeploymentType,
-                    OwnershipType = x.OwnershipType,
+                    ProductTypeId = x.ProductTypeId,
+                    ProductTypeName = _dbContext.LookupDetails
+                        .Where(l => l.LookupId == LookUpTypeEnum.ProductType && l.Id == x.ProductTypeId)
+                        .Select(l => l.Name)
+                        .FirstOrDefault() ?? string.Empty,
+                    DeploymentTypeId = x.DeploymentTypeId,
+                    DeploymentTypeName = _dbContext.LookupDetails
+                        .Where(l => l.LookupId == LookUpTypeEnum.DeploymentType && l.Id == x.DeploymentTypeId)
+                        .Select(l => l.Name)
+                        .FirstOrDefault() ?? string.Empty,
+                    OwnershipTypeId = x.OwnershipTypeId,
+                    OwnershipTypeName = _dbContext.LookupDetails
+                        .Where(l => l.LookupId == LookUpTypeEnum.OwnershipType && l.Id == x.OwnershipTypeId)
+                        .Select(l => l.Name)
+                        .FirstOrDefault() ?? string.Empty,
                     OwnerPartnerId = x.OwnerPartnerId,
                     Description = x.Description,
                     IsActive = x.IsActive,
@@ -71,7 +84,13 @@ namespace Products.Infrastructure.Repositories
         public async Task<ProductDetailViewModel?> GetProductAsync(Guid id, CancellationToken cancellationToken)
         {
             var product = await BaseQuery().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-            return product == null ? null : MapDetail(product);
+            if (product == null)
+            {
+                return null;
+            }
+
+            var typeNames = await GetTypeNamesAsync(product.ProductTypeId, product.DeploymentTypeId, product.OwnershipTypeId, cancellationToken);
+            return MapDetail(product, typeNames.ProductTypeName, typeNames.DeploymentTypeName, typeNames.OwnershipTypeName);
         }
 
         public async Task<ProductDetailViewModel> CreateProductAsync(CreateProductRequest request, CancellationToken cancellationToken)
@@ -80,9 +99,9 @@ namespace Products.Infrastructure.Repositories
             {
                 Code = request.Code,
                 Name = request.Name,
-                ProductType = request.ProductType,
-                DeploymentType = request.DeploymentType,
-                OwnershipType = request.OwnershipType,
+                ProductTypeId = request.ProductTypeId,
+                DeploymentTypeId = request.DeploymentTypeId,
+                OwnershipTypeId = request.OwnershipTypeId,
                 OwnerPartnerId = request.OwnerPartnerId,
                 Description = request.Description,
                 IsSubscriptionBased = request.IsSubscriptionBased,
@@ -106,9 +125,9 @@ namespace Products.Infrastructure.Repositories
 
             product.Code = request.Code;
             product.Name = request.Name;
-            product.ProductType = request.ProductType;
-            product.DeploymentType = request.DeploymentType;
-            product.OwnershipType = request.OwnershipType;
+            product.ProductTypeId = request.ProductTypeId;
+            product.DeploymentTypeId = request.DeploymentTypeId;
+            product.OwnershipTypeId = request.OwnershipTypeId;
             product.OwnerPartnerId = request.OwnerPartnerId;
             product.Description = request.Description;
             product.IsSubscriptionBased = request.IsSubscriptionBased;
@@ -155,9 +174,34 @@ namespace Products.Infrastructure.Repositories
                     Id = x.Id,
                     Name = x.Name,
                     Code = x.Code,
-                    OwnershipType = (int)x.OwnershipType,
+                    OwnershipTypeId = x.OwnershipTypeId,
                     OwnerPartnerId = x.OwnerPartnerId
                 })
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<List<ProductOptionViewModel>> GetProductTypeLookupsAsync(CancellationToken cancellationToken) => GetLookupOptionsAsync(LookUpTypeEnum.ProductType, cancellationToken);
+        public Task<List<ProductOptionViewModel>> GetDeploymentTypeLookupsAsync(CancellationToken cancellationToken) => GetLookupOptionsAsync(LookUpTypeEnum.DeploymentType, cancellationToken);
+        public Task<List<ProductOptionViewModel>> GetOwnershipTypeLookupsAsync(CancellationToken cancellationToken) => GetLookupOptionsAsync(LookUpTypeEnum.OwnershipType, cancellationToken);
+        public Task<bool> ProductTypeExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.ProductType && x.Id == id && x.IsActive, cancellationToken);
+        public Task<bool> DeploymentTypeExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.DeploymentType && x.Id == id && x.IsActive, cancellationToken);
+        public Task<bool> OwnershipTypeExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.OwnershipType && x.Id == id && x.IsActive, cancellationToken);
+        public Task<string?> GetOwnershipTypeCodeAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == LookUpTypeEnum.OwnershipType && x.Id == id && x.IsActive)
+                .Select(x => x.Code)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        private Task<List<ProductOptionViewModel>> GetLookupOptionsAsync(LookUpTypeEnum lookupId, CancellationToken cancellationToken)
+        {
+            return _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == lookupId && x.IsActive)
+                .OrderBy(x => x.Order).ThenBy(x => x.Name)
+                .Select(x => new ProductOptionViewModel { Value = x.Id, Code = x.Code ?? string.Empty, Name = x.Name })
                 .ToListAsync(cancellationToken);
         }
 
@@ -176,17 +220,35 @@ namespace Products.Infrastructure.Repositories
 
         private IQueryable<Product> BaseQuery() => _dbContext.Products.AsNoTracking().Where(x => !x.IsDeleted);
 
-        private static ProductDetailViewModel MapDetail(Product product)
+        private async Task<(string ProductTypeName, string DeploymentTypeName, string OwnershipTypeName)> GetTypeNamesAsync(
+            Guid productTypeId, Guid deploymentTypeId, Guid ownershipTypeId, CancellationToken cancellationToken)
+        {
+            var names = await _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(l => (l.LookupId == LookUpTypeEnum.ProductType && l.Id == productTypeId)
+                    || (l.LookupId == LookUpTypeEnum.DeploymentType && l.Id == deploymentTypeId)
+                    || (l.LookupId == LookUpTypeEnum.OwnershipType && l.Id == ownershipTypeId))
+                .ToDictionaryAsync(l => (l.LookupId, l.Id), l => l.Name, cancellationToken);
+
+            return (
+                names.GetValueOrDefault((LookUpTypeEnum.ProductType, productTypeId)) ?? string.Empty,
+                names.GetValueOrDefault((LookUpTypeEnum.DeploymentType, deploymentTypeId)) ?? string.Empty,
+                names.GetValueOrDefault((LookUpTypeEnum.OwnershipType, ownershipTypeId)) ?? string.Empty);
+        }
+
+        private static ProductDetailViewModel MapDetail(Product product, string productTypeName, string deploymentTypeName, string ownershipTypeName)
         {
             return new ProductDetailViewModel
             {
                 Id = product.Id,
                 Code = product.Code,
                 Name = product.Name,
-                ProductType = product.ProductType,
-                DeploymentType = product.DeploymentType,
-                OwnershipType = product.OwnershipType,
-                OwnershipTypeName = product.OwnershipType.ToString(),
+                ProductTypeId = product.ProductTypeId,
+                ProductTypeName = productTypeName,
+                DeploymentTypeId = product.DeploymentTypeId,
+                DeploymentTypeName = deploymentTypeName,
+                OwnershipTypeId = product.OwnershipTypeId,
+                OwnershipTypeName = ownershipTypeName,
                 OwnerPartnerId = product.OwnerPartnerId,
                 Description = product.Description,
                 IsSubscriptionBased = product.IsSubscriptionBased,

@@ -23,11 +23,8 @@ namespace Leads.Infrastructure.Persistence.Data
         public DbSet<LeadProductInterest> LeadProductInterests { get; set; }
         public DbSet<LeadTimelineEntry> LeadTimelineEntries { get; set; }
         public DbSet<LeadInteraction> LeadInteractions { get; set; }
-        public DbSet<LeadSource> LeadSources { get; set; }
-        public DbSet<LeadCategory> LeadCategories { get; set; }
         public DbSet<Product> Products { get; set; }
-        public DbSet<Country> Countries { get; set; }
-        public DbSet<Industry> Industries { get; set; }
+        public DbSet<LookupDetail> LookupDetails { get; set; }
         public DbSet<Client> Clients { get; set; }
         public DbSet<ClientContact> ClientContacts { get; set; }
         public DbSet<CrmClient> CrmClients { get; set; }
@@ -64,6 +61,10 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.HasOne<CrmClient>().WithMany().HasForeignKey(x => x.ClientId);
                 entity.HasOne<CrmClientContact>().WithMany().HasForeignKey(x => x.ClientContactId);
                 entity.HasOne<Opportunity>().WithMany().HasForeignKey(x => x.ConvertedOpportunityId);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.CountryId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.IndustryId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.SourceId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasMany(x => x.ProductInterests).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
                 entity.HasMany(x => x.TimelineEntries).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
                 entity.HasMany(x => x.Interactions).WithOne(x => x.Lead).HasForeignKey(x => x.LeadId);
@@ -87,8 +88,8 @@ namespace Leads.Infrastructure.Persistence.Data
             {
                 entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
                 entity.HasIndex(x => x.Name);
-                entity.HasOne(x => x.Country).WithMany().HasForeignKey(x => x.CountryId);
-                entity.HasOne(x => x.Industry).WithMany().HasForeignKey(x => x.IndustryId);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.CountryId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.IndustryId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasMany(x => x.Contacts).WithOne(x => x.Client).HasForeignKey(x => x.ClientId);
             });
 
@@ -114,7 +115,6 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.Property(x => x.RegistrationNumber).HasMaxLength(100);
                 entity.Property(x => x.Notes).HasMaxLength(2000);
                 entity.Property(x => x.Status).HasConversion<int>();
-                entity.Ignore(x => x.ClientType);
                 entity.Ignore(x => x.Contacts);
                 entity.Ignore(x => x.Products);
                 entity.Ignore(x => x.TimelineEntries);
@@ -181,11 +181,12 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.HasIndex(x => new { x.OpportunityId, x.ActivityDate });
             });
 
-            ConfigureLookup<LeadSource>(modelBuilder);
-            ConfigureLookup<LeadCategory>(modelBuilder);
             ConfigureProduct(modelBuilder);
-            ConfigureLookup<Country>(modelBuilder);
-            ConfigureLookup<Industry>(modelBuilder);
+            modelBuilder.Entity<LookupDetail>(entity =>
+            {
+                entity.ToTable("LookupDetails", "lookups", table => table.ExcludeFromMigrations());
+                entity.Property(x => x.LookupId).HasConversion<int>();
+            });
             ConfigureDeleteAuditColumns(modelBuilder, typeof(Lead));
         }
 
@@ -214,23 +215,12 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
                 entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
                 entity.Property(x => x.Description).HasColumnType("text");
-                entity.Property(x => x.ProductType).HasConversion<int>().IsRequired();
-                entity.Property(x => x.DeploymentType).HasConversion<int>().IsRequired();
-                entity.Property(x => x.OwnershipType).HasConversion<int>().HasDefaultValue(global::Products.Domain.Enums.ProductOwnershipType.InHouse).IsRequired();
                 entity.Property(x => x.IsDeleted).HasDefaultValue(false);
                 entity.Property(x => x.IsSubscriptionBased).HasDefaultValue(false);
                 entity.Property(x => x.IsLicenseBased).HasDefaultValue(false);
-                entity.HasIndex(x => new { x.Name, x.ProductType, x.DeploymentType });
+                entity.HasIndex(x => new { x.Name, x.ProductTypeId, x.DeploymentTypeId });
                 entity.HasIndex(x => x.OwnerPartnerId);
             });
-        }
-
-        private static void ConfigureLookup<T>(ModelBuilder modelBuilder) where T : BaseEntity
-        {
-            modelBuilder.Entity<T>().Property(nameof(BaseEntity.IsActive)).HasDefaultValue(true);
-            modelBuilder.Entity<T>().HasIndex("Code").IsUnique();
-            modelBuilder.Entity<T>().Property("Code").HasMaxLength(50).IsRequired();
-            modelBuilder.Entity<T>().Property("Name").HasMaxLength(150).IsRequired();
         }
 
         private void ApplyAuditInformation()

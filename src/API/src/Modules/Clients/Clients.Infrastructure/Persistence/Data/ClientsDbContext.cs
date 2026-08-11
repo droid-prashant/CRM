@@ -25,9 +25,7 @@ namespace Clients.Infrastructure.Persistence.Data
         public DbSet<ClientContact> ClientContacts { get; set; }
         public DbSet<ClientProduct> ClientProducts { get; set; }
         public DbSet<ClientTimelineEntry> ClientTimelineEntries { get; set; }
-        public DbSet<ClientType> ClientTypes { get; set; }
-        public DbSet<CountryLookup> Countries { get; set; }
-        public DbSet<IndustryLookup> Industries { get; set; }
+        public DbSet<LookupDetail> LookupDetails { get; set; }
         public DbSet<ApplicationUser> Users { get; set; }
         public DbSet<Product> Products { get; set; }
         public DbSet<Opportunity> Opportunities { get; set; }
@@ -68,7 +66,9 @@ namespace Clients.Infrastructure.Persistence.Data
                 entity.HasIndex(x => new { x.NormalizedName, x.CountryId });
                 entity.HasIndex(x => x.AccountOwnerUserId);
                 entity.HasIndex(x => new { x.IsActive, x.IsDeleted });
-                entity.HasOne(x => x.ClientType).WithMany().HasForeignKey(x => x.ClientTypeId);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.ClientTypeId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.CountryId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.IndustryId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasMany(x => x.Contacts).WithOne(x => x.Client).HasForeignKey(x => x.ClientId);
                 entity.HasMany(x => x.Products).WithOne(x => x.Client).HasForeignKey(x => x.ClientId);
                 entity.HasMany(x => x.TimelineEntries).WithOne(x => x.Client).HasForeignKey(x => x.ClientId);
@@ -120,17 +120,11 @@ namespace Clients.Infrastructure.Persistence.Data
                 entity.HasIndex(x => new { x.ClientId, x.CreatedOn });
             });
 
-            modelBuilder.Entity<ClientType>(entity =>
+            modelBuilder.Entity<LookupDetail>(entity =>
             {
-                entity.ToTable("ClientTypes", "clients");
-                entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
-                entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
-                entity.Property(x => x.IsActive).HasDefaultValue(true);
-                entity.HasIndex(x => x.Code).IsUnique();
+                entity.ToTable("LookupDetails", "lookups", table => table.ExcludeFromMigrations());
+                entity.Property(x => x.LookupId).HasConversion<int>();
             });
-
-            ConfigureLookup<CountryLookup>(modelBuilder, "Countries", "leads");
-            ConfigureLookup<IndustryLookup>(modelBuilder, "Industries", "leads");
 
             modelBuilder.Entity<ApplicationUser>(entity =>
             {
@@ -178,10 +172,6 @@ namespace Clients.Infrastructure.Persistence.Data
             {
                 entity.ToTable("Leads", "leads");
                 entity.Property(x => x.Status).HasConversion<int>();
-                entity.Ignore(x => x.Source);
-                entity.Ignore(x => x.Category);
-                entity.Ignore(x => x.Country);
-                entity.Ignore(x => x.Industry);
                 entity.Ignore(x => x.ProductInterests);
                 entity.Ignore(x => x.TimelineEntries);
                 entity.Ignore(x => x.Interactions);
@@ -220,17 +210,6 @@ namespace Clients.Infrastructure.Persistence.Data
             }
         }
 
-        private static void ConfigureLookup<T>(ModelBuilder modelBuilder, string tableName, string schema) where T : BaseEntity
-        {
-            modelBuilder.Entity<T>(entity =>
-            {
-                entity.ToTable(tableName, schema);
-                entity.Property("Code").HasMaxLength(50).IsRequired();
-                entity.Property("Name").HasMaxLength(150).IsRequired();
-                entity.Property(x => x.IsActive).HasDefaultValue(true);
-                entity.HasIndex("Code").IsUnique();
-            });
-        }
 
         private void ApplyAuditInformation()
         {

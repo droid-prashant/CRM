@@ -21,7 +21,6 @@ namespace Clients.Domain.Entities
         public ClientStatus Status { get; set; } = ClientStatus.Active;
         public bool IsDeleted { get; set; }
 
-        public ClientType? ClientType { get; set; }
         public ICollection<ClientContact> Contacts { get; set; } = new List<ClientContact>();
         public ICollection<ClientProduct> Products { get; set; } = new List<ClientProduct>();
         public ICollection<ClientTimelineEntry> TimelineEntries { get; set; } = new List<ClientTimelineEntry>();

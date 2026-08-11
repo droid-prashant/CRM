@@ -73,5 +73,5 @@ function selectedPartnerProductIds(formValue: Record<string, unknown>, partners:
 }
 
 function isInHouseProduct(option: SelectOption): boolean {
-    return !option.ownershipType || option.ownershipType === 1;
+    return !option.ownershipTypeCode || option.ownershipTypeCode === 'InHouse';
 }

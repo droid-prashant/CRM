@@ -4,9 +4,15 @@ namespace ERP.Core.Constants
 {
     public enum LookUpTypeEnum
     {
-        [Description("LeadStatus")] LeadStatus = 1,
-        [Description("LeadSource")] LeadSource = 2,
-        [Description("ActivityType")] ActivityType = 3,
-        [Description("OpportunityStage")] OpportunityStage = 4
+        [Description("Industry")] Industry = 1,
+        [Description("Country")] Country = 2,
+        [Description("Currency")] Currency = 3,
+        [Description("Client Type")] ClientType = 4,
+        [Description("Partner Type")] PartnerType = 5,
+        [Description("Lead Source")] LeadSource = 6,
+        [Description("Lead Category")] LeadCategory = 7,
+        [Description("Product Type")] ProductType = 8,
+        [Description("Deployment Type")] DeploymentType = 9,
+        [Description("Ownership Type")] OwnershipType = 10
     }
 }

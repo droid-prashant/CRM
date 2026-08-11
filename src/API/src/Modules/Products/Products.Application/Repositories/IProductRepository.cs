@@ -14,5 +14,12 @@ namespace Products.Application.Repositories
         Task<bool> SoftDeleteProductAsync(Guid id, CancellationToken cancellationToken);
         Task<bool> CodeExistsAsync(string code, Guid? excludingId, CancellationToken cancellationToken);
         Task<List<ProductLookupViewModel>> GetActiveProductLookupsAsync(CancellationToken cancellationToken);
+        Task<List<ProductOptionViewModel>> GetProductTypeLookupsAsync(CancellationToken cancellationToken);
+        Task<List<ProductOptionViewModel>> GetDeploymentTypeLookupsAsync(CancellationToken cancellationToken);
+        Task<List<ProductOptionViewModel>> GetOwnershipTypeLookupsAsync(CancellationToken cancellationToken);
+        Task<bool> ProductTypeExistsAsync(Guid id, CancellationToken cancellationToken);
+        Task<bool> DeploymentTypeExistsAsync(Guid id, CancellationToken cancellationToken);
+        Task<bool> OwnershipTypeExistsAsync(Guid id, CancellationToken cancellationToken);
+        Task<string?> GetOwnershipTypeCodeAsync(Guid id, CancellationToken cancellationToken);
     }
 }

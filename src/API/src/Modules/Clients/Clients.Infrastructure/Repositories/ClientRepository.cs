@@ -4,6 +4,7 @@ using Clients.Application.ViewModels;
 using Clients.Domain.Entities;
 using Clients.Domain.Enums;
 using Clients.Infrastructure.Persistence.Data;
+using ERP.Core.Constants;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -315,9 +316,9 @@ namespace Clients.Infrastructure.Repositories
                 .Select(client => new { client.Id, client.CountryId })
                 .ToDictionaryAsync(client => client.Id, client => client.CountryId, cancellationToken);
 
-            var countries = await _dbContext.Countries
+            var countries = await _dbContext.LookupDetails
                 .AsNoTracking()
-                .Where(country => clientCountries.Values.Contains(country.Id))
+                .Where(country => country.LookupId == LookUpTypeEnum.Country && clientCountries.Values.Contains(country.Id))
                 .ToDictionaryAsync(country => country.Id, country => country.Name, cancellationToken);
 
             foreach (var client in clients)
@@ -335,9 +336,9 @@ namespace Clients.Infrastructure.Repositories
         {
             return new ClientLookupBundleViewModel
             {
-                ClientTypes = await ToLookupsAsync(_dbContext.ClientTypes, cancellationToken),
-                Countries = await ToLookupsAsync(_dbContext.Countries, cancellationToken),
-                Industries = await ToLookupsAsync(_dbContext.Industries, cancellationToken)
+                ClientTypes = await GetLookupDetailsAsync(LookUpTypeEnum.ClientType, cancellationToken),
+                Countries = await GetLookupDetailsAsync(LookUpTypeEnum.Country, cancellationToken),
+                Industries = await GetLookupDetailsAsync(LookUpTypeEnum.Industry, cancellationToken)
             };
         }
 
@@ -345,8 +346,8 @@ namespace Clients.Infrastructure.Repositories
         {
             return new ClientFilterLookupViewModel
             {
-                Countries = await ToLookupsAsync(_dbContext.Countries, cancellationToken),
-                Industries = await ToLookupsAsync(_dbContext.Industries, cancellationToken),
+                Countries = await GetLookupDetailsAsync(LookUpTypeEnum.Country, cancellationToken),
+                Industries = await GetLookupDetailsAsync(LookUpTypeEnum.Industry, cancellationToken),
                 Statuses =
                 [
                     new LookupViewModel { Id = Guid.Parse("82000000-0000-0000-0000-000000000001"), Code = ClientStatus.Active.ToString(), Name = "Active" },
@@ -355,9 +356,9 @@ namespace Clients.Infrastructure.Repositories
             };
         }
 
-        public Task<bool> CountryExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Countries.AnyAsync(country => country.Id == id && country.IsActive, cancellationToken);
-        public Task<bool> IndustryExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Industries.AnyAsync(industry => industry.Id == id && industry.IsActive, cancellationToken);
-        public Task<bool> ClientTypeExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.ClientTypes.AnyAsync(type => type.Id == id && type.IsActive, cancellationToken);
+        public Task<bool> CountryExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(country => country.LookupId == LookUpTypeEnum.Country && country.Id == id && country.IsActive, cancellationToken);
+        public Task<bool> IndustryExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(industry => industry.LookupId == LookUpTypeEnum.Industry && industry.Id == id && industry.IsActive, cancellationToken);
+        public Task<bool> ClientTypeExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(type => type.LookupId == LookUpTypeEnum.ClientType && type.Id == id && type.IsActive, cancellationToken);
 
         public Task<bool> DuplicateClientExistsAsync(string normalizedName, Guid countryId, Guid? excludingId, CancellationToken cancellationToken)
         {
@@ -426,7 +427,6 @@ namespace Clients.Infrastructure.Repositories
         {
             return _dbContext.Clients
                 .AsNoTracking()
-                .Include(x => x.ClientType)
                 .Where(x => !x.IsDeleted);
         }
 
@@ -436,15 +436,21 @@ namespace Clients.Infrastructure.Repositories
             var industryIds = clients.Select(client => client.IndustryId).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
             var clientIds = clients.Select(client => client.Id).Distinct().ToList();
 
-            var countries = await _dbContext.Countries
+            var countries = await _dbContext.LookupDetails
                 .AsNoTracking()
-                .Where(country => countryIds.Contains(country.Id))
+                .Where(country => country.LookupId == LookUpTypeEnum.Country && countryIds.Contains(country.Id))
                 .ToDictionaryAsync(country => country.Id, country => country.Name, cancellationToken);
 
-            var industries = await _dbContext.Industries
+            var industries = await _dbContext.LookupDetails
                 .AsNoTracking()
-                .Where(industry => industryIds.Contains(industry.Id))
+                .Where(industry => industry.LookupId == LookUpTypeEnum.Industry && industryIds.Contains(industry.Id))
                 .ToDictionaryAsync(industry => industry.Id, industry => industry.Name, cancellationToken);
+
+            var clientTypeIds = clients.Select(client => client.ClientTypeId).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+            var clientTypes = await _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(clientType => clientType.LookupId == LookUpTypeEnum.ClientType && clientTypeIds.Contains(clientType.Id))
+                .ToDictionaryAsync(clientType => clientType.Id, clientType => clientType.Name, cancellationToken);
 
             var contactCounts = await _dbContext.ClientContacts
                 .AsNoTracking()
@@ -455,7 +461,7 @@ namespace Clients.Infrastructure.Repositories
 
             var productCounts = await GetProductCountsAsync(clientIds, cancellationToken);
 
-            return clients.Select(client => MapList(client, countries, industries, contactCounts, productCounts)).ToList();
+            return clients.Select(client => MapList(client, countries, industries, clientTypes, contactCounts, productCounts)).ToList();
         }
 
         private async Task<ClientCreatedViewModel> MapDetailAsync(Client client, CancellationToken cancellationToken)
@@ -886,7 +892,7 @@ namespace Clients.Infrastructure.Repositories
             }
         }
 
-        private static ClientListItemViewModel MapList(Client client, IReadOnlyDictionary<Guid, string> countries, IReadOnlyDictionary<Guid, string> industries, IReadOnlyDictionary<Guid, int> contactCounts, IReadOnlyDictionary<Guid, int> productCounts)
+        private static ClientListItemViewModel MapList(Client client, IReadOnlyDictionary<Guid, string> countries, IReadOnlyDictionary<Guid, string> industries, IReadOnlyDictionary<Guid, string> clientTypes, IReadOnlyDictionary<Guid, int> contactCounts, IReadOnlyDictionary<Guid, int> productCounts)
         {
             return new ClientListItemViewModel
             {
@@ -895,7 +901,7 @@ namespace Clients.Infrastructure.Repositories
                 Name = client.Name,
                 ShortName = client.ShortName,
                 ClientTypeId = client.ClientTypeId,
-                ClientTypeName = client.ClientType?.Name,
+                ClientTypeName = client.ClientTypeId.HasValue ? clientTypes.GetValueOrDefault(client.ClientTypeId.Value) : null,
                 IndustryId = client.IndustryId,
                 IndustryName = client.IndustryId.HasValue ? industries.GetValueOrDefault(client.IndustryId.Value) : null,
                 CountryId = client.CountryId,
@@ -930,6 +936,16 @@ namespace Clients.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
         }
 
+        private Task<List<LookupViewModel>> GetLookupDetailsAsync(LookUpTypeEnum lookupId, CancellationToken cancellationToken)
+        {
+            return _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == lookupId && x.IsActive)
+                .OrderBy(x => x.Order).ThenBy(x => x.Name)
+                .Select(x => new LookupViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
+                .ToListAsync(cancellationToken);
+        }
+
         private static string NormalizeName(string value) => string.Join(' ', (value ?? string.Empty).Trim().ToUpperInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
         private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
@@ -944,11 +960,11 @@ namespace Clients.Infrastructure.Repositories
                 "clientcode" => ascending ? query.OrderBy(client => client.ClientCode) : query.OrderByDescending(client => client.ClientCode),
                 "name" => ascending ? query.OrderBy(client => client.Name) : query.OrderByDescending(client => client.Name),
                 "countryname" => ascending
-                    ? query.OrderBy(client => dbContext.Countries.Where(country => country.Id == client.CountryId).Select(country => country.Name).FirstOrDefault())
-                    : query.OrderByDescending(client => dbContext.Countries.Where(country => country.Id == client.CountryId).Select(country => country.Name).FirstOrDefault()),
+                    ? query.OrderBy(client => dbContext.LookupDetails.Where(country => country.LookupId == LookUpTypeEnum.Country && country.Id == client.CountryId).Select(country => country.Name).FirstOrDefault())
+                    : query.OrderByDescending(client => dbContext.LookupDetails.Where(country => country.LookupId == LookUpTypeEnum.Country && country.Id == client.CountryId).Select(country => country.Name).FirstOrDefault()),
                 "industryname" => ascending
-                    ? query.OrderBy(client => dbContext.Industries.Where(industry => industry.Id == client.IndustryId).Select(industry => industry.Name).FirstOrDefault())
-                    : query.OrderByDescending(client => dbContext.Industries.Where(industry => industry.Id == client.IndustryId).Select(industry => industry.Name).FirstOrDefault()),
+                    ? query.OrderBy(client => dbContext.LookupDetails.Where(industry => industry.LookupId == LookUpTypeEnum.Industry && industry.Id == client.IndustryId).Select(industry => industry.Name).FirstOrDefault())
+                    : query.OrderByDescending(client => dbContext.LookupDetails.Where(industry => industry.LookupId == LookUpTypeEnum.Industry && industry.Id == client.IndustryId).Select(industry => industry.Name).FirstOrDefault()),
                 "status" => ascending ? query.OrderBy(client => client.Status) : query.OrderByDescending(client => client.Status),
                 "accountownerusername" => ascending
                     ? query.OrderBy(client => dbContext.Users.Where(user => user.Id == client.AccountOwnerUserId).Select(user => user.FullName).FirstOrDefault())

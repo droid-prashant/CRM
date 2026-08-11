@@ -41,9 +41,7 @@ export class ProductList implements OnInit {
 
     private readonly subscriptionBusinessModel = 'subscription';
     private readonly licenseBusinessModel = 'license';
-    private productTypeNames = new Map<number, string>();
-    private deploymentTypeNames = new Map<number, string>();
-    private ownershipTypeNames = new Map<number, string>();
+    private ownershipTypeCodeById = new Map<string, string>();
 
     constructor(
         private readonly productApiService: ProductApiService,
@@ -129,9 +127,7 @@ export class ProductList implements OnInit {
         this.isLoading = true;
         this.productApiService.getLookups().subscribe({
             next: (lookups) => {
-                this.productTypeNames = this.toNameMap(lookups.productTypes);
-                this.deploymentTypeNames = this.toNameMap(lookups.deploymentTypes);
-                this.ownershipTypeNames = this.toNameMap(lookups.ownershipTypes);
+                this.ownershipTypeCodeById = new Map(lookups.ownershipTypes.map((type) => [type.value, type.code]));
                 this.fields = buildProductFields({
                     productTypes: this.toOptions(lookups.productTypes),
                     deploymentTypes: this.toOptions(lookups.deploymentTypes),
@@ -166,9 +162,6 @@ export class ProductList implements OnInit {
     private toGridRow(product: ProductListItemViewModel): Record<string, unknown> {
         return {
             ...product,
-            productTypeName: this.productTypeNames.get(product.productType) ?? product.productType,
-            deploymentTypeName: this.deploymentTypeNames.get(product.deploymentType) ?? product.deploymentType,
-            ownershipTypeName: product.ownershipTypeName || this.ownershipTypeNames.get(product.ownershipType) || product.ownershipType,
             ownerPartnerName: product.ownerPartnerName ?? '',
             businessModel: this.toBusinessModel(product.isSubscriptionBased, product.isLicenseBased),
             isActive: product.isActive === true
@@ -176,13 +169,14 @@ export class ProductList implements OnInit {
     }
 
     private toCreateRequest(value: Record<string, unknown>): CreateProductRequest {
+        const ownershipTypeId = String(value['ownershipTypeId'] ?? '');
         return {
             code: String(value['code'] ?? ''),
             name: String(value['name'] ?? ''),
-            productType: this.toNumber(value['productType']),
-            deploymentType: this.toNumber(value['deploymentType']),
-            ownershipType: this.toNumber(value['ownershipType']) || 1,
-            ownerPartnerId: this.toNumber(value['ownershipType']) === 2 ? this.optionalString(value['ownerPartnerId']) : null,
+            productTypeId: String(value['productTypeId'] ?? ''),
+            deploymentTypeId: String(value['deploymentTypeId'] ?? ''),
+            ownershipTypeId,
+            ownerPartnerId: this.isPartnerOwned(ownershipTypeId) ? this.optionalString(value['ownerPartnerId']) : null,
             description: this.optionalString(value['description']),
             isSubscriptionBased: value['businessModel'] === this.subscriptionBusinessModel,
             isLicenseBased: value['businessModel'] === this.licenseBusinessModel,
@@ -191,13 +185,14 @@ export class ProductList implements OnInit {
     }
 
     private toUpdateRequest(value: Record<string, unknown>): UpdateProductRequest {
+        const ownershipTypeId = String(value['ownershipTypeId'] ?? '');
         return {
             code: String(value['code'] ?? ''),
             name: String(value['name'] ?? ''),
-            productType: this.toNumber(value['productType']),
-            deploymentType: this.toNumber(value['deploymentType']),
-            ownershipType: this.toNumber(value['ownershipType']) || 1,
-            ownerPartnerId: this.toNumber(value['ownershipType']) === 2 ? this.optionalString(value['ownerPartnerId']) : null,
+            productTypeId: String(value['productTypeId'] ?? ''),
+            deploymentTypeId: String(value['deploymentTypeId'] ?? ''),
+            ownershipTypeId,
+            ownerPartnerId: this.isPartnerOwned(ownershipTypeId) ? this.optionalString(value['ownerPartnerId']) : null,
             description: this.optionalString(value['description']),
             isSubscriptionBased: value['businessModel'] === this.subscriptionBusinessModel,
             isLicenseBased: value['businessModel'] === this.licenseBusinessModel,
@@ -209,8 +204,8 @@ export class ProductList implements OnInit {
         return values.map((value) => ({ label: value.name, value: value.value, code: value.code }));
     }
 
-    private toNameMap(values: ProductOptionViewModel[]): Map<number, string> {
-        return new Map(values.map((value) => [value.value, value.name]));
+    private isPartnerOwned(ownershipTypeId: string): boolean {
+        return this.ownershipTypeCodeById.get(ownershipTypeId) === 'PartnerOwned';
     }
 
     private getRowId(row?: Record<string, unknown>): string | null {
@@ -219,11 +214,6 @@ export class ProductList implements OnInit {
 
     private optionalString(value: unknown): string | null {
         return typeof value === 'string' && value.trim() ? value.trim() : null;
-    }
-
-    private toNumber(value: unknown): number {
-        const parsed = Number(value);
-        return Number.isFinite(parsed) ? parsed : 0;
     }
 
     private toBusinessModel(isSubscriptionBased: boolean, isLicenseBased: boolean): string {

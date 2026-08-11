@@ -8,8 +8,6 @@ namespace Leads.Domain.Entities
         public Guid CountryId { get; set; }
         public Guid? IndustryId { get; set; }
 
-        public Country? Country { get; set; }
-        public Industry? Industry { get; set; }
         public ICollection<ClientContact> Contacts { get; set; } = new List<ClientContact>();
     }
 }

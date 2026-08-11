@@ -20,7 +20,7 @@ namespace Products.Infrastructure.Services
                 .SqlQueryRaw<ProductOwnerPartnerLookupViewModel>("""
                     SELECT p."Id", p."Name", p."Code", pt."Code" AS "PartnerTypeCode"
                     FROM "partners"."Partners" p
-                    INNER JOIN "partners"."PartnerTypes" pt ON pt."Id" = p."PartnerTypeId"
+                    INNER JOIN "lookups"."LookupDetails" pt ON pt."Id" = p."PartnerTypeId" AND pt."LookupId" = 5
                     WHERE p."IsActive" = true
                       AND pt."IsActive" = true
                       AND REPLACE(UPPER(pt."Code"), '-', '_') IN ('VENDOR', 'SUPPLIER', 'TECHNOLOGY_PARTNER')
@@ -35,7 +35,7 @@ namespace Products.Infrastructure.Services
                 .SqlQueryRaw<ProductOwnerPartnerLookupViewModel>("""
                     SELECT p."Id", p."Name", p."Code", pt."Code" AS "PartnerTypeCode"
                     FROM "partners"."Partners" p
-                    INNER JOIN "partners"."PartnerTypes" pt ON pt."Id" = p."PartnerTypeId"
+                    INNER JOIN "lookups"."LookupDetails" pt ON pt."Id" = p."PartnerTypeId" AND pt."LookupId" = 5
                     WHERE p."Id" = {0}
                       AND p."IsActive" = true
                       AND pt."IsActive" = true
@@ -56,7 +56,7 @@ namespace Products.Infrastructure.Services
                 .SqlQueryRaw<ProductOwnerPartnerLookupViewModel>("""
                     SELECT p."Id", p."Name", p."Code", pt."Code" AS "PartnerTypeCode"
                     FROM "partners"."Partners" p
-                    LEFT JOIN "partners"."PartnerTypes" pt ON pt."Id" = p."PartnerTypeId"
+                    LEFT JOIN "lookups"."LookupDetails" pt ON pt."Id" = p."PartnerTypeId" AND pt."LookupId" = 5
                     WHERE p."Id" = ANY({0})
                     ORDER BY p."Name"
                     """, ids)
