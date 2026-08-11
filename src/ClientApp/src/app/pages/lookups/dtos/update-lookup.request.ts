@@ -3,4 +3,5 @@ export interface UpdateLookupRequest {
     description?: string | null;
     order: number;
     isActive: boolean;
+    dialingCode?: string | null;
 }

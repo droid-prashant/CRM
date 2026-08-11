@@ -2472,4 +2472,25 @@ BEGIN
 END
 $migration$;
 
+-- -------------------------------------------------------------------------
+-- 20260811193519_AddDialingCodeToLookupDetail
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260811193519_AddDialingCodeToLookupDetail') THEN
+        RETURN;
+    END IF;
+
+    ALTER TABLE "lookups"."LookupDetails" ADD COLUMN IF NOT EXISTS "DialingCode" character varying(10) NULL;
+
+    UPDATE "lookups"."LookupDetails" SET "DialingCode" = '+977' WHERE "Id" = '50000000-0000-0000-0000-000000000001';
+    UPDATE "lookups"."LookupDetails" SET "DialingCode" = '+1' WHERE "Id" = '50000000-0000-0000-0000-000000000002';
+    UPDATE "lookups"."LookupDetails" SET "DialingCode" = '+91' WHERE "Id" = '50000000-0000-0000-0000-000000000003';
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260811193519_AddDialingCodeToLookupDetail', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
 COMMIT;

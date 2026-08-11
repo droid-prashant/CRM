@@ -5,5 +5,6 @@ export const LookupColumns: DynamicColumn[] = [
     { field: 'name', header: 'Name', type: 'text', width: '220px', sortable: true },
     { field: 'description', header: 'Description', type: 'text', width: '320px', sortable: false },
     { field: 'order', header: 'Order', type: 'number', width: '110px', sortable: true },
+    { field: 'dialingCode', header: 'Dialing Code', type: 'text', width: '130px', sortable: false },
     { field: 'isActive', header: 'Active', type: 'checkbox', width: '110px', sortable: true }
 ];

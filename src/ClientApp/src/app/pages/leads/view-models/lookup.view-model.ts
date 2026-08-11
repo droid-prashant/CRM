@@ -2,6 +2,7 @@ export interface LookupViewModel {
     id: string;
     name: string;
     code?: string;
+    dialingCode?: string;
     partnerTypeCode?: string;
     productIds?: string[];
     ownershipTypeCode?: string;

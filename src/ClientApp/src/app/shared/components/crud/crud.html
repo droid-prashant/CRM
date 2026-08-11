@@ -120,16 +120,32 @@
 
                                 @switch (field.type) {
                                     @case ('text') {
-                                        <input
-                                            pInputText
-                                            type="text"
-                                            [formControlName]="field.key"
-                                            [placeholder]="field.placeholder ?? ''"
-                                            [attr.inputmode]="field.inputMode ?? (field.digitsOnly ? 'numeric' : null)"
-                                            [attr.maxlength]="field.maxLength ?? null"
-                                            class="w-full"
-                                            (input)="onTextInput(field, $event)"
-                                        />
+                                        @if (fieldPrefix(field); as prefix) {
+                                            <div class="flex">
+                                                <span class="inline-flex items-center rounded-l-md border border-r-0 border-surface-300 bg-surface-100 px-3 text-sm text-surface-600 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-300">{{ prefix }}</span>
+                                                <input
+                                                    pInputText
+                                                    type="text"
+                                                    [formControlName]="field.key"
+                                                    [placeholder]="field.placeholder ?? ''"
+                                                    [attr.inputmode]="field.inputMode ?? (field.digitsOnly ? 'numeric' : null)"
+                                                    [attr.maxlength]="field.maxLength ?? null"
+                                                    class="w-full rounded-l-none"
+                                                    (input)="onTextInput(field, $event)"
+                                                />
+                                            </div>
+                                        } @else {
+                                            <input
+                                                pInputText
+                                                type="text"
+                                                [formControlName]="field.key"
+                                                [placeholder]="field.placeholder ?? ''"
+                                                [attr.inputmode]="field.inputMode ?? (field.digitsOnly ? 'numeric' : null)"
+                                                [attr.maxlength]="field.maxLength ?? null"
+                                                class="w-full"
+                                                (input)="onTextInput(field, $event)"
+                                            />
+                                        }
                                     }
                                     @case ('email') {
                                         <input pInputText type="email" [formControlName]="field.key" [placeholder]="field.placeholder ?? ''" class="w-full" />

@@ -43,7 +43,8 @@ namespace Lookups.Infrastructure.Repositories
                 LookupId = request.LookupId,
                 Name = request.Name,
                 Description = request.Description,
-                Order = request.Order ?? 0
+                Order = request.Order ?? 0,
+                DialingCode = request.DialingCode
             };
 
             _dbContext.LookupDetails.Add(lookup);
@@ -63,6 +64,7 @@ namespace Lookups.Infrastructure.Repositories
             lookup.Description = request.Description;
             lookup.Order = request.Order;
             lookup.IsActive = request.IsActive;
+            lookup.DialingCode = request.DialingCode;
 
             await _dbContext.SaveChangesAsync(cancellationToken);
             return ToViewModel(lookup);
@@ -121,6 +123,7 @@ namespace Lookups.Infrastructure.Repositories
                 Name = lookup.Name,
                 Description = lookup.Description,
                 Order = lookup.Order,
+                DialingCode = lookup.DialingCode,
                 IsActive = lookup.IsActive,
                 CreatedOn = lookup.CreatedOn
             };
