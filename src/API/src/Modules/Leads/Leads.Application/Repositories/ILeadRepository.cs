@@ -38,6 +38,8 @@ namespace Leads.Application.Repositories
         Task<LeadAssignmentResultViewModel?> AssignLeadAsync(Guid id, AssignLeadRequest request, CancellationToken cancellationToken);
         Task<List<LeadInteractionViewModel>?> GetLeadInteractionsAsync(Guid id, CancellationToken cancellationToken);
         Task<LeadInteractionViewModel?> CreateLeadInteractionAsync(Guid id, CreateLeadInteractionRequest request, CancellationToken cancellationToken);
+        Task<LeadInteractionViewModel?> UpdateLeadInteractionAsync(Guid leadId, Guid interactionId, UpdateLeadInteractionRequest request, CancellationToken cancellationToken);
+        Task<bool> DeleteLeadInteractionAsync(Guid leadId, Guid interactionId, CancellationToken cancellationToken);
         Task<List<ClientLookupViewModel>> GetClientLookupsAsync(CancellationToken cancellationToken);
         Task<List<ContactLookupViewModel>> GetAllClientContactsAsync(CancellationToken cancellationToken);
         Task<List<ContactLookupViewModel>?> GetClientContactsAsync(Guid clientId, CancellationToken cancellationToken);

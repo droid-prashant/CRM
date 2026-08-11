@@ -36,3 +36,11 @@ export interface CreateLeadInteractionRequest {
     interactionDate?: string;
     nextFollowUpDate?: string;
 }
+
+export interface UpdateLeadInteractionRequest {
+    interactionType: string;
+    subject?: string;
+    notes: string;
+    interactionDate?: string;
+    nextFollowUpDate?: string;
+}

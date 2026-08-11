@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { forkJoin, Observable } from 'rxjs';
-import { AssignLeadRequest, ConvertLeadRequest, CreateLeadInteractionRequest, DisqualifyLeadRequest, QualifyLeadRequest } from '../dtos/lead-action.dto';
+import { AssignLeadRequest, ConvertLeadRequest, CreateLeadInteractionRequest, DisqualifyLeadRequest, QualifyLeadRequest, UpdateLeadInteractionRequest } from '../dtos/lead-action.dto';
 import { CreateLeadRequest } from '../dtos/create-lead.request';
 import { UpdateLeadRequest } from '../dtos/update-lead.request';
 import { ClientLookupViewModel, ContactLookupViewModel, DeletedLeadLogViewModel, LeadAssignmentResultViewModel, LeadConversionViewModel, LeadInteractionViewModel, LeadLookupBundle, LeadQualificationResultViewModel, OpportunityCreatedViewModel } from '../view-models/lead-action.view-model';
@@ -68,6 +68,14 @@ export class LeadApiService {
 
     createLeadInteraction(id: string, request: CreateLeadInteractionRequest): Observable<LeadInteractionViewModel> {
         return this.http.post<LeadInteractionViewModel>(`${this.endpoints.leads}/${id}/interactions`, request);
+    }
+
+    updateLeadInteraction(id: string, interactionId: string, request: UpdateLeadInteractionRequest): Observable<LeadInteractionViewModel> {
+        return this.http.put<LeadInteractionViewModel>(`${this.endpoints.leads}/${id}/interactions/${interactionId}`, request);
+    }
+
+    deleteLeadInteraction(id: string, interactionId: string): Observable<void> {
+        return this.http.delete<void>(`${this.endpoints.leads}/${id}/interactions/${interactionId}`);
     }
 
     deleteLead(id: string): Observable<void> {

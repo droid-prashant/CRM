@@ -66,11 +66,11 @@
             <div class="col-span-12 rounded-md border border-surface-200 px-4 py-3 dark:border-surface-700 md:col-span-3">
                 <div class="text-xs font-semibold uppercase text-surface-500">Last Interaction</div>
                 <div class="mt-1 font-semibold text-surface-900 dark:text-surface-0">{{ latestInteraction?.interactionType || 'Not set' }}</div>
-                <div class="mt-1 text-xs text-surface-500">{{ formatDate(latestInteraction?.interactionDate) }}</div>
+                <div class="mt-1 text-xs text-surface-500">{{ formatDateOnly(latestInteraction?.interactionDate) }}</div>
             </div>
             <div class="col-span-12 rounded-md border border-surface-200 px-4 py-3 dark:border-surface-700 md:col-span-3">
                 <div class="text-xs font-semibold uppercase text-surface-500">Next Follow-up</div>
-                <div class="mt-1 font-semibold text-surface-900 dark:text-surface-0">{{ formatDate(nextFollowUpDate) }}</div>
+                <div class="mt-1 font-semibold text-surface-900 dark:text-surface-0">{{ formatDateOnly(nextFollowUpDate) }}</div>
                 <div class="mt-1 text-xs text-surface-500">{{ openActivityCount }} scheduled follow-up(s)</div>
             </div>
         </div>
@@ -182,18 +182,28 @@
                                                 <p-tag [severity]="interactionSeverity(interaction.interactionType)" [value]="interaction.interactionType" />
                                             </div>
                                             <div class="mt-1 text-xs text-surface-500">
-                                                {{ formatDate(interaction.interactionDate) }}
+                                                {{ formatDateOnly(interaction.interactionDate) }}
                                                 @if (interaction.createdByUserName) {
                                                     <span> / {{ interaction.createdByUserName }}</span>
                                                 }
                                             </div>
                                         </div>
                                     </div>
-                                    @if (interaction.nextFollowUpDate) {
-                                        <div class="rounded-md bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-                                            Follow-up {{ formatDate(interaction.nextFollowUpDate) }}
-                                        </div>
-                                    }
+                                    <div class="flex shrink-0 items-center gap-2">
+                                        @if (interaction.nextFollowUpDate) {
+                                            <div class="rounded-md bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                                                Follow-up {{ formatDateOnly(interaction.nextFollowUpDate) }}
+                                            </div>
+                                        }
+                                        @if (canShowInteractionAction) {
+                                            <button type="button" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800" (click)="openInteractionDialog(interaction)" aria-label="Edit interaction">
+                                                <i class="pi pi-pencil text-sm"></i>
+                                            </button>
+                                            <button type="button" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-surface-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30" [disabled]="isDeletingInteraction" (click)="confirmDeleteInteraction(interaction)" aria-label="Delete interaction">
+                                                <i class="pi pi-trash text-sm"></i>
+                                            </button>
+                                        }
+                                    </div>
                                 </div>
                                 <p class="mb-0 mt-3 whitespace-pre-line text-sm leading-6 text-surface-700 dark:text-surface-200">{{ interaction.notes }}</p>
                             </article>
@@ -449,7 +459,7 @@
         </ng-template>
     </p-dialog>
 
-    <p-dialog [(visible)]="interactionDialog" [modal]="true" [style]="{ width: 'min(640px, 94vw)' }" header="Add Interaction">
+    <p-dialog [(visible)]="interactionDialog" [modal]="true" [style]="{ width: 'min(640px, 94vw)' }" [header]="editingInteractionId ? 'Edit Interaction' : 'Add Interaction'">
         <form [formGroup]="interactionForm" class="grid grid-cols-12 gap-4">
             <div class="col-span-12 md:col-span-6">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Type <span class="text-red-500">*</span></label>
@@ -458,7 +468,7 @@
 
             <div class="col-span-12 md:col-span-6">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Interaction Date</label>
-                <p-datepicker #interactionDatePicker formControlName="interactionDate" dateFormat="yy-mm-dd" [showTime]="true" hourFormat="24" [hideOnDateTimeSelect]="false" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(interactionDatePicker)" />
+                <p-datepicker #interactionDatePicker formControlName="interactionDate" dateFormat="yy-mm-dd" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" [minDate]="todayStart" (onSelect)="closeDatePicker(interactionDatePicker)" />
             </div>
 
             <div class="col-span-12">
@@ -476,13 +486,13 @@
 
             <div class="col-span-12">
                 <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Next Follow-up Date</label>
-                <p-datepicker #nextFollowUpDatePicker formControlName="nextFollowUpDate" dateFormat="yy-mm-dd" [showTime]="true" hourFormat="24" [hideOnDateTimeSelect]="false" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" (onSelect)="closeDatePicker(nextFollowUpDatePicker)" />
+                <p-datepicker #nextFollowUpDatePicker formControlName="nextFollowUpDate" dateFormat="yy-mm-dd" appendTo="body" styleClass="w-full" inputStyleClass="w-full" [showIcon]="true" [minDate]="todayStart" (onSelect)="closeDatePicker(nextFollowUpDatePicker)" />
             </div>
         </form>
 
         <ng-template #footer>
             <p-button label="Cancel" icon="pi pi-times" text [disabled]="isSavingInteraction" (onClick)="interactionDialog = false" />
-            <p-button label="Save Interaction" icon="pi pi-check" [loading]="isSavingInteraction" (onClick)="addInteraction()" />
+            <p-button [label]="editingInteractionId ? 'Update Interaction' : 'Save Interaction'" icon="pi pi-check" [loading]="isSavingInteraction" (onClick)="saveInteraction()" />
         </ng-template>
     </p-dialog>
 
@@ -571,4 +581,6 @@
             <p-button label="Convert" icon="pi pi-arrow-right-arrow-left" [loading]="isConverting" (onClick)="convertLead()" />
         </ng-template>
     </p-dialog>
+
+    <p-confirmdialog [style]="{ width: '450px' }" />
 }

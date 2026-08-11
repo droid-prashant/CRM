@@ -195,6 +195,32 @@ namespace ERP.API.Controllers.Leads
             return BadRequest(new { errors = result.Errors });
         }
 
+        [HttpPut("{id:guid}/interactions/{interactionId:guid}")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsEdit)]
+        public async Task<ActionResult<LeadInteractionViewModel>> UpdateLeadInteraction(Guid id, Guid interactionId, [FromBody] UpdateLeadInteractionRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _leadService.UpdateLeadInteractionAsync(id, interactionId, request, cancellationToken);
+            if (result.Succeeded)
+            {
+                return result.Interaction!;
+            }
+
+            if (result.Errors.Any(x => x.Contains("not found", StringComparison.OrdinalIgnoreCase)))
+            {
+                return NotFound(new { errors = result.Errors });
+            }
+
+            return BadRequest(new { errors = result.Errors });
+        }
+
+        [HttpDelete("{id:guid}/interactions/{interactionId:guid}")]
+        [Authorize(Policy = PermissionPolicyNames.LeadsEdit)]
+        public async Task<IActionResult> DeleteLeadInteraction(Guid id, Guid interactionId, CancellationToken cancellationToken)
+        {
+            var deleted = await _leadService.DeleteLeadInteractionAsync(id, interactionId, cancellationToken);
+            return deleted ? NoContent() : NotFound();
+        }
+
         [HttpGet("lookups")]
         [Authorize(Policy = PermissionPolicyNames.LeadsView)]
         public async Task<ActionResult<List<LeadLookupViewModel>>> GetLeadLookups(CancellationToken cancellationToken)

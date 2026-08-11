@@ -312,6 +312,38 @@ namespace Leads.Application.Services
             return new LeadInteractionResult { Interaction = interaction };
         }
 
+        public async Task<LeadInteractionResult> UpdateLeadInteractionAsync(Guid id, Guid interactionId, UpdateLeadInteractionRequest request, CancellationToken cancellationToken)
+        {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return new LeadInteractionResult { Errors = new List<string> { "Lead was not found." } };
+            }
+
+            var errors = ValidateUpdateInteractionRequest(request);
+            if (errors.Count > 0)
+            {
+                return new LeadInteractionResult { Errors = errors };
+            }
+
+            var interaction = await _leadRepository.UpdateLeadInteractionAsync(id, interactionId, request, cancellationToken);
+            if (interaction == null)
+            {
+                return new LeadInteractionResult { Errors = new List<string> { "Lead interaction was not found." } };
+            }
+
+            return new LeadInteractionResult { Interaction = interaction };
+        }
+
+        public async Task<bool> DeleteLeadInteractionAsync(Guid id, Guid interactionId, CancellationToken cancellationToken)
+        {
+            if (!await EnsureCanAccessLeadAsync(id, cancellationToken))
+            {
+                return false;
+            }
+
+            return await _leadRepository.DeleteLeadInteractionAsync(id, interactionId, cancellationToken);
+        }
+
         private async Task<List<string>> ValidateCreateRequestAsync(CreateLeadRequest request, CancellationToken cancellationToken)
         {
             var errors = new List<string>();
@@ -626,6 +658,37 @@ namespace Leads.Application.Services
             {
                 errors.Add("LeadId must match the route lead id.");
             }
+
+            if (string.IsNullOrWhiteSpace(request.InteractionType))
+            {
+                errors.Add("InteractionType is required.");
+            }
+            else if (!Enum.TryParse<LeadInteractionType>(request.InteractionType, true, out _))
+            {
+                errors.Add("InteractionType is invalid.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Notes))
+            {
+                errors.Add("Notes is required.");
+            }
+
+            if (request.Subject?.Length > 250)
+            {
+                errors.Add("Subject must be 250 characters or fewer.");
+            }
+
+            if (request.Notes?.Length > 2000)
+            {
+                errors.Add("Notes must be 2000 characters or fewer.");
+            }
+
+            return errors;
+        }
+
+        private static List<string> ValidateUpdateInteractionRequest(UpdateLeadInteractionRequest request)
+        {
+            var errors = new List<string>();
 
             if (string.IsNullOrWhiteSpace(request.InteractionType))
             {
