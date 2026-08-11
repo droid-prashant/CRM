@@ -15,7 +15,6 @@ namespace Dashboard.Infrastructure.Services
     public class DashboardService : IDashboardService
     {
         private const int RecentLimit = 10;
-        private const int StaleClientDays = 30;
 
         private readonly DashboardDbContext _dbContext;
         private readonly IUserContextService _userContextService;
@@ -412,7 +411,6 @@ namespace Dashboard.Infrastructure.Services
         {
             var now = DateTime.UtcNow;
             var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var staleCutoff = now.AddDays(-StaleClientDays);
             var clientIds = clients.Select(x => x.Id);
 
             var productRows = await _dbContext.ClientProducts
@@ -436,9 +434,6 @@ namespace Dashboard.Infrastructure.Services
                 .OrderBy(x => x.Year).ThenBy(x => x.Month)
                 .ToListAsync(cancellationToken);
 
-            var activeClientIds = await clients.Select(x => x.Id).ToListAsync(cancellationToken);
-            var recentlyActiveClientIds = await GetRecentlyActiveClientIdsAsync(activeClientIds, staleCutoff, cancellationToken);
-
             return new ClientAnalyticsViewModel
             {
                 TotalClients = await clients.CountAsync(cancellationToken),
@@ -450,18 +445,6 @@ namespace Dashboard.Infrastructure.Services
                     .ToList(),
                 RecentlyAddedClients = await clients
                     .OrderByDescending(x => x.CreatedOn)
-                    .Take(RecentLimit)
-                    .Select(x => new DashboardEntityLinkViewModel
-                    {
-                        Id = x.Id,
-                        Label = x.Name,
-                        Subtitle = x.ClientCode,
-                        Date = x.CreatedOn
-                    })
-                    .ToListAsync(cancellationToken),
-                ClientsWithoutRecentActivity = await clients
-                    .Where(x => !recentlyActiveClientIds.Contains(x.Id))
-                    .OrderBy(x => x.Name)
                     .Take(RecentLimit)
                     .Select(x => new DashboardEntityLinkViewModel
                     {
@@ -720,42 +703,6 @@ namespace Dashboard.Infrastructure.Services
                 LatestActivities = activities.OrderByDescending(x => x.Date).Take(RecentLimit).ToList(),
                 PendingFollowUps = pendingFollowUps.OrderBy(x => x.Date).Take(RecentLimit).ToList()
             };
-        }
-
-        private async Task<HashSet<Guid>> GetRecentlyActiveClientIdsAsync(List<Guid> clientIds, DateTime cutoff, CancellationToken cancellationToken)
-        {
-            var recentClientIds = new HashSet<Guid>();
-
-            foreach (var id in await _dbContext.ClientTimelineEntries.AsNoTracking()
-                         .Where(x => x.CreatedOn >= cutoff && clientIds.Contains(x.ClientId))
-                         .Select(x => x.ClientId)
-                         .Distinct()
-                         .ToListAsync(cancellationToken))
-            {
-                recentClientIds.Add(id);
-            }
-
-            foreach (var id in await _dbContext.LeadTimelineEntries.AsNoTracking()
-                         .Join(_dbContext.Leads.AsNoTracking(), timeline => timeline.LeadId, lead => lead.Id, (timeline, lead) => new { timeline, lead })
-                         .Where(x => x.timeline.CreatedOn >= cutoff && x.lead.ClientId.HasValue && clientIds.Contains(x.lead.ClientId.Value))
-                         .Select(x => x.lead.ClientId!.Value)
-                         .Distinct()
-                         .ToListAsync(cancellationToken))
-            {
-                recentClientIds.Add(id);
-            }
-
-            foreach (var id in await _dbContext.OpportunityStageHistories.AsNoTracking()
-                         .Join(_dbContext.Opportunities.AsNoTracking(), history => history.OpportunityId, opportunity => opportunity.Id, (history, opportunity) => new { history, opportunity })
-                         .Where(x => x.history.CreatedOn >= cutoff && clientIds.Contains(x.opportunity.ClientId))
-                         .Select(x => x.opportunity.ClientId)
-                         .Distinct()
-                         .ToListAsync(cancellationToken))
-            {
-                recentClientIds.Add(id);
-            }
-
-            return recentClientIds;
         }
 
         private sealed record DashboardScope(bool CanSeeAll, List<Guid> UserIds);

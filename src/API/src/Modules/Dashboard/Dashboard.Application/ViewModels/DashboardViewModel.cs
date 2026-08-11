@@ -47,7 +47,6 @@ namespace Dashboard.Application.ViewModels
         public int InactiveClients { get; set; }
         public List<ChartPointViewModel> ClientsByProduct { get; set; } = new();
         public List<DashboardEntityLinkViewModel> RecentlyAddedClients { get; set; } = new();
-        public List<DashboardEntityLinkViewModel> ClientsWithoutRecentActivity { get; set; } = new();
         public List<MonthlyTrendViewModel> ClientGrowthTrend { get; set; } = new();
     }
 
