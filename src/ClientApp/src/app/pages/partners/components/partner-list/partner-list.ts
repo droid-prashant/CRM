@@ -53,6 +53,8 @@ export class PartnerList implements OnInit {
     rowActionLabelResolver = (row: Record<string, unknown>) => (row['isActive'] === true ? 'Deactivate' : 'Activate');
     rowActionIconResolver = (row: Record<string, unknown>) => (row['isActive'] === true ? 'pi pi-ban' : 'pi pi-check-circle');
 
+    private countryOptions: SelectOption[] = [];
+
     constructor(
         private readonly partnerApiService: PartnerApiService,
         private readonly messageService: MessageService,
@@ -137,9 +139,10 @@ export class PartnerList implements OnInit {
         this.isLoading = true;
         this.partnerApiService.getLookups().subscribe({
             next: (lookups) => {
+                this.countryOptions = this.toOptions(lookups.countries);
                 this.fields = buildPartnerFields({
                     partnerTypes: this.toPartnerTypeOptions(lookups.partnerTypes),
-                    countries: this.toOptions(lookups.countries),
+                    countries: this.countryOptions,
                     products: this.toOptions(lookups.products)
                 });
                 this.loadPartners();
@@ -168,10 +171,12 @@ export class PartnerList implements OnInit {
     }
 
     private toGridRow(partner: PartnerListItemViewModel): Record<string, unknown> {
+        const dialingCode = this.countryOptions.find((country) => country.value === partner.countryId)?.dialingCode;
         return {
             ...partner,
             productIds: partner.productIds ?? [],
-            isActive: partner.isActive === true
+            isActive: partner.isActive === true,
+            phoneDisplay: partner.phoneNumber && dialingCode ? `${dialingCode} ${partner.phoneNumber}` : partner.phoneNumber
         };
     }
 
