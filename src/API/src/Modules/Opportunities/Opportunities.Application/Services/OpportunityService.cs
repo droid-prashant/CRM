@@ -13,12 +13,6 @@ namespace Opportunities.Application.Services
         private const string AgreementDocumentType = "Agreement";
         private const string PurchaseOrderDocumentType = "PurchaseOrder";
 
-        private static readonly HashSet<Guid> SupportedCurrencyIds =
-        [
-            Guid.Parse("70000000-0000-0000-0000-000000000001"),
-            Guid.Parse("70000000-0000-0000-0000-000000000002"),
-            Guid.Parse("70000000-0000-0000-0000-000000000003")
-        ];
         private static readonly HashSet<string> AllowedProposalDocumentExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx" };
         private static readonly HashSet<string> AllowedCommercialDocumentExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx" };
         private static readonly HashSet<string> AllowedProposalDocumentContentTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -438,7 +432,7 @@ namespace Opportunities.Application.Services
             if (!await _opportunityRepository.ContactBelongsToClientAsync(request.ContactId, request.ClientId, cancellationToken)) errors.Add("ContactId does not belong to the selected client.");
             if (!await _opportunityRepository.UserExistsAsync(request.OwnerUserId)) errors.Add("OwnerUserId is invalid.");
             else if (!await _opportunityRepository.UserCanOwnOpportunityAsync(request.OwnerUserId)) errors.Add("Owner must be a valid business user. Admin and SuperAdmin users cannot own opportunities.");
-            if (!SupportedCurrencyIds.Contains(request.CurrencyId)) errors.Add("CurrencyId is invalid.");
+            if (!await _opportunityRepository.CurrencyExistsAsync(request.CurrencyId, cancellationToken)) errors.Add("CurrencyId is invalid.");
 
             var lead = await _opportunityRepository.GetLeadForOpportunityCreationAsync(request.LeadId, cancellationToken);
             if (lead == null)
@@ -765,7 +759,7 @@ namespace Opportunities.Application.Services
             {
                 errors.Add("CurrencyId is required.");
             }
-            else if (!SupportedCurrencyIds.Contains(request.CurrencyId))
+            else if (!await _opportunityRepository.CurrencyExistsAsync(request.CurrencyId, cancellationToken))
             {
                 errors.Add("CurrencyId is invalid.");
             }

@@ -16,7 +16,6 @@ namespace Leads.Application.Repositories
         Task<List<LookupViewModel>> GetProductLookupsAsync(CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetCountryLookupsAsync(CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetIndustryLookupsAsync(CancellationToken cancellationToken);
-        Task<bool> SourceRequiresPartnerAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<string?> GetLeadSourceCodeAsync(Guid sourceId, CancellationToken cancellationToken);
         Task<bool> LeadExistsAsync(Guid id, CancellationToken cancellationToken);
         Task<bool> UserCanAccessLeadAsync(Guid id, Guid userId, bool hasOverrideAccess, CancellationToken cancellationToken);

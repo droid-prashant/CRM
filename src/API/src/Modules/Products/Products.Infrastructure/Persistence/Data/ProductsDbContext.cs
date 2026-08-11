@@ -15,6 +15,7 @@ namespace Products.Infrastructure.Persistence.Data
         }
 
         public DbSet<Product> Products { get; set; }
+        public DbSet<LookupDetail> LookupDetails { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -34,16 +35,22 @@ namespace Products.Infrastructure.Persistence.Data
                 entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
                 entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
                 entity.Property(x => x.Description).HasColumnType("text");
-                entity.Property(x => x.ProductType).HasConversion<int>().IsRequired();
-                entity.Property(x => x.DeploymentType).HasConversion<int>().IsRequired();
-                entity.Property(x => x.OwnershipType).HasConversion<int>().HasDefaultValue(global::Products.Domain.Enums.ProductOwnershipType.InHouse).IsRequired();
                 entity.Property(x => x.IsActive).HasDefaultValue(true);
                 entity.Property(x => x.IsDeleted).HasDefaultValue(false);
                 entity.Property(x => x.IsSubscriptionBased).HasDefaultValue(false);
                 entity.Property(x => x.IsLicenseBased).HasDefaultValue(false);
                 entity.HasIndex(x => x.Code).IsUnique();
-                entity.HasIndex(x => new { x.Name, x.ProductType, x.DeploymentType });
+                entity.HasIndex(x => new { x.Name, x.ProductTypeId, x.DeploymentTypeId });
                 entity.HasIndex(x => x.OwnerPartnerId);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.ProductTypeId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.DeploymentTypeId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.OwnershipTypeId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<LookupDetail>(entity =>
+            {
+                entity.ToTable("LookupDetails", "lookups", table => table.ExcludeFromMigrations());
+                entity.Property(x => x.LookupId).HasConversion<int>();
             });
 
             ConfigureDeleteAuditColumns(modelBuilder);

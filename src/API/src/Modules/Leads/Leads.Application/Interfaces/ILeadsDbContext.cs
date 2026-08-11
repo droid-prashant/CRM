@@ -1,3 +1,4 @@
+using ERP.Core.Entities;
 using Leads.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,10 +10,7 @@ namespace Leads.Application.Interfaces
         DbSet<LeadProductInterest> LeadProductInterests { get; set; }
         DbSet<LeadTimelineEntry> LeadTimelineEntries { get; set; }
         DbSet<LeadInteraction> LeadInteractions { get; set; }
-        DbSet<LeadSource> LeadSources { get; set; }
-        DbSet<LeadCategory> LeadCategories { get; set; }
-        DbSet<Country> Countries { get; set; }
-        DbSet<Industry> Industries { get; set; }
+        DbSet<LookupDetail> LookupDetails { get; set; }
         DbSet<Client> Clients { get; set; }
         DbSet<ClientContact> ClientContacts { get; set; }
         Task<int> SaveChangesAsync(CancellationToken cancellationToken);

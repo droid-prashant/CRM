@@ -643,7 +643,7 @@ export class LeadDetail implements OnInit, OnDestroy {
         }
 
         if (!this.isPartnerOwnedEditProductContext) {
-            return this.leadLookups.products.filter((product) => !product.ownershipType || product.ownershipType === 1);
+            return this.leadLookups.products.filter((product) => !product.ownershipTypeCode || product.ownershipTypeCode === 'InHouse');
         }
 
         const assignedProductIds = this.selectedEditPartnerProductIds;

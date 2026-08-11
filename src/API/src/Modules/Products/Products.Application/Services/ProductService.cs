@@ -1,34 +1,11 @@
 using Products.Application.DTOs;
 using Products.Application.Repositories;
 using Products.Application.ViewModels;
-using Products.Domain.Enums;
 
 namespace Products.Application.Services
 {
     public class ProductService : IProductService
     {
-        private static readonly ProductOptionViewModel[] ProductTypes =
-        [
-            new() { Value = (int)ProductType.Software, Code = ProductType.Software.ToString(), Name = "Software" },
-            new() { Value = (int)ProductType.Service, Code = ProductType.Service.ToString(), Name = "Service" },
-            new() { Value = (int)ProductType.Addon, Code = ProductType.Addon.ToString(), Name = "Addon" },
-            new() { Value = (int)ProductType.Hardware, Code = ProductType.Hardware.ToString(), Name = "Hardware" }
-        ];
-
-        private static readonly ProductOptionViewModel[] DeploymentTypes =
-        [
-            new() { Value = (int)DeploymentType.Cloud, Code = DeploymentType.Cloud.ToString(), Name = "Cloud" },
-            new() { Value = (int)DeploymentType.OnPremise, Code = DeploymentType.OnPremise.ToString(), Name = "On Premise" },
-            new() { Value = (int)DeploymentType.Hybrid, Code = DeploymentType.Hybrid.ToString(), Name = "Hybrid" },
-            new() { Value = (int)DeploymentType.NotApplicable, Code = DeploymentType.NotApplicable.ToString(), Name = "Not Applicable" }
-        ];
-
-        private static readonly ProductOptionViewModel[] OwnershipTypes =
-        [
-            new() { Value = (int)ProductOwnershipType.InHouse, Code = ProductOwnershipType.InHouse.ToString(), Name = "In House" },
-            new() { Value = (int)ProductOwnershipType.PartnerOwned, Code = ProductOwnershipType.PartnerOwned.ToString(), Name = "Partner" }
-        ];
-
         private readonly IProductRepository _productRepository;
         private readonly IProductOwnerPartnerLookupService _ownerPartnerLookupService;
 
@@ -65,22 +42,24 @@ namespace Products.Application.Services
         {
             return new ProductLookupBundleViewModel
             {
-                ProductTypes = ProductTypes.ToList(),
-                DeploymentTypes = DeploymentTypes.ToList(),
-                OwnershipTypes = OwnershipTypes.ToList(),
+                ProductTypes = await _productRepository.GetProductTypeLookupsAsync(cancellationToken),
+                DeploymentTypes = await _productRepository.GetDeploymentTypeLookupsAsync(cancellationToken),
+                OwnershipTypes = await _productRepository.GetOwnershipTypeLookupsAsync(cancellationToken),
                 OwnerPartners = await _ownerPartnerLookupService.GetActiveProductOwnerPartnersAsync(cancellationToken)
             };
         }
 
         public async Task<ProductResult> CreateProductAsync(CreateProductRequest request, CancellationToken cancellationToken)
         {
-            Clean(request);
+            var ownershipTypeCode = await _productRepository.GetOwnershipTypeCodeAsync(request.OwnershipTypeId, cancellationToken);
+            Clean(request, ownershipTypeCode);
             var errors = await ValidateProductAsync(
                 request.Code,
                 request.Name,
-                request.ProductType,
-                request.DeploymentType,
-                request.OwnershipType,
+                request.ProductTypeId,
+                request.DeploymentTypeId,
+                request.OwnershipTypeId,
+                ownershipTypeCode,
                 request.OwnerPartnerId,
                 request.Description,
                 request.IsSubscriptionBased,
@@ -104,13 +83,15 @@ namespace Products.Application.Services
                 return new ProductResult { Errors = new List<string> { "Product id is required." } };
             }
 
-            Clean(request);
+            var ownershipTypeCode = await _productRepository.GetOwnershipTypeCodeAsync(request.OwnershipTypeId, cancellationToken);
+            Clean(request, ownershipTypeCode);
             var errors = await ValidateProductAsync(
                 request.Code,
                 request.Name,
-                request.ProductType,
-                request.DeploymentType,
-                request.OwnershipType,
+                request.ProductTypeId,
+                request.DeploymentTypeId,
+                request.OwnershipTypeId,
+                ownershipTypeCode,
                 request.OwnerPartnerId,
                 request.Description,
                 request.IsSubscriptionBased,
@@ -135,9 +116,10 @@ namespace Products.Application.Services
         private async Task<List<string>> ValidateProductAsync(
             string code,
             string name,
-            ProductType productType,
-            DeploymentType deploymentType,
-            ProductOwnershipType ownershipType,
+            Guid productTypeId,
+            Guid deploymentTypeId,
+            Guid ownershipTypeId,
+            string? ownershipTypeCode,
             Guid? ownerPartnerId,
             string? description,
             bool isSubscriptionBased,
@@ -155,27 +137,27 @@ namespace Products.Application.Services
             if (description?.Length > 1000) errors.Add("Description must be 1000 characters or fewer.");
             if (isSubscriptionBased == isLicenseBased) errors.Add("Product must be either subscription-based or license-based.");
 
-            if (!Enum.IsDefined(productType) || productType == 0)
+            if (productTypeId == Guid.Empty || !await _productRepository.ProductTypeExistsAsync(productTypeId, cancellationToken))
             {
                 errors.Add("Product type is invalid.");
             }
 
-            if (!Enum.IsDefined(deploymentType) || deploymentType == 0)
+            if (deploymentTypeId == Guid.Empty || !await _productRepository.DeploymentTypeExistsAsync(deploymentTypeId, cancellationToken))
             {
                 errors.Add("Deployment type is invalid.");
             }
 
-            if (!Enum.IsDefined(ownershipType) || ownershipType == 0)
+            if (ownershipTypeId == Guid.Empty || ownershipTypeCode == null)
             {
                 errors.Add("Product ownership type is invalid.");
             }
 
-            if (ownershipType == ProductOwnershipType.InHouse && ownerPartnerId.HasValue)
+            if (ownershipTypeCode == "InHouse" && ownerPartnerId.HasValue)
             {
                 errors.Add("In-house products cannot have an owner partner.");
             }
 
-            if (ownershipType == ProductOwnershipType.PartnerOwned && (!ownerPartnerId.HasValue || ownerPartnerId.Value == Guid.Empty))
+            if (ownershipTypeCode == "PartnerOwned" && (!ownerPartnerId.HasValue || ownerPartnerId.Value == Guid.Empty))
             {
                 errors.Add("Owner partner is required for partner-owned products.");
             }
@@ -185,7 +167,7 @@ namespace Products.Application.Services
                 return errors;
             }
 
-            if (ownershipType == ProductOwnershipType.PartnerOwned
+            if (ownershipTypeCode == "PartnerOwned"
                 && ownerPartnerId.HasValue
                 && await _ownerPartnerLookupService.GetActiveProductOwnerPartnerAsync(ownerPartnerId.Value, cancellationToken) == null)
             {
@@ -200,23 +182,23 @@ namespace Products.Application.Services
             return errors;
         }
 
-        private static void Clean(CreateProductRequest request)
+        private static void Clean(CreateProductRequest request, string? ownershipTypeCode)
         {
             request.Code = NormalizeCode(request.Code);
             request.Name = CleanRequired(request.Name);
             request.Description = CleanOptional(request.Description);
-            if (request.OwnershipType == ProductOwnershipType.InHouse)
+            if (ownershipTypeCode == "InHouse")
             {
                 request.OwnerPartnerId = null;
             }
         }
 
-        private static void Clean(UpdateProductRequest request)
+        private static void Clean(UpdateProductRequest request, string? ownershipTypeCode)
         {
             request.Code = NormalizeCode(request.Code);
             request.Name = CleanRequired(request.Name);
             request.Description = CleanOptional(request.Description);
-            if (request.OwnershipType == ProductOwnershipType.InHouse)
+            if (ownershipTypeCode == "InHouse")
             {
                 request.OwnerPartnerId = null;
             }
@@ -236,7 +218,6 @@ namespace Products.Application.Services
 
             foreach (var product in products)
             {
-                product.OwnershipTypeName = OwnershipTypes.FirstOrDefault(type => type.Value == (int)product.OwnershipType)?.Name ?? product.OwnershipType.ToString();
                 product.OwnerPartnerName = product.OwnerPartnerId.HasValue ? ownerPartners.GetValueOrDefault(product.OwnerPartnerId.Value) : null;
             }
         }

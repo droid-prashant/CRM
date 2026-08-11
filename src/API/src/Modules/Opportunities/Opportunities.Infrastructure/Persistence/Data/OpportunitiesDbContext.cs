@@ -25,7 +25,7 @@ namespace Opportunities.Infrastructure.Persistence.Data
         public DbSet<ClientContact> ClientContacts { get; set; }
         public DbSet<CrmClient> CrmClients { get; set; }
         public DbSet<CrmClientContact> CrmClientContacts { get; set; }
-        public DbSet<Country> Countries { get; set; }
+        public DbSet<LookupDetail> LookupDetails { get; set; }
         public DbSet<OpportunityStage> OpportunityStages { get; set; }
         public DbSet<OpportunityStageHistory> OpportunityStageHistories { get; set; }
         public DbSet<OpportunityActivity> OpportunityActivities { get; set; }
@@ -62,6 +62,7 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.HasOne<CrmClient>().WithMany().HasForeignKey(x => x.ClientId);
                 entity.HasOne<CrmClientContact>().WithMany().HasForeignKey(x => x.ContactId);
                 entity.HasOne(x => x.CurrentStage).WithMany().HasForeignKey(x => x.StageId);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasMany(x => x.CommercialDocuments).WithOne(x => x.Opportunity).HasForeignKey(x => x.OpportunityId);
                 entity.HasOne(x => x.CommercialBreakdown).WithOne(x => x.Opportunity).HasForeignKey<OpportunityCommercialBreakdown>(x => x.OpportunityId);
             });
@@ -136,6 +137,7 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.HasIndex(x => x.AmcExpiryDate);
                 entity.HasIndex(x => x.NextSubscriptionBillingDate);
                 entity.HasOne(x => x.Opportunity).WithOne(x => x.CommercialBreakdown).HasForeignKey<OpportunityCommercialBreakdown>(x => x.OpportunityId);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasOne(x => x.AgreementDocument).WithMany().HasForeignKey(x => x.AgreementDocumentId);
                 entity.HasOne(x => x.PurchaseOrderDocument).WithMany().HasForeignKey(x => x.PurchaseOrderDocumentId);
             });
@@ -144,10 +146,6 @@ namespace Opportunities.Infrastructure.Persistence.Data
             {
                 entity.ToTable("Leads", "leads");
                 entity.Property(x => x.Status).HasConversion<int>();
-                entity.Ignore(x => x.Source);
-                entity.Ignore(x => x.Category);
-                entity.Ignore(x => x.Country);
-                entity.Ignore(x => x.Industry);
                 entity.Ignore(x => x.ProductInterests);
                 entity.Ignore(x => x.TimelineEntries);
                 entity.Ignore(x => x.Interactions);
@@ -166,20 +164,21 @@ namespace Opportunities.Infrastructure.Persistence.Data
             {
                 ConfigureProduct(entity, "Products");
                 entity.Property(x => x.Description).HasColumnType("text");
-                entity.Property(x => x.ProductType).HasConversion<int>().IsRequired();
-                entity.Property(x => x.DeploymentType).HasConversion<int>().IsRequired();
                 entity.Property(x => x.IsDeleted).HasDefaultValue(false);
                 entity.Property(x => x.IsSubscriptionBased).HasDefaultValue(false);
                 entity.Property(x => x.IsLicenseBased).HasDefaultValue(false);
             });
-            modelBuilder.Entity<Country>(entity => ConfigureLookup(entity, "Countries"));
+            modelBuilder.Entity<LookupDetail>(entity =>
+            {
+                entity.ToTable("LookupDetails", "lookups", table => table.ExcludeFromMigrations());
+                entity.Property(x => x.LookupId).HasConversion<int>();
+            });
 
             modelBuilder.Entity<Client>(entity =>
             {
                 entity.ToTable("Clients", "leads");
                 entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
-                entity.HasOne(x => x.Country).WithMany().HasForeignKey(x => x.CountryId);
-                entity.Ignore(x => x.Industry);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.CountryId).OnDelete(DeleteBehavior.Restrict);
                 entity.Ignore(x => x.Contacts);
             });
 
@@ -200,7 +199,6 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
                 entity.Property(x => x.NormalizedName).HasMaxLength(250).IsRequired();
                 entity.Property(x => x.Status).HasConversion<int>();
-                entity.Ignore(x => x.ClientType);
                 entity.Ignore(x => x.Contacts);
                 entity.Ignore(x => x.Products);
                 entity.Ignore(x => x.TimelineEntries);
@@ -233,15 +231,6 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedBy));
                 modelBuilder.Entity(entityType.ClrType).Ignore(nameof(BaseEntity.DeletedOn));
             }
-        }
-
-        private static void ConfigureLookup<T>(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<T> entity, string tableName) where T : BaseEntity
-        {
-            entity.ToTable(tableName, "leads");
-            entity.Property(nameof(BaseEntity.IsActive)).HasDefaultValue(true);
-            entity.HasIndex("Code").IsUnique();
-            entity.Property("Code").HasMaxLength(50).IsRequired();
-            entity.Property("Name").HasMaxLength(150).IsRequired();
         }
 
         private static void ConfigureProduct(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<Product> entity, string tableName)

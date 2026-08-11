@@ -1,5 +1,6 @@
 using Clients.Infrastructure.Persistence.Data;
 using Leads.Infrastructure.Persistence.Data;
+using Lookups.Infrastructure.Persistence.Data;
 using Microsoft.EntityFrameworkCore;
 using Notifications.Infrastructure.Persistence.Data;
 using Opportunities.Infrastructure.Persistence.Data;
@@ -18,6 +19,9 @@ namespace ERP.API.Extensions
             }
 
             using var scope = app.Services.CreateScope();
+            var lookupsDbContext = scope.ServiceProvider.GetRequiredService<LookupsDbContext>();
+            await lookupsDbContext.Database.MigrateAsync();
+
             var clientsDbContext = scope.ServiceProvider.GetRequiredService<ClientsDbContext>();
             await clientsDbContext.Database.MigrateAsync();
 

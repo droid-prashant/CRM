@@ -1942,4 +1942,534 @@ BEGIN
 END
 $migration$;
 
+-- -------------------------------------------------------------------------
+-- 20260810180151_RevertLookupsExperimentCleanup
+-- -------------------------------------------------------------------------
+-- Cleanup after a reverted experiment (a per-module Country/Industry view-based
+-- approach that was tried and undone in the local dev environment before this
+-- LookupDetail-based redesign). No-op in an environment that never had that
+-- experiment applied: the FKs it re-adds already exist, the scratch "lookups"
+-- schema it drops was never created, and the history rows it deletes never existed.
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810180151_RevertLookupsExperimentCleanup') THEN
+        RETURN;
+    END IF;
+
+    IF to_regclass('"leads"."Countries"') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_Countries_CountryId' AND conrelid = '"leads"."Leads"'::regclass) THEN
+        ALTER TABLE "leads"."Leads" ADD CONSTRAINT "FK_Leads_Countries_CountryId"
+            FOREIGN KEY ("CountryId") REFERENCES "leads"."Countries" ("Id") ON DELETE CASCADE;
+    END IF;
+
+    IF to_regclass('"leads"."Industries"') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_Industries_IndustryId' AND conrelid = '"leads"."Leads"'::regclass) THEN
+        ALTER TABLE "leads"."Leads" ADD CONSTRAINT "FK_Leads_Industries_IndustryId"
+            FOREIGN KEY ("IndustryId") REFERENCES "leads"."Industries" ("Id");
+    END IF;
+
+    IF to_regclass('"leads"."Countries"') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Clients_Countries_CountryId' AND conrelid = '"leads"."Clients"'::regclass) THEN
+        ALTER TABLE "leads"."Clients" ADD CONSTRAINT "FK_Clients_Countries_CountryId"
+            FOREIGN KEY ("CountryId") REFERENCES "leads"."Countries" ("Id") ON DELETE CASCADE;
+    END IF;
+
+    IF to_regclass('"leads"."Industries"') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Clients_Industries_IndustryId' AND conrelid = '"leads"."Clients"'::regclass) THEN
+        ALTER TABLE "leads"."Clients" ADD CONSTRAINT "FK_Clients_Industries_IndustryId"
+            FOREIGN KEY ("IndustryId") REFERENCES "leads"."Industries" ("Id");
+    END IF;
+
+    DROP SCHEMA IF EXISTS "lookups" CASCADE;
+
+    DELETE FROM "__EFMigrationsHistory"
+    WHERE "MigrationId" IN (
+        '20260809163137_LookupsInitial',
+        '20260809165435_LookupsCountryIndustryViews',
+        '20260809170704_RepointCountryIndustryLookup',
+        '20260809171007_RepointCountryIndustryLookup',
+        '20260809171144_RepointCountryLookup',
+        '20260809171611_RepointCountryLookup'
+    );
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810180151_RevertLookupsExperimentCleanup', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810181802_LookupsInitial
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810181802_LookupsInitial') THEN
+        RETURN;
+    END IF;
+
+    CREATE SCHEMA IF NOT EXISTS "lookups";
+
+    CREATE TABLE IF NOT EXISTS "lookups"."LookupDetails" (
+        "Id" uuid NOT NULL,
+        "LookupId" integer NOT NULL,
+        "Name" character varying(150) NOT NULL,
+        "Description" character varying(500) NULL,
+        "Order" integer NOT NULL DEFAULT 0,
+        "Code" character varying(50) NULL,
+        "CreatedBy" uuid NOT NULL,
+        "CreatedOn" timestamp with time zone NOT NULL,
+        "UpdatedBy" uuid NULL,
+        "UpdatedOn" timestamp with time zone NULL,
+        "IsActive" boolean NOT NULL DEFAULT true,
+        CONSTRAINT "PK_LookupDetails" PRIMARY KEY ("Id")
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS "IX_LookupDetails_LookupId_Name" ON "lookups"."LookupDetails" ("LookupId", "Name");
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810181802_LookupsInitial', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810184131_SeedCountryIndustry
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810184131_SeedCountryIndustry') THEN
+        RETURN;
+    END IF;
+
+    INSERT INTO "lookups"."LookupDetails" ("Id", "LookupId", "Name", "Description", "Order", "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive")
+    SELECT "Id", 1, "Name", NULL, (ROW_NUMBER() OVER (ORDER BY "Name"))::int, "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive"
+    FROM "leads"."Industries"
+    ON CONFLICT ("Id") DO NOTHING;
+
+    INSERT INTO "lookups"."LookupDetails" ("Id", "LookupId", "Name", "Description", "Order", "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive")
+    SELECT "Id", 2, "Name", NULL, (ROW_NUMBER() OVER (ORDER BY "Name"))::int, "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive"
+    FROM "leads"."Countries"
+    ON CONFLICT ("Id") DO NOTHING;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810184131_SeedCountryIndustry', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810184419_RepointCountryIndustry (Leads)
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810184419_RepointCountryIndustry') THEN
+        RETURN;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Clients_Countries_CountryId' AND conrelid = '"leads"."Clients"'::regclass) THEN
+        ALTER TABLE "leads"."Clients" DROP CONSTRAINT "FK_Clients_Countries_CountryId";
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Clients_Industries_IndustryId' AND conrelid = '"leads"."Clients"'::regclass) THEN
+        ALTER TABLE "leads"."Clients" DROP CONSTRAINT "FK_Clients_Industries_IndustryId";
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_Countries_CountryId' AND conrelid = '"leads"."Leads"'::regclass) THEN
+        ALTER TABLE "leads"."Leads" DROP CONSTRAINT "FK_Leads_Countries_CountryId";
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_Industries_IndustryId' AND conrelid = '"leads"."Leads"'::regclass) THEN
+        ALTER TABLE "leads"."Leads" DROP CONSTRAINT "FK_Leads_Industries_IndustryId";
+    END IF;
+
+    DROP TABLE IF EXISTS "leads"."Countries";
+    DROP TABLE IF EXISTS "leads"."Industries";
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Clients_LookupDetails_CountryId' AND conrelid = '"leads"."Clients"'::regclass) THEN
+        ALTER TABLE "leads"."Clients" ADD CONSTRAINT "FK_Clients_LookupDetails_CountryId"
+        FOREIGN KEY ("CountryId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Clients_LookupDetails_IndustryId' AND conrelid = '"leads"."Clients"'::regclass) THEN
+        ALTER TABLE "leads"."Clients" ADD CONSTRAINT "FK_Clients_LookupDetails_IndustryId"
+        FOREIGN KEY ("IndustryId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_LookupDetails_CountryId' AND conrelid = '"leads"."Leads"'::regclass) THEN
+        ALTER TABLE "leads"."Leads" ADD CONSTRAINT "FK_Leads_LookupDetails_CountryId"
+        FOREIGN KEY ("CountryId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_LookupDetails_IndustryId' AND conrelid = '"leads"."Leads"'::regclass) THEN
+        ALTER TABLE "leads"."Leads" ADD CONSTRAINT "FK_Leads_LookupDetails_IndustryId"
+        FOREIGN KEY ("IndustryId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810184419_RepointCountryIndustry', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810190446_RepointCountryIndustry (Clients)
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810190446_RepointCountryIndustry') THEN
+        RETURN;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Clients_LookupDetails_CountryId' AND conrelid = '"clients"."Clients"'::regclass) THEN
+        ALTER TABLE "clients"."Clients" ADD CONSTRAINT "FK_Clients_LookupDetails_CountryId"
+        FOREIGN KEY ("CountryId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Clients_LookupDetails_IndustryId' AND conrelid = '"clients"."Clients"'::regclass) THEN
+        ALTER TABLE "clients"."Clients" ADD CONSTRAINT "FK_Clients_LookupDetails_IndustryId"
+        FOREIGN KEY ("IndustryId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810190446_RepointCountryIndustry', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810190737_RepointCountry (Partners)
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810190737_RepointCountry') THEN
+        RETURN;
+    END IF;
+
+    CREATE INDEX IF NOT EXISTS "IX_Partners_CountryId" ON "partners"."Partners" ("CountryId");
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Partners_LookupDetails_CountryId') THEN
+        ALTER TABLE "partners"."Partners" ADD CONSTRAINT "FK_Partners_LookupDetails_CountryId"
+        FOREIGN KEY ("CountryId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810190737_RepointCountry', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810190853_RepointCountry (Opportunities)
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810190853_RepointCountry') THEN
+        RETURN;
+    END IF;
+
+    -- No physical DDL: OpportunitiesDbContext resolves Country lookups through the shared
+    -- lookups.LookupDetails table; the underlying leads.Clients FK was already repointed by
+    -- the Leads module's own RepointCountryIndustry migration above.
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810190853_RepointCountry', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810191815_SeedCurrency
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810191815_SeedCurrency') THEN
+        RETURN;
+    END IF;
+
+    INSERT INTO "lookups"."LookupDetails" ("Id", "LookupId", "Name", "Description", "Order", "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive")
+    VALUES
+        ('70000000-0000-0000-0000-000000000001', 3, 'Nepalese Rupee', NULL, 1, 'NPR', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('70000000-0000-0000-0000-000000000002', 3, 'US Dollar', NULL, 2, 'USD', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('70000000-0000-0000-0000-000000000003', 3, 'Indian Rupee', NULL, 3, 'INR', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true)
+    ON CONFLICT ("Id") DO NOTHING;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810191815_SeedCurrency', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810191919_AddCurrencyForeignKeys
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810191919_AddCurrencyForeignKeys') THEN
+        RETURN;
+    END IF;
+
+    CREATE INDEX IF NOT EXISTS "IX_OpportunityCommercialBreakdowns_CurrencyId" ON "leads"."OpportunityCommercialBreakdowns" ("CurrencyId");
+    CREATE INDEX IF NOT EXISTS "IX_Opportunities_CurrencyId" ON "leads"."Opportunities" ("CurrencyId");
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Opportunities_LookupDetails_CurrencyId') THEN
+        ALTER TABLE "leads"."Opportunities" ADD CONSTRAINT "FK_Opportunities_LookupDetails_CurrencyId"
+        FOREIGN KEY ("CurrencyId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_OpportunityCommercialBreakdowns_LookupDetails_CurrencyId') THEN
+        ALTER TABLE "leads"."OpportunityCommercialBreakdowns" ADD CONSTRAINT "FK_OpportunityCommercialBreakdowns_LookupDetails_CurrencyId"
+        FOREIGN KEY ("CurrencyId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810191919_AddCurrencyForeignKeys', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810192515_SeedClientType
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810192515_SeedClientType') THEN
+        RETURN;
+    END IF;
+
+    INSERT INTO "lookups"."LookupDetails" ("Id", "LookupId", "Name", "Description", "Order", "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive")
+    SELECT "Id", 4, "Name", NULL, (ROW_NUMBER() OVER (ORDER BY "Name"))::int, "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive"
+    FROM "clients"."ClientTypes"
+    ON CONFLICT ("Id") DO NOTHING;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810192515_SeedClientType', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810192618_RepointClientType
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810192618_RepointClientType') THEN
+        RETURN;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Clients_ClientTypes_ClientTypeId') THEN
+        ALTER TABLE "clients"."Clients" DROP CONSTRAINT "FK_Clients_ClientTypes_ClientTypeId";
+    END IF;
+
+    DROP TABLE IF EXISTS "clients"."ClientTypes";
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Clients_LookupDetails_ClientTypeId') THEN
+        ALTER TABLE "clients"."Clients" ADD CONSTRAINT "FK_Clients_LookupDetails_ClientTypeId"
+        FOREIGN KEY ("ClientTypeId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810192618_RepointClientType', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810193605_SeedPartnerType
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810193605_SeedPartnerType') THEN
+        RETURN;
+    END IF;
+
+    INSERT INTO "lookups"."LookupDetails" ("Id", "LookupId", "Name", "Description", "Order", "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive")
+    SELECT "Id", 5, "Name", NULL, (ROW_NUMBER() OVER (ORDER BY "Name"))::int, "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive"
+    FROM "partners"."PartnerTypes"
+    ON CONFLICT ("Id") DO NOTHING;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810193605_SeedPartnerType', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810193635_RepointPartnerType
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810193635_RepointPartnerType') THEN
+        RETURN;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Partners_PartnerTypes_PartnerTypeId') THEN
+        ALTER TABLE "partners"."Partners" DROP CONSTRAINT "FK_Partners_PartnerTypes_PartnerTypeId";
+    END IF;
+
+    DROP TABLE IF EXISTS "partners"."PartnerTypes";
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Partners_LookupDetails_PartnerTypeId') THEN
+        ALTER TABLE "partners"."Partners" ADD CONSTRAINT "FK_Partners_LookupDetails_PartnerTypeId"
+        FOREIGN KEY ("PartnerTypeId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810193635_RepointPartnerType', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810200446_SeedLeadSourceCategory
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810200446_SeedLeadSourceCategory') THEN
+        RETURN;
+    END IF;
+
+    INSERT INTO "lookups"."LookupDetails" ("Id", "LookupId", "Name", "Description", "Order", "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive")
+    SELECT "Id", 6, "Name", NULL, (ROW_NUMBER() OVER (ORDER BY "Name"))::int, "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive"
+    FROM "leads"."LeadSources"
+    ON CONFLICT ("Id") DO NOTHING;
+
+    INSERT INTO "lookups"."LookupDetails" ("Id", "LookupId", "Name", "Description", "Order", "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive")
+    SELECT "Id", 7, "Name", NULL, (ROW_NUMBER() OVER (ORDER BY "Name"))::int, "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive"
+    FROM "leads"."LeadCategories"
+    ON CONFLICT ("Id") DO NOTHING;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810200446_SeedLeadSourceCategory', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810200525_RepointLeadSourceCategory
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810200525_RepointLeadSourceCategory') THEN
+        RETURN;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_LeadCategories_CategoryId') THEN
+        ALTER TABLE "leads"."Leads" DROP CONSTRAINT "FK_Leads_LeadCategories_CategoryId";
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_LeadSources_SourceId') THEN
+        ALTER TABLE "leads"."Leads" DROP CONSTRAINT "FK_Leads_LeadSources_SourceId";
+    END IF;
+
+    DROP TABLE IF EXISTS "leads"."LeadCategories";
+    DROP TABLE IF EXISTS "leads"."LeadSources";
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_LookupDetails_CategoryId') THEN
+        ALTER TABLE "leads"."Leads" ADD CONSTRAINT "FK_Leads_LookupDetails_CategoryId"
+        FOREIGN KEY ("CategoryId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Leads_LookupDetails_SourceId') THEN
+        ALTER TABLE "leads"."Leads" ADD CONSTRAINT "FK_Leads_LookupDetails_SourceId"
+        FOREIGN KEY ("SourceId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810200525_RepointLeadSourceCategory', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810203313_SeedProductLookups
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810203313_SeedProductLookups') THEN
+        RETURN;
+    END IF;
+
+    INSERT INTO "lookups"."LookupDetails" ("Id", "LookupId", "Name", "Description", "Order", "Code", "CreatedBy", "CreatedOn", "UpdatedBy", "UpdatedOn", "IsActive")
+    VALUES
+        ('91000000-0000-0000-0000-000000000001', 8, 'Software', NULL, 1, 'Software', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('91000000-0000-0000-0000-000000000002', 8, 'Service', NULL, 2, 'Service', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('91000000-0000-0000-0000-000000000003', 8, 'Addon', NULL, 3, 'Addon', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('91000000-0000-0000-0000-000000000004', 8, 'Hardware', NULL, 4, 'Hardware', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('92000000-0000-0000-0000-000000000001', 9, 'Cloud', NULL, 1, 'Cloud', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('92000000-0000-0000-0000-000000000002', 9, 'On Premise', NULL, 2, 'OnPremise', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('92000000-0000-0000-0000-000000000003', 9, 'Hybrid', NULL, 3, 'Hybrid', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('92000000-0000-0000-0000-000000000004', 9, 'Not Applicable', NULL, 4, 'NotApplicable', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('93000000-0000-0000-0000-000000000001', 10, 'In House', NULL, 1, 'InHouse', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true),
+        ('93000000-0000-0000-0000-000000000002', 10, 'Partner', NULL, 2, 'PartnerOwned', '00000000-0000-0000-0000-000000000000', now(), NULL, NULL, true)
+    ON CONFLICT ("Id") DO NOTHING;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810203313_SeedProductLookups', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260810204157_ConvertProductTypesToLookups
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260810204157_ConvertProductTypesToLookups') THEN
+        RETURN;
+    END IF;
+
+    ALTER TABLE "products"."Products"
+        ADD COLUMN IF NOT EXISTS "ProductTypeId" uuid NULL,
+        ADD COLUMN IF NOT EXISTS "DeploymentTypeId" uuid NULL,
+        ADD COLUMN IF NOT EXISTS "OwnershipTypeId" uuid NULL;
+
+    UPDATE "products"."Products"
+    SET "ProductTypeId" = CASE "ProductType"
+            WHEN 1 THEN '91000000-0000-0000-0000-000000000001'::uuid
+            WHEN 2 THEN '91000000-0000-0000-0000-000000000002'::uuid
+            WHEN 3 THEN '91000000-0000-0000-0000-000000000003'::uuid
+            WHEN 4 THEN '91000000-0000-0000-0000-000000000004'::uuid
+            ELSE '91000000-0000-0000-0000-000000000001'::uuid
+        END,
+        "DeploymentTypeId" = CASE "DeploymentType"
+            WHEN 1 THEN '92000000-0000-0000-0000-000000000001'::uuid
+            WHEN 2 THEN '92000000-0000-0000-0000-000000000002'::uuid
+            WHEN 3 THEN '92000000-0000-0000-0000-000000000003'::uuid
+            WHEN 4 THEN '92000000-0000-0000-0000-000000000004'::uuid
+            ELSE '92000000-0000-0000-0000-000000000004'::uuid
+        END,
+        "OwnershipTypeId" = CASE "OwnershipType"
+            WHEN 1 THEN '93000000-0000-0000-0000-000000000001'::uuid
+            WHEN 2 THEN '93000000-0000-0000-0000-000000000002'::uuid
+            ELSE '93000000-0000-0000-0000-000000000001'::uuid
+        END
+    WHERE "ProductTypeId" IS NULL OR "DeploymentTypeId" IS NULL OR "OwnershipTypeId" IS NULL;
+
+    ALTER TABLE "products"."Products"
+        ALTER COLUMN "ProductTypeId" SET NOT NULL,
+        ALTER COLUMN "DeploymentTypeId" SET NOT NULL,
+        ALTER COLUMN "OwnershipTypeId" SET NOT NULL;
+
+    DROP INDEX IF EXISTS "products"."IX_Products_Name_ProductType_DeploymentType";
+
+    ALTER TABLE "products"."Products"
+        DROP COLUMN IF EXISTS "ProductType",
+        DROP COLUMN IF EXISTS "DeploymentType",
+        DROP COLUMN IF EXISTS "OwnershipType";
+
+    CREATE INDEX IF NOT EXISTS "IX_Products_DeploymentTypeId" ON "products"."Products" ("DeploymentTypeId");
+    CREATE INDEX IF NOT EXISTS "IX_Products_Name_ProductTypeId_DeploymentTypeId" ON "products"."Products" ("Name", "ProductTypeId", "DeploymentTypeId");
+    CREATE INDEX IF NOT EXISTS "IX_Products_OwnershipTypeId" ON "products"."Products" ("OwnershipTypeId");
+    CREATE INDEX IF NOT EXISTS "IX_Products_ProductTypeId" ON "products"."Products" ("ProductTypeId");
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Products_LookupDetails_DeploymentTypeId') THEN
+        ALTER TABLE "products"."Products" ADD CONSTRAINT "FK_Products_LookupDetails_DeploymentTypeId"
+        FOREIGN KEY ("DeploymentTypeId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Products_LookupDetails_OwnershipTypeId') THEN
+        ALTER TABLE "products"."Products" ADD CONSTRAINT "FK_Products_LookupDetails_OwnershipTypeId"
+        FOREIGN KEY ("OwnershipTypeId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Products_LookupDetails_ProductTypeId') THEN
+        ALTER TABLE "products"."Products" ADD CONSTRAINT "FK_Products_LookupDetails_ProductTypeId"
+        FOREIGN KEY ("ProductTypeId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260810204157_ConvertProductTypesToLookups', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
 COMMIT;

@@ -1,5 +1,5 @@
 export interface ProductOptionViewModel {
-    value: number;
+    value: string;
     code: string;
     name: string;
 }

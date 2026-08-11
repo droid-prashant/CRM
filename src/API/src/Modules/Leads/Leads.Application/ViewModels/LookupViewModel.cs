@@ -7,7 +7,7 @@ namespace Leads.Application.ViewModels
         public string? Code { get; set; }
         public string? PartnerTypeCode { get; set; }
         public List<Guid> ProductIds { get; set; } = new();
-        public int? OwnershipType { get; set; }
+        public string? OwnershipTypeCode { get; set; }
         public Guid? OwnerPartnerId { get; set; }
     }
 }

@@ -16,8 +16,7 @@ namespace Partners.Infrastructure.Persistence.Data
 
         public DbSet<Partner> Partners { get; set; }
         public DbSet<PartnerProduct> PartnerProducts { get; set; }
-        public DbSet<PartnerType> PartnerTypes { get; set; }
-        public DbSet<CountryLookup> Countries { get; set; }
+        public DbSet<LookupDetail> LookupDetails { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -42,7 +41,8 @@ namespace Partners.Infrastructure.Persistence.Data
                 entity.Property(x => x.IsActive).HasDefaultValue(true);
                 entity.HasIndex(x => x.Code).IsUnique();
                 entity.HasIndex(x => new { x.Name, x.PartnerTypeId, x.CountryId });
-                entity.HasOne(x => x.PartnerType).WithMany().HasForeignKey(x => x.PartnerTypeId);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.PartnerTypeId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.CountryId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasMany(x => x.PartnerProducts).WithOne(x => x.Partner).HasForeignKey(x => x.PartnerId);
             });
 
@@ -53,22 +53,10 @@ namespace Partners.Infrastructure.Persistence.Data
                 entity.HasIndex(x => new { x.PartnerId, x.ProductId }).IsUnique();
             });
 
-            modelBuilder.Entity<PartnerType>(entity =>
+            modelBuilder.Entity<LookupDetail>(entity =>
             {
-                entity.ToTable("PartnerTypes", "partners");
-                entity.Property(x => x.IsActive).HasDefaultValue(true);
-                entity.HasIndex(x => x.Code).IsUnique();
-                entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
-                entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
-            });
-
-            modelBuilder.Entity<CountryLookup>(entity =>
-            {
-                entity.ToTable("Countries", "leads");
-                entity.Property(x => x.IsActive).HasDefaultValue(true);
-                entity.HasIndex(x => x.Code).IsUnique();
-                entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
-                entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
+                entity.ToTable("LookupDetails", "lookups", table => table.ExcludeFromMigrations());
+                entity.Property(x => x.LookupId).HasConversion<int>();
             });
 
             ConfigureDeleteAuditColumns(modelBuilder);

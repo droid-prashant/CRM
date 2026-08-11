@@ -1,5 +1,4 @@
 using ERP.Core.Entities;
-using Products.Domain.Enums;
 
 namespace Products.Domain.Entities
 {
@@ -8,9 +7,9 @@ namespace Products.Domain.Entities
         public string Code { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
-        public ProductType ProductType { get; set; }
-        public DeploymentType DeploymentType { get; set; }
-        public ProductOwnershipType OwnershipType { get; set; } = ProductOwnershipType.InHouse;
+        public Guid ProductTypeId { get; set; }
+        public Guid DeploymentTypeId { get; set; }
+        public Guid OwnershipTypeId { get; set; }
         public Guid? OwnerPartnerId { get; set; }
         public bool IsSubscriptionBased { get; set; }
         public bool IsLicenseBased { get; set; }
