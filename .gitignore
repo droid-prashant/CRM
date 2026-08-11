@@ -39,7 +39,7 @@ secrets.json
 /Angular/.angular/
 /Angular/.env
 /src/ClientApp/dist/
-
+/dst/crm-client/
 # Angular IDE files
 .AngularCache/
 *.tsbuildinfo
