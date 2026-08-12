@@ -86,12 +86,12 @@ export class ClientDetail implements OnInit {
     });
 
     contactForm = this.fb.group({
-        firstName: [''],
-        lastName: [''],
+        firstName: ['', Validators.required],
+        lastName: ['',Validators.required],
         fullName: ['', Validators.required],
         designation: [''],
         department: [''],
-        email: ['', Validators.email],
+        email: ['', [Validators.required, Validators.email]],
         phone: ['', Validators.pattern(NEPAL_CONTACT_NUMBER_PATTERN)],
         mobile: ['', Validators.pattern(NEPAL_CONTACT_NUMBER_PATTERN)],
         isPrimary: [false],
@@ -121,7 +121,22 @@ export class ClientDetail implements OnInit {
         this.canEditClient = this.authService.hasPermission(Permissions.clients.edit);
         this.canDeleteClient = this.authService.hasPermission(Permissions.clients.delete);
         this.loadClient();
+        this.contactForm.valueChanges.subscribe(value => {
+        const firstName = value.firstName?.trim() || '';
+        const lastName = value.lastName?.trim() || '';
+
+        const fullName = [firstName, lastName]
+            .filter(Boolean)
+            .join(' ');
+
+        if (this.contactForm.get('fullName')?.value !== fullName) {
+            this.contactForm.get('fullName')?.setValue(fullName, {
+                emitEvent: false
+            });
+        }
+    });
     }
+   
 
     loadClient(): void {
         const id = this.route.snapshot.paramMap.get('id');
@@ -332,7 +347,6 @@ export class ClientDetail implements OnInit {
             status: contact.status || (contact.isActive ? 1 : 2),
             notes: contact.notes ?? ''
         });
-        this.contactForm.controls.isPrimary.disable();
         this.contactDialog = true;
     }
 

@@ -538,7 +538,8 @@ namespace Dashboard.Infrastructure.Services
                     })
                     .ToListAsync(cancellationToken),
                 OpportunitiesClosingSoon = await opportunities
-                    .Where(x => x.ExpectedCloseDate.HasValue && x.ExpectedCloseDate.Value >= DateTime.UtcNow && x.ExpectedCloseDate.Value <= DateTime.UtcNow.AddDays(30))
+                    .Where(x => x.ExpectedCloseDate.HasValue && x.ExpectedCloseDate.Value >= DateTime.UtcNow && x.ExpectedCloseDate.Value <= DateTime.UtcNow.AddDays(30) && x.Stage != "Won" &&
+                            x.Stage != "Lost")
                     .OrderBy(x => x.ExpectedCloseDate)
                     .Take(RecentLimit)
                     .Select(x => new OpportunityHighlightViewModel

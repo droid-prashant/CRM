@@ -9,23 +9,23 @@
 
         <div class="col-span-12 sm:col-span-6 lg:col-span-2">
             <label class="mb-2 block text-xs font-semibold uppercase text-surface-500">Country</label>
-            <p-select [options]="filterCountries" optionLabel="label" optionValue="value" appendTo="body" formControlName="countryId" placeholder="All countries" [showClear]="true" class="w-full text-sm" />
-        </div>
+            <p-select [options]="filterCountries" optionLabel="label" optionValue="value" appendTo="body" formControlName="countryId" placeholder="All countries" [showClear]="!!filterForm.get('countryId')?.value" class="w-full text-sm"/>
+             </div>
 
         <div class="col-span-12 sm:col-span-6 lg:col-span-2">
             <label class="mb-2 block text-xs font-semibold uppercase text-surface-500">Industry</label>
-            <p-select [options]="filterIndustries" optionLabel="label" optionValue="value" appendTo="body" formControlName="industryId" placeholder="All industries" [showClear]="true" class="w-full text-sm" />
-        </div>
+            <p-select [options]="filterIndustries" optionLabel="label" optionValue="value" appendTo="body" formControlName="industryId" placeholder="All industries" [showClear]="!!filterForm.get('industryId')?.value" class="w-full text-sm"/>
+            </div>
 
         <div class="col-span-12 sm:col-span-6 lg:col-span-2">
             <label class="mb-2 block text-xs font-semibold uppercase text-surface-500">Owner</label>
-            <p-select [options]="filterOwners" optionLabel="label" optionValue="value" appendTo="body" formControlName="accountOwnerUserId" placeholder="All owners" [showClear]="true" class="w-full text-sm" />
-        </div>
+            <p-select [options]="filterOwners" optionLabel="label" optionValue="value" appendTo="body" formControlName="accountOwnerUserId" placeholder="All owners" [showClear]="!!filterForm.get('accountOwnerUserId')?.value" class="w-full text-sm"/>
+            </div>
 
         <div class="col-span-12 sm:col-span-6 lg:col-span-1">
             <label class="mb-2 block text-xs font-semibold uppercase text-surface-500">Status</label>
-            <p-select [options]="filterStatuses" optionLabel="label" optionValue="value" appendTo="body" formControlName="status" placeholder="All" [showClear]="true" class="w-full text-sm" />
-        </div>
+            <p-select [options]="filterStatuses" optionLabel="label" optionValue="value" appendTo="body" formControlName="status" placeholder="All" [showClear]="filterForm.get('status')?.value != null" class="w-full text-sm"/>
+            </div>
 
         <div class="col-span-12 flex justify-end gap-2 lg:col-span-2">
             <p-button label="Clear" icon="pi pi-filter-slash" severity="secondary" size="small" outlined (onClick)="clearFilters()" />

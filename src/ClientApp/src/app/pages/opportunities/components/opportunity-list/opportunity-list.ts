@@ -411,7 +411,11 @@ export class OpportunityList implements OnInit, OnDestroy {
     }
 
     canDropOnStage(stage: OpportunityPipelineStageViewModel): boolean {
-        return !!this.draggedOpportunity && !stage.isFinal && stage.sequence > this.draggedOpportunity.stageSequence && stage.stageId !== this.draggedOpportunity.stageId;
+        return !!this.draggedOpportunity && !stage.isFinal && stage.sequence > this.draggedOpportunity.stageSequence && stage.stageId !== this.draggedOpportunity.stageId &&
+         !(
+            this.draggedOpportunity.stageName?.trim().toLowerCase() === 'discovery'
+            && stage.stageName?.trim().toLowerCase() === 'negotiation'
+        );
     }
 
     isStageDragTarget(stage: OpportunityPipelineStageViewModel): boolean {
@@ -1015,6 +1019,22 @@ export class OpportunityList implements OnInit, OnDestroy {
             }
         });
     }
+
+    private isNegotiationStage(stage: any): boolean {
+    return stage?.stageName?.trim().toLowerCase() === 'negotiation';
+}
+
+private canMoveToNegotiation(opportunity: any, targetStage: any): boolean {
+    if (!this.isNegotiationStage(targetStage)) {
+        return true;
+    }
+
+    if (opportunity.hasProposalDocument) {
+        return true;
+    }
+
+    return false;
+}
 
     private refreshData(): void {
         this.isLoading = true;

@@ -37,6 +37,7 @@ namespace Opportunities.Application.Repositories
         Task<bool> UserExistsAsync(Guid userId);
         Task<bool> StageExistsAsync(Guid stageId, CancellationToken cancellationToken);
         Task<bool> StageIsProposalSentAsync(Guid stageId, CancellationToken cancellationToken);
+        Task<bool> StageIsNegotiationAsync(Guid stageId, CancellationToken cancellationToken);
         Task<bool> OpportunityHasProposalDocumentAsync(Guid id, CancellationToken cancellationToken);
         Task<List<ProposalVersionViewModel>> GetProposalHistoryAsync(Guid id, CancellationToken cancellationToken);
         Task<OpportunityDocumentViewModel?> GetProposalDocumentVersionAsync(Guid id, Guid documentId, CancellationToken cancellationToken);

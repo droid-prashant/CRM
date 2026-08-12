@@ -487,6 +487,22 @@ namespace Opportunities.Application.Services
             {
                 errors.Add("Final proposal document is required when moving an opportunity to Proposal Sent.");
             }
+            if (errors.Count == 0
+                && await _opportunityRepository.StageIsNegotiationAsync(
+                    request.StageId,
+                    cancellationToken))
+                        {
+                            var hasProposalDocument =
+                                await _opportunityRepository.OpportunityHasProposalDocumentAsync(
+                                    opportunityId,
+                                    cancellationToken);
+
+                            if (!hasProposalDocument)
+                            {
+                                errors.Add(
+                                    "Proposal Sent stage must be completed before moving an opportunity to Negotiation.");
+                            }
+            }
 
             return errors;
         }

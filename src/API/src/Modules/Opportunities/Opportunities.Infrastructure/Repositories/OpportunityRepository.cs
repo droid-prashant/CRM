@@ -593,6 +593,12 @@ namespace Opportunities.Infrastructure.Repositories
                 cancellationToken);
         }
 
+        public Task<bool> StageIsNegotiationAsync(Guid stageId, CancellationToken cancellationToken)
+        {
+            return GetActiveStagesQuery().AnyAsync(
+                x => x.Id == stageId && x.Name.ToLower() == "negotiation",
+                cancellationToken);
+        }
         public Task<bool> OpportunityHasProposalDocumentAsync(Guid id, CancellationToken cancellationToken)
         {
             return GetLatestProposalDocumentQuery(id).AnyAsync(cancellationToken);
