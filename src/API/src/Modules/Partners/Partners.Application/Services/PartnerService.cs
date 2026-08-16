@@ -41,6 +41,7 @@ namespace Partners.Application.Services
         }
         public Task<List<LookupViewModel>> GetActivePartnersAsync(CancellationToken cancellationToken) => _partnerRepository.GetActivePartnerLookupsAsync(cancellationToken);
         public Task<string?> GetPartnerNameAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.GetPartnerNameAsync(id, cancellationToken);
+        public Task<Guid?> GetPartnerCountryIdAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.GetPartnerCountryIdAsync(id, cancellationToken);
         public Task<string?> GetPartnerTypeCodeAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.GetPartnerTypeCodeForPartnerAsync(id, cancellationToken);
         public Task<List<Guid>> GetPartnerProductIdsAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.GetPartnerProductIdsAsync(id, cancellationToken);
         public Task<bool> PartnerExistsAsync(Guid id, CancellationToken cancellationToken) => _partnerRepository.PartnerExistsAsync(id, cancellationToken);

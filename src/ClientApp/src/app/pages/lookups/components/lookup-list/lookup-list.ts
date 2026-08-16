@@ -8,7 +8,7 @@ import { AuthService } from '@/core/auth/auth.service';
 import { Crud, CrudSaveEvent } from '@/shared/components/crud/crud';
 import { DynamicField, SelectOption } from '@/shared/dynamic-form/models/dynamicFields/field.model';
 import { LookupColumns } from '../../config/lookup-columns.config';
-import { buildLookupFields } from '../../config/lookup-fields.config';
+import { buildLookupFields, CURRENCY_LOOKUP_ID } from '../../config/lookup-fields.config';
 import { CreateLookupRequest } from '../../dtos/create-lookup.request';
 import { UpdateLookupRequest } from '../../dtos/update-lookup.request';
 import { LookupApiService } from '../../services/lookup-api.service';
@@ -37,6 +37,7 @@ export class LookupList implements OnInit {
     rowActionIconResolver = (row: Record<string, unknown>) => (row['isActive'] === true ? 'pi pi-ban' : 'pi pi-check-circle');
 
     lookupTypeOptions: SelectOption[] = [];
+    currencyOptions: SelectOption[] = [];
     selectedLookupId: number | null = null;
 
     constructor(
@@ -47,9 +48,13 @@ export class LookupList implements OnInit {
 
     ngOnInit(): void {
         this.canManage = this.authService.hasAnyRole(['Admin', 'SuperAdmin']);
-        this.lookupApiService.getLookupTypes().subscribe({
-            next: (types) => {
+        forkJoin({
+            types: this.lookupApiService.getLookupTypes(),
+            currencies: this.lookupApiService.getLookups(CURRENCY_LOOKUP_ID)
+        }).subscribe({
+            next: ({ types, currencies }) => {
                 this.lookupTypeOptions = this.toOptions(types);
+                this.currencyOptions = currencies.map((currency) => ({ label: currency.name, value: currency.id }));
                 this.selectedLookupId = types[0]?.value ?? null;
                 this.rebuildFields();
                 this.loadLookups();
@@ -137,7 +142,7 @@ export class LookupList implements OnInit {
     }
 
     private rebuildFields(): void {
-        this.fields = buildLookupFields(this.lookupTypeOptions, this.selectedLookupId);
+        this.fields = buildLookupFields(this.lookupTypeOptions, this.selectedLookupId, this.currencyOptions);
     }
 
     private loadLookups(): void {
@@ -164,7 +169,8 @@ export class LookupList implements OnInit {
     private toGridRow(lookup: LookupListItemViewModel): Record<string, unknown> {
         return {
             ...lookup,
-            isActive: lookup.isActive === true
+            isActive: lookup.isActive === true,
+            defaultCurrencyName: this.currencyOptions.find((currency) => currency.value === lookup.defaultCurrencyId)?.label ?? null
         };
     }
 
@@ -174,7 +180,8 @@ export class LookupList implements OnInit {
             name: String(value['name'] ?? ''),
             description: this.optionalString(value['description']),
             order: value['order'] != null && value['order'] !== '' ? this.toNumber(value['order']) : null,
-            dialingCode: this.optionalString(value['dialingCode'])
+            dialingCode: this.optionalString(value['dialingCode']),
+            defaultCurrencyId: this.optionalString(value['defaultCurrencyId'])
         };
     }
 
@@ -184,7 +191,8 @@ export class LookupList implements OnInit {
             description: this.optionalString(value['description']),
             order: this.toNumber(value['order']),
             isActive: value['isActive'] === true,
-            dialingCode: this.optionalString(value['dialingCode'])
+            dialingCode: this.optionalString(value['dialingCode']),
+            defaultCurrencyId: this.optionalString(value['defaultCurrencyId'])
         };
     }
 

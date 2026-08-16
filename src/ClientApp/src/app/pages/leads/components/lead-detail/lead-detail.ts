@@ -395,7 +395,8 @@ export class LeadDetail implements OnInit, OnDestroy {
             next: (conversion) => {
                 this.conversion = conversion;
                 const firstProduct = conversion.productInterests[0]?.productId ?? '';
-                const firstCurrency = conversion.currencies[0]?.id ?? '';
+                const lockedCurrencyId = conversion.defaultCurrencyId ?? '';
+                const firstCurrency = lockedCurrencyId || (conversion.currencies[0]?.id ?? '');
                 const defaultOwnerUserId = conversion.defaultOwnerUserId ?? conversion.ownerUsers[0]?.id ?? '';
                 const selectedClientId = this.resolveConversionClientId(conversion);
                 const selectedContactId = this.resolveConversionContactId(conversion, selectedClientId);
@@ -415,6 +416,11 @@ export class LeadDetail implements OnInit, OnDestroy {
                     ownerUserId: defaultOwnerUserId
                 });
                 this.applyConversionContactRules();
+                if (lockedCurrencyId) {
+                    this.conversionForm.controls.currencyId.disable({ emitEvent: false });
+                } else {
+                    this.conversionForm.controls.currencyId.enable({ emitEvent: false });
+                }
                 this.conversionDialog = true;
                 this.isConverting = false;
             },
@@ -673,6 +679,10 @@ export class LeadDetail implements OnInit, OnDestroy {
 
     get useExistingContact(): boolean {
         return this.conversionForm.controls.contactMode.value === 'existing';
+    }
+
+    get isCurrencyLocked(): boolean {
+        return !!this.conversion?.defaultCurrencyId;
     }
 
     get isEditCampaignSource(): boolean {

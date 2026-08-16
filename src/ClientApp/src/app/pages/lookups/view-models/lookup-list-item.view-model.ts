@@ -6,6 +6,7 @@ export interface LookupListItemViewModel {
     description?: string | null;
     order: number;
     dialingCode?: string | null;
+    defaultCurrencyId?: string | null;
     isActive: boolean;
     createdOn: string;
 }

@@ -13,6 +13,7 @@ namespace Lookups.Application.Repositories
         Task<bool> ActivateLookupAsync(Guid id, CancellationToken cancellationToken);
         Task<bool> DeactivateLookupAsync(Guid id, CancellationToken cancellationToken);
         Task<bool> NameExistsAsync(LookUpTypeEnum lookupId, string name, Guid? excludingId, CancellationToken cancellationToken);
+        Task<bool> CurrencyExistsAsync(Guid currencyId, CancellationToken cancellationToken);
         Task<int> GetNextOrderAsync(LookUpTypeEnum lookupId, CancellationToken cancellationToken);
     }
 }

@@ -44,7 +44,8 @@ namespace Lookups.Infrastructure.Repositories
                 Name = request.Name,
                 Description = request.Description,
                 Order = request.Order ?? 0,
-                DialingCode = request.DialingCode
+                DialingCode = request.DialingCode,
+                DefaultCurrencyId = request.DefaultCurrencyId
             };
 
             _dbContext.LookupDetails.Add(lookup);
@@ -65,6 +66,7 @@ namespace Lookups.Infrastructure.Repositories
             lookup.Order = request.Order;
             lookup.IsActive = request.IsActive;
             lookup.DialingCode = request.DialingCode;
+            lookup.DefaultCurrencyId = request.DefaultCurrencyId;
 
             await _dbContext.SaveChangesAsync(cancellationToken);
             return ToViewModel(lookup);
@@ -103,6 +105,13 @@ namespace Lookups.Infrastructure.Repositories
                 cancellationToken);
         }
 
+        public Task<bool> CurrencyExistsAsync(Guid currencyId, CancellationToken cancellationToken)
+        {
+            return _dbContext.LookupDetails.AsNoTracking().AnyAsync(
+                x => x.Id == currencyId && x.LookupId == LookUpTypeEnum.Currency,
+                cancellationToken);
+        }
+
         public async Task<int> GetNextOrderAsync(LookUpTypeEnum lookupId, CancellationToken cancellationToken)
         {
             var maxOrder = await _dbContext.LookupDetails.AsNoTracking()
@@ -124,6 +133,7 @@ namespace Lookups.Infrastructure.Repositories
                 Description = lookup.Description,
                 Order = lookup.Order,
                 DialingCode = lookup.DialingCode,
+                DefaultCurrencyId = lookup.DefaultCurrencyId,
                 IsActive = lookup.IsActive,
                 CreatedOn = lookup.CreatedOn
             };

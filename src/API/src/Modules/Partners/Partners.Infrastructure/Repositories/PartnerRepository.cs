@@ -119,6 +119,11 @@ namespace Partners.Infrastructure.Repositories
         public Task<bool> CountryExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.LookupDetails.AnyAsync(x => x.LookupId == LookUpTypeEnum.Country && x.Id == id && x.IsActive, cancellationToken);
         public Task<bool> PartnerExistsAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Partners.AnyAsync(x => x.Id == id && x.IsActive, cancellationToken);
         public Task<string?> GetPartnerNameAsync(Guid id, CancellationToken cancellationToken) => _dbContext.Partners.AsNoTracking().Where(x => x.Id == id && x.IsActive).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken);
+        public async Task<Guid?> GetPartnerCountryIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            var partner = await _dbContext.Partners.AsNoTracking().Where(x => x.Id == id && x.IsActive).Select(x => new { x.CountryId }).FirstOrDefaultAsync(cancellationToken);
+            return partner?.CountryId;
+        }
         public Task<string?> GetPartnerTypeCodeForPartnerAsync(Guid id, CancellationToken cancellationToken)
         {
             return _dbContext.Partners

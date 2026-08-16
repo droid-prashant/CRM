@@ -751,11 +751,12 @@ namespace Clients.Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(contact => contact.ClientId == clientId && !contact.IsDeleted)
                 .OrderByDescending(contact => contact.IsPrimary)
-                .ThenBy(contact => contact.FullName)
+                .ThenBy(contact => contact.FirstName)
+                .ThenBy(contact => contact.LastName)
                 .Select(contact => new ClientContactSummaryViewModel
                 {
                     Id = contact.Id,
-                    FullName = contact.FullName,
+                    FullName = contact.FirstName + " " + contact.LastName,
                     Designation = contact.Designation,
                     Department = contact.Department,
                     Email = contact.Email,

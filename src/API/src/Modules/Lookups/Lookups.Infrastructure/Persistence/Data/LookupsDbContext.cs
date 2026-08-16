@@ -37,6 +37,7 @@ namespace Lookups.Infrastructure.Persistence.Data
                 entity.Property(x => x.Order).HasDefaultValue(0);
                 entity.Property(x => x.IsActive).HasDefaultValue(true);
                 entity.HasIndex(x => new { x.LookupId, x.Name }).IsUnique();
+                entity.HasOne<LookupDetail>().WithMany().HasForeignKey(x => x.DefaultCurrencyId).OnDelete(DeleteBehavior.Restrict);
                 entity.Ignore(nameof(BaseEntity.DeletedBy));
                 entity.Ignore(nameof(BaseEntity.DeletedOn));
             });

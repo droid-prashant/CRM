@@ -86,9 +86,8 @@ export class ClientDetail implements OnInit {
     });
 
     contactForm = this.fb.group({
-        firstName: [''],
-        lastName: [''],
-        fullName: ['', Validators.required],
+        firstName: ['', Validators.required],
+        lastName: ['', Validators.required],
         designation: [''],
         department: [''],
         email: ['', Validators.email],
@@ -121,6 +120,7 @@ export class ClientDetail implements OnInit {
         this.canEditClient = this.authService.hasPermission(Permissions.clients.edit);
         this.canDeleteClient = this.authService.hasPermission(Permissions.clients.delete);
         this.loadClient();
+        this.loadLookups();
     }
 
     loadClient(): void {
@@ -298,7 +298,6 @@ export class ClientDetail implements OnInit {
         this.contactForm.reset({
             firstName: '',
             lastName: '',
-            fullName: '',
             designation: '',
             department: '',
             email: '',
@@ -322,7 +321,6 @@ export class ClientDetail implements OnInit {
         this.contactForm.reset({
             firstName: contact.firstName ?? '',
             lastName: contact.lastName ?? '',
-            fullName: contact.fullName,
             designation: contact.designation ?? '',
             department: contact.department ?? '',
             email: contact.email ?? '',
@@ -353,7 +351,6 @@ export class ClientDetail implements OnInit {
                   clientId: this.client.id,
                   firstName: value.firstName ?? '',
                   lastName: value.lastName ?? '',
-                  fullName: value.fullName ?? '',
                   designation: this.optionalFormString(value.designation),
                   department: this.optionalFormString(value.department),
                   email: this.optionalFormString(value.email),
@@ -366,7 +363,6 @@ export class ClientDetail implements OnInit {
                   contactId: this.selectedContact?.id ?? '',
                   firstName: value.firstName ?? '',
                   lastName: value.lastName ?? '',
-                  fullName: value.fullName ?? '',
                   designation: this.optionalFormString(value.designation),
                   department: this.optionalFormString(value.department),
                   email: this.optionalFormString(value.email),
@@ -597,6 +593,15 @@ export class ClientDetail implements OnInit {
 
     get contactPhonePrefix(): string | undefined {
         return this.lookups?.countries.find((country) => country.id === this.client?.countryId)?.dialingCode;
+    }
+
+    contactPhoneDisplay(contact: ClientContactViewModel): string {
+        const number = contact.mobile || contact.phone;
+        if (!number) {
+            return 'Not set';
+        }
+
+        return this.contactPhonePrefix ? `${this.contactPhonePrefix} ${number}` : number;
     }
 
     normalizeContactNumber(controlName: 'phone' | 'mobile', event: Event): void {

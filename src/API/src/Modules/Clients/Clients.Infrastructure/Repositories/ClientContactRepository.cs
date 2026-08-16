@@ -28,7 +28,8 @@ namespace Clients.Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(contact => contact.ClientId == clientId && !contact.IsDeleted)
                 .OrderByDescending(contact => contact.IsPrimary)
-                .ThenBy(contact => contact.FullName)
+                .ThenBy(contact => contact.FirstName)
+                .ThenBy(contact => contact.LastName)
                 .ToListAsync(cancellationToken);
 
             return contacts.Select(Map).ToList();
@@ -55,7 +56,6 @@ namespace Clients.Infrastructure.Repositories
                 ClientId = request.ClientId,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
-                FullName = request.FullName,
                 Designation = request.Designation,
                 Department = request.Department,
                 Email = request.Email,
@@ -69,7 +69,7 @@ namespace Clients.Infrastructure.Repositories
             };
 
             _dbContext.ClientContacts.Add(contact);
-            await AddTimelineEntryAsync(request.ClientId, "ClientContactCreated", $"Contact {request.FullName} was added.", cancellationToken);
+            await AddTimelineEntryAsync(request.ClientId, "ClientContactCreated", $"Contact {ComposeFullName(request.FirstName, request.LastName)} was added.", cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
             return Map(contact);
         }
@@ -86,7 +86,6 @@ namespace Clients.Infrastructure.Repositories
 
             contact.FirstName = request.FirstName;
             contact.LastName = request.LastName;
-            contact.FullName = request.FullName;
             contact.Designation = request.Designation;
             contact.Department = request.Department;
             contact.Email = request.Email;
@@ -97,7 +96,7 @@ namespace Clients.Infrastructure.Repositories
             contact.IsActive = request.Status == ClientContactStatus.Active;
             contact.Notes = request.Notes;
 
-            await AddTimelineEntryAsync(contact.ClientId, "ClientContactUpdated", $"Contact {contact.FullName} was updated.", cancellationToken);
+            await AddTimelineEntryAsync(contact.ClientId, "ClientContactUpdated", $"Contact {ComposeFullName(contact.FirstName, contact.LastName)} was updated.", cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
             return Map(contact);
         }
@@ -116,7 +115,8 @@ namespace Clients.Infrastructure.Repositories
             contact.Status = isActive ? ClientContactStatus.Active : ClientContactStatus.Inactive;
 
             var eventType = isActive ? "ClientContactActivated" : "ClientContactDeactivated";
-            var description = isActive ? $"Contact {contact.FullName} was activated." : $"Contact {contact.FullName} was deactivated.";
+            var contactFullName = ComposeFullName(contact.FirstName, contact.LastName);
+            var description = isActive ? $"Contact {contactFullName} was activated." : $"Contact {contactFullName} was deactivated.";
             await AddTimelineEntryAsync(contact.ClientId, eventType, description, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
             return Map(contact);
@@ -134,13 +134,13 @@ namespace Clients.Infrastructure.Repositories
 
             await ClearPrimaryContactsAsync(contact.ClientId, contact.Id, cancellationToken);
             contact.IsPrimary = true;
-            await AddTimelineEntryAsync(contact.ClientId, "ClientPrimaryContactChanged", $"Contact {contact.FullName} was set as the primary contact.", cancellationToken);
+            await AddTimelineEntryAsync(contact.ClientId, "ClientPrimaryContactChanged", $"Contact {ComposeFullName(contact.FirstName, contact.LastName)} was set as the primary contact.", cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             return new PrimaryContactViewModel
             {
                 ContactId = contact.Id,
-                FullName = contact.FullName,
+                FullName = ComposeFullName(contact.FirstName, contact.LastName),
                 Email = contact.Email,
                 Phone = contact.Phone ?? contact.Mobile,
                 IsPrimary = contact.IsPrimary
@@ -207,7 +207,7 @@ namespace Clients.Infrastructure.Repositories
                 ClientId = contact.ClientId,
                 FirstName = contact.FirstName,
                 LastName = contact.LastName,
-                FullName = contact.FullName,
+                FullName = ComposeFullName(contact.FirstName, contact.LastName),
                 Designation = contact.Designation,
                 Department = contact.Department,
                 Email = contact.Email,
@@ -224,5 +224,6 @@ namespace Clients.Infrastructure.Repositories
         }
 
         private static string? NormalizeEmail(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+        private static string ComposeFullName(string firstName, string lastName) => $"{firstName} {lastName}".Trim();
     }
 }

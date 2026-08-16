@@ -2493,4 +2493,49 @@ BEGIN
 END
 $migration$;
 
+-- -------------------------------------------------------------------------
+-- 20260816120000_AddDefaultCurrencyIdToLookupDetail
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260816120000_AddDefaultCurrencyIdToLookupDetail') THEN
+        RETURN;
+    END IF;
+
+    ALTER TABLE "lookups"."LookupDetails" ADD COLUMN IF NOT EXISTS "DefaultCurrencyId" uuid NULL;
+
+    CREATE INDEX IF NOT EXISTS "IX_LookupDetails_DefaultCurrencyId" ON "lookups"."LookupDetails" ("DefaultCurrencyId");
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_LookupDetails_LookupDetails_DefaultCurrencyId') THEN
+        ALTER TABLE "lookups"."LookupDetails" ADD CONSTRAINT "FK_LookupDetails_LookupDetails_DefaultCurrencyId"
+        FOREIGN KEY ("DefaultCurrencyId") REFERENCES "lookups"."LookupDetails" ("Id") ON DELETE RESTRICT;
+    END IF;
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260816120000_AddDefaultCurrencyIdToLookupDetail', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
+-- -------------------------------------------------------------------------
+-- 20260816140000_DropClientContactFullName
+-- Data impact: ClientContacts.FullName is dropped without a backfill into
+-- FirstName/LastName. Any contact row where FullName was populated but
+-- FirstName/LastName were left blank will display a blank name after this
+-- migration (product decision: no backfill).
+-- -------------------------------------------------------------------------
+DO $migration$
+BEGIN
+    IF EXISTS (SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260816140000_DropClientContactFullName') THEN
+        RETURN;
+    END IF;
+
+    ALTER TABLE "clients"."ClientContacts" DROP COLUMN IF EXISTS "FullName";
+
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260816140000_DropClientContactFullName', '8.0.24')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+END
+$migration$;
+
 COMMIT;

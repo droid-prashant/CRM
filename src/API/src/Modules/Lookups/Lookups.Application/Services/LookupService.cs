@@ -45,7 +45,7 @@ namespace Lookups.Application.Services
         public async Task<LookupResult> CreateLookupAsync(CreateLookupRequest request, CancellationToken cancellationToken)
         {
             Clean(request);
-            var errors = await ValidateAsync(request.LookupId, request.Name, null, cancellationToken);
+            var errors = await ValidateAsync(request.LookupId, request.Name, null, request.DefaultCurrencyId, cancellationToken);
             if (errors.Count > 0)
             {
                 return new LookupResult { Errors = errors };
@@ -69,7 +69,7 @@ namespace Lookups.Application.Services
             }
 
             Clean(request);
-            var errors = await ValidateAsync((LookUpTypeEnum)existing.LookupId, request.Name, id, cancellationToken);
+            var errors = await ValidateAsync((LookUpTypeEnum)existing.LookupId, request.Name, id, request.DefaultCurrencyId, cancellationToken);
             if (errors.Count > 0)
             {
                 return new LookupResult { Errors = errors };
@@ -84,7 +84,7 @@ namespace Lookups.Application.Services
             return new LookupResult { Lookup = lookup };
         }
 
-        private async Task<List<string>> ValidateAsync(LookUpTypeEnum lookupId, string name, Guid? excludingId, CancellationToken cancellationToken)
+        private async Task<List<string>> ValidateAsync(LookUpTypeEnum lookupId, string name, Guid? excludingId, Guid? defaultCurrencyId, CancellationToken cancellationToken)
         {
             var errors = new List<string>();
 
@@ -110,6 +110,11 @@ namespace Lookups.Application.Services
             if (await _lookupRepository.NameExistsAsync(lookupId, name, excludingId, cancellationToken))
             {
                 errors.Add("A lookup with the same name already exists for this lookup type.");
+            }
+
+            if (defaultCurrencyId.HasValue && !await _lookupRepository.CurrencyExistsAsync(defaultCurrencyId.Value, cancellationToken))
+            {
+                errors.Add("Selected currency is invalid.");
             }
 
             return errors;

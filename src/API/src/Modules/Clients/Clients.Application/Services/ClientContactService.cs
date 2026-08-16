@@ -26,7 +26,7 @@ namespace Clients.Application.Services
         public async Task<ClientContactResult> CreateContactAsync(CreateClientContactRequest request, CancellationToken cancellationToken)
         {
             Clean(request);
-            var errors = await ValidateContactAsync(request.ClientId, request.FullName, request.Email, request.Phone, request.Mobile, null, cancellationToken);
+            var errors = await ValidateContactAsync(request.ClientId, request.FirstName, request.LastName, request.Email, request.Phone, request.Mobile, null, cancellationToken);
             if (errors.Count > 0)
             {
                 return new ClientContactResult { Errors = errors };
@@ -54,7 +54,7 @@ namespace Clients.Application.Services
                 return new ClientContactResult { NotFound = true };
             }
 
-            var errors = await ValidateContactAsync(null, request.FullName, request.Email, request.Phone, request.Mobile, id, cancellationToken);
+            var errors = await ValidateContactAsync(null, request.FirstName, request.LastName, request.Email, request.Phone, request.Mobile, id, cancellationToken);
 
             if (!Enum.IsDefined(request.Status) || request.Status == 0)
             {
@@ -126,7 +126,8 @@ namespace Clients.Application.Services
 
         private async Task<List<string>> ValidateContactAsync(
             Guid? clientId,
-            string fullName,
+            string firstName,
+            string lastName,
             string? email,
             string? phone,
             string? mobile,
@@ -140,9 +141,14 @@ namespace Clients.Application.Services
                 errors.Add("ClientId is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(fullName))
+            if (string.IsNullOrWhiteSpace(firstName))
             {
-                errors.Add("Full name is required.");
+                errors.Add("First name is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(lastName))
+            {
+                errors.Add("Last name is required.");
             }
 
             if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(phone) && string.IsNullOrWhiteSpace(mobile))
@@ -194,7 +200,6 @@ namespace Clients.Application.Services
         {
             request.FirstName = CleanRequired(request.FirstName);
             request.LastName = CleanRequired(request.LastName);
-            request.FullName = CleanRequired(request.FullName);
             request.Designation = CleanOptional(request.Designation);
             request.Department = CleanOptional(request.Department);
             request.Email = CleanOptional(request.Email);
@@ -207,7 +212,6 @@ namespace Clients.Application.Services
         {
             request.FirstName = CleanRequired(request.FirstName);
             request.LastName = CleanRequired(request.LastName);
-            request.FullName = CleanRequired(request.FullName);
             request.Designation = CleanOptional(request.Designation);
             request.Department = CleanOptional(request.Department);
             request.Email = CleanOptional(request.Email);

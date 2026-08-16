@@ -517,6 +517,9 @@
                 <div class="col-span-12 md:col-span-4">
                     <label class="mb-2 block text-sm font-semibold text-surface-700 dark:text-surface-200">Currency <span class="text-red-500">*</span></label>
                     <p-select [options]="conversion.currencies" optionLabel="code" optionValue="id" appendTo="body" formControlName="currencyId" class="w-full" />
+                    @if (isCurrencyLocked) {
+                        <small class="mt-1 block text-surface-500">Set by the partner's country and cannot be changed here.</small>
+                    }
                 </div>
 
                 <div class="col-span-12 md:col-span-4">

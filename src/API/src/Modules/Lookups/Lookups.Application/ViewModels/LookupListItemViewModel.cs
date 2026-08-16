@@ -9,6 +9,7 @@ namespace Lookups.Application.ViewModels
         public string? Description { get; set; }
         public int Order { get; set; }
         public string? DialingCode { get; set; }
+        public Guid? DefaultCurrencyId { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedOn { get; set; }
     }

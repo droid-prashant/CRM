@@ -16,6 +16,7 @@ namespace Leads.Application.ViewModels
         public List<LookupViewModel> Countries { get; set; } = new();
         public List<LookupViewModel> Industries { get; set; } = new();
         public List<CurrencyLookupViewModel> Currencies { get; set; } = new();
+        public Guid? DefaultCurrencyId { get; set; }
         public List<LeadUserLookupViewModel> OwnerUsers { get; set; } = new();
         public Guid? DefaultOwnerUserId { get; set; }
         public string? DefaultOwnerUserName { get; set; }

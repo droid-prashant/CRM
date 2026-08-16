@@ -209,7 +209,6 @@ namespace Opportunities.Infrastructure.Persistence.Data
                 entity.ToTable("ClientContacts", "clients");
                 entity.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
                 entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
-                entity.Property(x => x.FullName).HasMaxLength(250).IsRequired();
                 entity.Property(x => x.NormalizedEmail).HasMaxLength(320);
                 entity.Property(x => x.Status).HasConversion<int>();
                 entity.Ignore(x => x.Client);

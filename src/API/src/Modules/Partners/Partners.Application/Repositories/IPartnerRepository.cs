@@ -10,6 +10,7 @@ namespace Partners.Application.Repositories
         Task<PartnerLookupBundleViewModel> GetLookupsAsync(CancellationToken cancellationToken);
         Task<List<LookupViewModel>> GetActivePartnerLookupsAsync(CancellationToken cancellationToken);
         Task<string?> GetPartnerNameAsync(Guid id, CancellationToken cancellationToken);
+        Task<Guid?> GetPartnerCountryIdAsync(Guid id, CancellationToken cancellationToken);
         Task<string?> GetPartnerTypeCodeForPartnerAsync(Guid id, CancellationToken cancellationToken);
         Task<List<Guid>> GetPartnerProductIdsAsync(Guid id, CancellationToken cancellationToken);
         Task<PartnerDetailViewModel> CreatePartnerAsync(CreatePartnerRequest request, string code, CancellationToken cancellationToken);

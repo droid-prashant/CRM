@@ -99,7 +99,7 @@ namespace Opportunities.Infrastructure.Repositories
                     {
                         Id = x.Id,
                         ClientId = x.ClientId,
-                        FullName = x.FullName,
+                        FullName = x.FirstName + " " + x.LastName,
                         Email = x.Email
                     })
                     .ToListAsync(cancellationToken),
@@ -828,7 +828,7 @@ namespace Opportunities.Infrastructure.Repositories
 
             var contactName = await _dbContext.CrmClientContacts
                 .Where(x => x.Id == opportunity.ContactId)
-                .Select(x => x.FullName)
+                .Select(x => x.FirstName + " " + x.LastName)
                 .FirstOrDefaultAsync(cancellationToken);
 
             var leadNumber = await _dbContext.Leads
@@ -922,7 +922,7 @@ namespace Opportunities.Infrastructure.Repositories
                     .Where(x => !x.IsDeleted && (x.Name.ToLower().Contains(searchTerm) || x.Code.ToLower().Contains(searchTerm)))
                     .Select(x => x.Id);
                 var matchingContactIds = _dbContext.CrmClientContacts
-                    .Where(x => x.FullName.ToLower().Contains(searchTerm) || (x.Email != null && x.Email.ToLower().Contains(searchTerm)))
+                    .Where(x => (x.FirstName + " " + x.LastName).ToLower().Contains(searchTerm) || (x.Email != null && x.Email.ToLower().Contains(searchTerm)))
                     .Select(x => x.Id);
                 var matchingLeadIds = _dbContext.Leads
                     .Where(x => x.LeadNumber.ToLower().Contains(searchTerm) || x.CompanyName.ToLower().Contains(searchTerm))

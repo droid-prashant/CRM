@@ -77,7 +77,7 @@ namespace Leads.Infrastructure.Repositories
                     ClientContactId = x.ClientContactId,
                     ClientCode = client?.ClientCode,
                     ClientName = client?.Name,
-                    ClientContactName = contact?.FullName,
+                    ClientContactName = contact != null ? ComposeFullName(contact.FirstName, contact.LastName) : null,
                     ClientContactEmail = contact?.Email,
                     ClientContactPhone = contact?.Phone ?? contact?.Mobile,
                     CompanyName = x.CompanyName,
@@ -570,10 +570,11 @@ namespace Leads.Infrastructure.Repositories
                 ExistingContacts = existingContacts,
                 Countries = await GetCountryLookupsAsync(cancellationToken),
                 Industries = await GetIndustryLookupsAsync(cancellationToken),
-                Currencies = GetCurrencyLookups(),
+                Currencies = await GetCurrencyLookupsAsync(cancellationToken),
                 OwnerUsers = await GetActiveUserLookupsAsync(cancellationToken),
                 DefaultOwnerUserId = lead.AssignedToUserId,
                 DefaultOwnerUserName = await GetUserFullNameAsync(lead.AssignedToUserId),
+                DefaultCurrencyId = await GetPartnerDefaultCurrencyIdAsync(lead.PartnerId, cancellationToken),
                 CanConvert = lead.Status == LeadStatus.Qualified
                     && lead.AssignedToUserId.HasValue
                     && lead.ClientId.HasValue
@@ -864,7 +865,7 @@ namespace Leads.Infrastructure.Repositories
                 {
                     Id = x.Id,
                     ClientId = x.ClientId,
-                    FullName = x.FullName,
+                    FullName = x.FirstName + " " + x.LastName,
                     Email = x.Email
                 })
                 .ToListAsync(cancellationToken);
@@ -1019,7 +1020,7 @@ namespace Leads.Infrastructure.Repositories
             lead.ClientContactId = contact.Id;
             lead.CompanyName = client.Name.Trim();
             lead.Website = Clean(client.Website);
-            lead.ContactPersonName = Clean(contact.FullName) ?? $"{contact.FirstName} {contact.LastName}".Trim();
+            lead.ContactPersonName = ComposeFullName(contact.FirstName, contact.LastName);
             lead.JobTitle = Clean(contact.Designation);
             lead.Email = Clean(contact.Email);
             lead.Phone = Clean(contact.Phone) ?? Clean(contact.Mobile);
@@ -1075,7 +1076,7 @@ namespace Leads.Infrastructure.Repositories
 
             detail.ClientCode = client?.ClientCode;
             detail.ClientName = client?.Name;
-            detail.ClientContactName = contact?.FullName;
+            detail.ClientContactName = contact != null ? ComposeFullName(contact.FirstName, contact.LastName) : null;
             detail.ClientContactEmail = contact?.Email;
             detail.ClientContactPhone = contact?.Phone ?? contact?.Mobile;
         }
@@ -1086,7 +1087,7 @@ namespace Leads.Infrastructure.Repositories
                 ? await _dbContext.CrmClients.AsNoTracking().Where(x => x.Id == edit.ClientId.Value).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken)
                 : null;
             edit.ClientContactName = edit.ClientContactId.HasValue
-                ? await _dbContext.CrmClientContacts.AsNoTracking().Where(x => x.Id == edit.ClientContactId.Value).Select(x => x.FullName).FirstOrDefaultAsync(cancellationToken)
+                ? await _dbContext.CrmClientContacts.AsNoTracking().Where(x => x.Id == edit.ClientContactId.Value).Select(x => x.FirstName + " " + x.LastName).FirstOrDefaultAsync(cancellationToken)
                 : null;
         }
 
@@ -1191,6 +1192,8 @@ namespace Leads.Infrastructure.Repositories
             return Regex.Replace(value?.Trim().ToUpperInvariant() ?? string.Empty, @"[\W_]+", string.Empty);
         }
 
+        private static string ComposeFullName(string firstName, string lastName) => $"{firstName} {lastName}".Trim();
+
         private static void UpdateProductInterests(Lead lead, List<Guid> productIds)
         {
             var selectedIds = productIds.Distinct().ToHashSet();
@@ -1221,20 +1224,40 @@ namespace Leads.Infrastructure.Repositories
                 {
                     Id = x.Id,
                     ClientId = x.ClientId,
-                    FullName = x.FullName,
+                    FullName = x.FirstName + " " + x.LastName,
                     Email = x.Email
                 })
                 .ToListAsync(cancellationToken);
         }
 
-        private static List<CurrencyLookupViewModel> GetCurrencyLookups()
+        private Task<List<CurrencyLookupViewModel>> GetCurrencyLookupsAsync(CancellationToken cancellationToken)
         {
-            return new List<CurrencyLookupViewModel>
+            return _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.LookupId == LookUpTypeEnum.Currency && x.IsActive)
+                .OrderBy(x => x.Order).ThenBy(x => x.Name)
+                .Select(x => new CurrencyLookupViewModel { Id = x.Id, Code = x.Code ?? string.Empty, Name = x.Name })
+                .ToListAsync(cancellationToken);
+        }
+
+        private async Task<Guid?> GetPartnerDefaultCurrencyIdAsync(Guid? partnerId, CancellationToken cancellationToken)
+        {
+            if (!partnerId.HasValue)
             {
-                new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000001"), Code = "NPR", Name = "Nepalese Rupee" },
-                new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000002"), Code = "USD", Name = "US Dollar" },
-                new() { Id = Guid.Parse("70000000-0000-0000-0000-000000000003"), Code = "INR", Name = "Indian Rupee" }
-            };
+                return null;
+            }
+
+            var countryId = await _partnerLookupService.GetPartnerCountryIdAsync(partnerId.Value, cancellationToken);
+            if (!countryId.HasValue)
+            {
+                return null;
+            }
+
+            return await _dbContext.LookupDetails
+                .AsNoTracking()
+                .Where(x => x.Id == countryId.Value && x.LookupId == LookUpTypeEnum.Country)
+                .Select(x => x.DefaultCurrencyId)
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         private Task<List<LeadUserLookupViewModel>> GetActiveUserLookupsAsync(CancellationToken cancellationToken)

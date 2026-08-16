@@ -38,6 +38,7 @@ export interface LeadConversionViewModel {
     ownerUsers: LeadUserLookupViewModel[];
     defaultOwnerUserId?: string;
     defaultOwnerUserName?: string;
+    defaultCurrencyId?: string | null;
     canConvert: boolean;
 }
 

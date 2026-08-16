@@ -4,4 +4,5 @@ export interface UpdateLookupRequest {
     order: number;
     isActive: boolean;
     dialingCode?: string | null;
+    defaultCurrencyId?: string | null;
 }

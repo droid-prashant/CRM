@@ -22,5 +22,7 @@ namespace ERP.Core.Entities
 
         [StringLength(10)]
         public string? DialingCode { get; set; }
+
+        public Guid? DefaultCurrencyId { get; set; }
     }
 }

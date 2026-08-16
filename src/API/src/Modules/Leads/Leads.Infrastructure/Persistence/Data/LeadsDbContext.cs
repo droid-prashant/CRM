@@ -125,7 +125,6 @@ namespace Leads.Infrastructure.Persistence.Data
                 entity.ToTable("ClientContacts", "clients");
                 entity.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
                 entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
-                entity.Property(x => x.FullName).HasMaxLength(250).IsRequired();
                 entity.Property(x => x.Designation).HasMaxLength(150);
                 entity.Property(x => x.Department).HasMaxLength(150);
                 entity.Property(x => x.Email).HasMaxLength(320);
