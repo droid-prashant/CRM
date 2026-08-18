@@ -70,6 +70,7 @@ export class LeadDetail implements OnInit, OnDestroy {
         { label: 'Use Existing', value: 'existing' }
     ];
     readonly contactNumberValidationMessage = NEPAL_CONTACT_NUMBER_MESSAGE;
+    readonly todayStart: Date = new Date(new Date().setHours(0, 0, 0, 0));
 
     private readonly fb = inject(FormBuilder);
     private readonly messageService = inject(MessageService);
@@ -97,7 +98,7 @@ export class LeadDetail implements OnInit, OnDestroy {
         interactionType: ['Call', Validators.required],
         subject: ['', [Validators.maxLength(250)]],
         notes: ['', [Validators.required, Validators.maxLength(2000)]],
-        interactionDate: [null as Date | null],
+        interactionDate: [{ value: null as Date | null, disabled: true }],
         nextFollowUpDate: [null as Date | null]
     });
 
@@ -377,12 +378,6 @@ export class LeadDetail implements OnInit, OnDestroy {
             nextFollowUpDate: interaction?.nextFollowUpDate ? new Date(interaction.nextFollowUpDate) : null
         });
         this.interactionDialog = true;
-    }
-
-    get todayStart(): Date {
-        const date = new Date();
-        date.setHours(0, 0, 0, 0);
-        return date;
     }
 
     openConversionDialog(): void {
