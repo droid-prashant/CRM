@@ -5,6 +5,7 @@ namespace Partners.Application.ViewModels
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string? Code { get; set; }
+        public string? DialingCode { get; set; }
         public string? PartnerTypeCode { get; set; }
         public bool? CanOwnProducts { get; set; }
         public bool? CanSellInHouseProducts { get; set; }

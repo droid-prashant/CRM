@@ -173,7 +173,8 @@ export class LookupList implements OnInit {
             lookupId: this.toNumber(value['lookupId']),
             name: String(value['name'] ?? ''),
             description: this.optionalString(value['description']),
-            order: value['order'] != null && value['order'] !== '' ? this.toNumber(value['order']) : null
+            order: value['order'] != null && value['order'] !== '' ? this.toNumber(value['order']) : null,
+            dialingCode: this.optionalString(value['dialingCode'])
         };
     }
 
@@ -182,7 +183,8 @@ export class LookupList implements OnInit {
             name: String(value['name'] ?? ''),
             description: this.optionalString(value['description']),
             order: this.toNumber(value['order']),
-            isActive: value['isActive'] === true
+            isActive: value['isActive'] === true,
+            dialingCode: this.optionalString(value['dialingCode'])
         };
     }
 

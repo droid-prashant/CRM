@@ -33,6 +33,7 @@ namespace Lookups.Infrastructure.Persistence.Data
                 entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
                 entity.Property(x => x.Description).HasMaxLength(500);
                 entity.Property(x => x.Code).HasMaxLength(50);
+                entity.Property(x => x.DialingCode).HasMaxLength(10);
                 entity.Property(x => x.Order).HasDefaultValue(0);
                 entity.Property(x => x.IsActive).HasDefaultValue(true);
                 entity.HasIndex(x => new { x.LookupId, x.Name }).IsUnique();

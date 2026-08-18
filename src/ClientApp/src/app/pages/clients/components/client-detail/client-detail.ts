@@ -595,6 +595,10 @@ export class ClientDetail implements OnInit {
         setTimeout(() => picker.hideOverlay(), 0);
     }
 
+    get contactPhonePrefix(): string | undefined {
+        return this.lookups?.countries.find((country) => country.id === this.client?.countryId)?.dialingCode;
+    }
+
     normalizeContactNumber(controlName: 'phone' | 'mobile', event: Event): void {
         const input = event.target as HTMLInputElement;
         const value = input.value.replace(/\D/g, '').slice(0, 10);

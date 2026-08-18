@@ -19,5 +19,8 @@ namespace ERP.Core.Entities
 
         [StringLength(50)]
         public string? Code { get; set; }
+
+        [StringLength(10)]
+        public string? DialingCode { get; set; }
     }
 }

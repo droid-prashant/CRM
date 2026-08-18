@@ -6,6 +6,7 @@ export interface SelectOption {
     label: string;
     value: any;
     code?: string;
+    dialingCode?: string;
     partnerTypeCode?: string;
     productIds?: string[];
     ownershipTypeCode?: string;
@@ -17,6 +18,7 @@ export interface SelectOption {
 
 export type DynamicFieldRule = (formValue: Record<string, unknown>, mode: 'create' | 'update') => boolean;
 export type DynamicFieldOptionFilter = (option: SelectOption, formValue: Record<string, unknown>, mode: 'create' | 'update') => boolean;
+export type DynamicFieldPrefixResolver = (formValue: Record<string, unknown>, mode: 'create' | 'update') => string | null | undefined;
 
 export interface DynamicField {
     key: string;
@@ -37,6 +39,7 @@ export interface DynamicField {
     visibleWhen?: DynamicFieldRule;
     requiredWhen?: DynamicFieldRule;
     optionFilter?: DynamicFieldOptionFilter;
+    prefixFrom?: DynamicFieldPrefixResolver;
     clearWhenHidden?: boolean;
     validators?: ValidatorFn[];
     validationMessages?: Record<string, string>;
